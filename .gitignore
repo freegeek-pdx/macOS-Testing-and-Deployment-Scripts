@@ -1,0 +1,31 @@
+# Ignore from macOS:
+.DS_Store
+
+# Ignore file types in any location:
+*.app
+*.dmg
+*.pkg
+*.zip
+*.aiff
+*.icns
+*.png
+*.tiff
+*.pdf
+*.svg
+*.pxm
+*.iconsproj
+
+# Ignore if name starts with in any location:
+OLD-*
+
+# Ignore in "Build Tools":
+Free\ Geek\ Passwords.plist
+
+# Ignore in "fgMIB Resources":
+extra-bins/
+Tools/
+
+# Ignore in AppleScript Source folders:
+DriveDx/
+Remote\ Management\ Debugging/
+ZIPs\ for\ Auto-Update/

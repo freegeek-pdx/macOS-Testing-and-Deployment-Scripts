@@ -1,0 +1,96 @@
+/*
+* By: Pico Mitchell
+* For: MacLand @ Free Geek
+* Last Updated: December 30th, 2021
+*
+* MIT License
+*
+* Copyright (c) 2021 Free Geek
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
+* to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+* and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+* WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*
+*/
+
+body {
+	background-image: none !important;
+	background-color: white;
+	overflow: hidden;
+	display: none;
+}
+
+#resetbutton {
+	padding: 2px 14px 5px 14px !important;
+}
+
+#testarea {
+	resize: none;
+	margin: 31px 0px 5px 0px;
+	width: 691px;
+	height: 65px;
+	font-family: sans-serif;
+	font-size: 12px;
+}
+
+#soundArea, input[name="reset"], #key44, #key145, #key19, #key45, #key36, #key33, #key46, #key35, #key34, #key144, #key111, #key106, #key109b, #key103, #key104, #key105, #key107b, #key100, #key101, #key102, #key97, #key98, #key99, #key13b, #key96, #key110, #key224, #key224b, #key92, #key17b, .label, #notes
+{
+	display: none;
+}
+
+td {
+	vertical-align: bottom !important;
+}
+
+#keyboard {
+	padding-bottom: 20px;
+	background-color: white;
+}
+
+.key_un {
+	background-color: white;
+}
+
+.key_highlight {
+	border-color: orange !important;
+	background-color: #FFC864;
+}
+
+.key_pressed, .key_pressed_m {
+    border-color: green !important;
+    background-color: #2CB32C;
+    color: white;
+}
+
+.key_block tr td, .key_row div {
+    border-radius: 4px;
+    font-family: Arial, sans-serif !important;
+    font-size: 13px;
+}
+
+.key_small td
+{
+	padding-bottom: 0px !important;
+}
+
+.key_small .key_row div {
+    font-size: 9px !important;
+}
+
+textarea::placeholder {
+	text-align: center;
+	font-weight: bold;
+	font-size: 11px;
+}
+
+#hidden_text_before {
+    width: 1px;
+    height: 1px;
+    border: 0
+}

@@ -1,0 +1,33 @@
+# THIS IS NOT A SCRIPT.
+# THE FOLLOWING COMMANDS ARE INTENDED TO BE COPIED-AND-PASTED INTO TERMINAL WHEN NEEDED.
+
+# CREATE Monterey INSTALLER USB (14.5 GB REQUIRED):
+sudo '/Volumes/Install macOS Monterey/Install macOS Monterey.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallMonterey --nointeraction
+
+# CREATE Big Sur INSTALLER USB (14 GB REQUIRED):
+sudo '/Volumes/Install macOS Big Sur/Install macOS Big Sur.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallBigSur --nointeraction
+
+# CREATE Catalina INSTALLER USB (9 GB REQUIRED):
+sudo '/Volumes/Install macOS Catalina/Install macOS Catalina.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallCatalina --nointeraction
+
+# CREATE High Sierra INSTALLER USB (6 GB REQUIRED):
+sudo '/Volumes/Install macOS High Sierra/Install macOS High Sierra.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallHighSierra --nointeraction
+
+
+
+# UNUSED INSTALLER COMMANDS
+
+# CREATE Mojave INSTALLER USB (7 GB REQUIRED):
+sudo '/Volumes/Install macOS Mojave/Install macOS Mojave.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallMojave --nointeraction
+
+# CREATE Sierra INSTALLER USB (6 GB REQUIRED)
+sudo '/Applications/Install macOS Sierra.app/Contents/Resources/createinstallmedia' --applicationpath '/Applications/Install macOS Sierra.app' --volume /Volumes/InstallSierra --nointeraction
+# REQUIRED FIX (https://forums.macrumors.com/threads/not-a-valid-volume-mount-point-cant-make-bootable-drive.1935673/page-3?post=28197924#post-28197924):
+sudo plutil -replace CFBundleShortVersionString -string '12.6.03' '/Applications/Install macOS Sierra.app/Contents/Info.plist'
+
+# CREATE El Capitan INSTALLER USB (7 GB REQUIRED):
+sudo '/Applications/Install OS X El Capitan.app/Contents/Resources/createinstallmedia' --applicationpath '/Applications/Install OS X El Capitan.app' --volume /Volumes/InstallElCapitan --nointeraction
+
+# CREATE Yosemite INSTALLER USB (6 GB REQUIRED)
+sudo '/Applications/Install OS X Yosemite.app/Contents/Resources/createinstallmedia' --applicationpath '/Applications/Install OS X Yosemite.app' --volume /Volumes/InstallYosemite --nointeraction
+

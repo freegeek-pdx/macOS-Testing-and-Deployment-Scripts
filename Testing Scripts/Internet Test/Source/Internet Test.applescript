@@ -16,23 +16,23 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.11-1
 
 -- App Icon is “Satellite Antenna” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -147,7 +147,7 @@ repeat
 	try
 		set modelIdentifier to (do shell script "sysctl -n hw.model")
 		set isLaptop to (modelIdentifier contains "MacBook")
-		set modelIdentifierName to (do shell script "sed 's/[0-9,]//g' <<< " & (quoted form of modelIdentifier))
+		set modelIdentifierName to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
 		set modelIdentifierMajorNumber to ((text ((length of modelIdentifierName) + 1) thru ((offset of "," in modelIdentifier) - 1) of modelIdentifier) as number)
 		set manufacturedWithoutEthernetPort to ((modelIdentifierName is equal to "MacBookAir") or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)))
 	on error (checkHasEthernetError) number (checkHasEthernetErrorNumber)

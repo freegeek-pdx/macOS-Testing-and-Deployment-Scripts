@@ -31,7 +31,7 @@
 	# To help avoid this issue, the time was set back to midnight when creating the reset Snapshot so that the reset Snapshot could really only be in the future for a few seconds near midnight.
 
 # Solution 2: KEEP THE SNAPSHOT MOUNTED
-	# This is a much better solution than manipulating the date and time (since Internet things can get wonky when the date is wrong).
+	# This is a much better solution than manipulating the date and time (since internet things can get wonky when the date is wrong).
 	# The issue with this solution is that a Snapshot can only be mounted by an app that has been granted Full Disk Access, and LaunchDaemon scripts cannot be granted Full Disk Access.
 	# To workaround this limitation, I created the "Free Geek Snapshot Helper" AppleScript applet which can be granted Full Disk Access and then mount the reset Snapshot as soon as possible on each boot.
 	# And while I have automated "Free Geek Snapshot Helper" being granted Full Disk Access, that automation can only run after the technician has run "Automation Guide" and manually granted the "Free Geek Setup" Accessibility acccess.
@@ -47,7 +47,9 @@
 	# It seems that somehow the "deleted" daemon is maybe marking the reset Snapshot as unusable and preventing it from being able to show up in "Restore from Time Machine Backup" in Recovery. This seems to not be an issue on macOS 11 Big Sur though.
 	# So, ALWAYS manipulate the system date (Solution 1) to keep set to the Snapshot date on macOS 10.15 Catalina and do not bother mounting the Snapshot (since knowing the Snapshot got purged is better user feedback than it just not showing in Recovery).
 
-readonly SCRIPT_VERSION='2021.12.30-1'
+readonly SCRIPT_VERSION='2022.4.8-1'
+
+PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
 SCRIPT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
@@ -339,7 +341,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 	fi
 else
 	if [[ ! -f '/Users/Shared/.fgResetSnapshotLost' ]]; then
-		effective_loss_date_time="$(date '+%F %T')" # The possibly manipulated time before turning back on Network Time if it is off.
+		effective_loss_date_time="$(date '+%D %T')" # The possibly manipulated time before turning back on Network Time if it is off.
 
 		if [[ "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then
 			systemsetup -setusingnetworktime on &> /dev/null
@@ -347,7 +349,7 @@ else
 			write_to_log 'Turned Network Time On'
 		fi
 
-		actual_loss_date_time="$(date '+%F %T')" # The actual time which should have synced since turning back on Network Time if it was off.
+		actual_loss_date_time="$(date '+%D %T')" # The actual time which should have synced since turning back on Network Time if it was off.
 
 		loss_date_time_display="${effective_loss_date_time} / ${actual_loss_date_time}"
 		if [[ "${effective_loss_date_time}" == "${actual_loss_date_time}" ]]; then loss_date_time_display="${actual_loss_date_time}"; fi

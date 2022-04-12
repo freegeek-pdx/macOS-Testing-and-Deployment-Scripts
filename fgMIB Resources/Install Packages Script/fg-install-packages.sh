@@ -21,7 +21,9 @@
 
 # NOTICE: This script will only be installed and run via LaunchDaemon when customizing an existing clean install, such as on Apple Silicon Macs.
 
-readonly SCRIPT_VERSION='2021.12.30-1'
+readonly SCRIPT_VERSION='2022.4.8-1'
+
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
 SCRIPT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
@@ -39,31 +41,20 @@ launch_login_progress_app() {
 
 	if [[ -d "${SCRIPT_DIR}/Tools/Free Geek Login Progress.app" ]]; then
 		# Cannot open "Free Geek Login Progress" directly when at Login Window, but a LaunchAgent with LimitLoadToSessionType=LoginWindow and "launchctl load -S LoginWindow" can open it.
-
-		echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>Label</key>
-	<string>org.freegeek.Free-Geek-Login-Progress</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/usr/bin/open</string>
-		<string>-n</string>
-		<string>-a</string>
-		<string>${SCRIPT_DIR}/Tools/Free Geek Login Progress.app</string>
-	</array>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>LimitLoadToSessionType</key>
-	<string>LoginWindow</string>
-</dict>
-</plist>" > '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
 		
+		PlistBuddy \
+			-c 'Add :Label string org.freegeek.Free-Geek-Login-Progress' \
+			-c 'Add :LimitLoadToSessionType string LoginWindow' \
+			-c 'Add :ProgramArguments array' \
+			-c 'Add :ProgramArguments: string /usr/bin/open' \
+			-c 'Add :ProgramArguments: string -n' \
+			-c 'Add :ProgramArguments: string -a' \
+			-c "Add :ProgramArguments: string '${SCRIPT_DIR}/Tools/Free Geek Login Progress.app'" \
+			-c 'Add :RunAtLoad bool true' \
+			-c 'Add :StandardOutPath string /dev/null' \
+			-c 'Add :StandardErrorPath string /dev/null' \
+			'/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist' &> /dev/null
+
 		launchctl load -S LoginWindow '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
 
 		for (( wait_for_progress_app_seconds = 0; wait_for_progress_app_seconds < 15; wait_for_progress_app_seconds ++ )); do
@@ -127,7 +118,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 
 		rm -f "${launch_daemon_path}"
 		rm -rf "${SCRIPT_DIR}"
-	elif [[ -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && "$(dscl . -list /Users 2> /dev/null | grep -v '^_' | xargs)" == 'daemon nobody root' ]]; then
+	elif [[ -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant. 
 		# Only run if running as root on a clean installation prepared by fg-install-os.
 		# IMPORTANT: fg-install-os will create AppleSetupDone to not show Setup Assistant while this script runs.
 

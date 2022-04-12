@@ -3,7 +3,7 @@
 #
 # Created by Pico Mitchell on 4/19/21.
 # For MacLand @ Free Geek
-# Version: 2021.12.30-1
+# Version: 2022.4.8-1
 #
 # MIT License
 #
@@ -23,6 +23,8 @@
 # NOTICE: This script will only exist on boot to be able to run via LaunchDaemon when booting after not successfully completing fg-prepare-os.
 # Actually, it will also exist when booting for fg-snapshot-reset, but will not run since there will be no error in the log.
 
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
+
 SCRIPT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
 
@@ -37,30 +39,19 @@ launch_login_progress_app() {
 	if [[ -d "${SCRIPT_DIR}/Tools/Free Geek Login Progress.app" ]]; then
 		# Cannot open "Free Geek Login Progress" directly when at Login Window, but a LaunchAgent with LimitLoadToSessionType=LoginWindow and "launchctl load -S LoginWindow" can open it.
 
-		echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>Label</key>
-	<string>org.freegeek.Free-Geek-Login-Progress</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/usr/bin/open</string>
-		<string>-n</string>
-		<string>-a</string>
-		<string>${SCRIPT_DIR}/Tools/Free Geek Login Progress.app</string>
-	</array>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>LimitLoadToSessionType</key>
-	<string>LoginWindow</string>
-</dict>
-</plist>" > '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
-		
+		PlistBuddy \
+			-c 'Add :Label string org.freegeek.Free-Geek-Login-Progress' \
+			-c 'Add :LimitLoadToSessionType string LoginWindow' \
+			-c 'Add :ProgramArguments array' \
+			-c 'Add :ProgramArguments: string /usr/bin/open' \
+			-c 'Add :ProgramArguments: string -n' \
+			-c 'Add :ProgramArguments: string -a' \
+			-c "Add :ProgramArguments: string '${SCRIPT_DIR}/Tools/Free Geek Login Progress.app'" \
+			-c 'Add :RunAtLoad bool true' \
+			-c 'Add :StandardOutPath string /dev/null' \
+			-c 'Add :StandardErrorPath string /dev/null' \
+			'/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist' &> /dev/null
+
 		launchctl load -S LoginWindow '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
 
 		for (( wait_for_progress_app_seconds = 0; wait_for_progress_app_seconds < 15; wait_for_progress_app_seconds ++ )); do

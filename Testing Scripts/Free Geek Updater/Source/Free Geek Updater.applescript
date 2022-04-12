@@ -16,26 +16,26 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.8-1
 
 -- App Icon is “Counterclockwise Arrows” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 -- Build Flag: LSUIElement
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 use framework "Cocoa"
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -186,7 +186,7 @@ if (appVersion is not equal to "UNKNOWN") then
 	
 	repeat
 		try
-			set latestVersions to (do shell script "curl -m 5 -sL " & baseUpdatesURL & "latest-versions.txt")
+			set latestVersions to (do shell script "curl -m 5 -sL " & (quoted form of (baseUpdatesURL & "latest-versions.txt")))
 		end try
 		
 		if (latestVersions is equal to "") then
@@ -200,13 +200,13 @@ if (appVersion is not equal to "UNKNOWN") then
 				display dialog (name of me) & " Failed to Check for Updates
 
 
-You must be connected to the Internet to be able to check for updates.
+You must be connected to the internet to be able to check for updates.
 
 Make sure you're connected to either the “Free Geek” or “FG Reuse” Wi-Fi network or plugged in with an Ethernet cable.
 
 If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
 
-Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the Internet connection to be established.
+Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
 
 If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Continue Without Updating", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName giving up after 30
 				delay 0.5
@@ -234,8 +234,7 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 		end repeat
 	end try
 	
-	set AppleScript's text item delimiters to {linefeed, return}
-	set latestVersionsLines to (every text item of latestVersions)
+	set latestVersionsLines to (paragraphs of latestVersions)
 	
 	repeat with thisLatestVersionLine in latestVersionsLines
 		if (thisLatestVersionLine contains ": ") then
@@ -249,9 +248,9 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 	
 	set shouldUpdateSelf to true -- Always have Free Geek Updater update itself before updating any other apps.
 	try
-		(("/Users/Shared/Build Info/.fgUpdaterJustUpdatedItself" as POSIX file) as alias)
+		(((buildInfoPath & ".fgUpdaterJustUpdatedItself") as POSIX file) as alias)
 		set shouldUpdateSelf to false
-		do shell script "rm -f /Users/Shared/Build Info/.fgUpdaterJustUpdatedItself" user name adminUsername password adminPassword with administrator privileges
+		do shell script "rm -f " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdatedItself")) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	set shouldUpdateOtherApps to true -- Will be set to false if self update is started.
@@ -280,16 +279,11 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 			set appUpdateZipFilePath to (tmpPath & appUpdateZipFilename)
 			set appUpdateTempFilePath to (tmpPathBase & "/" & updaterAppFileName)
 			
-			try
-				do shell script "rm -f " & (quoted form of appUpdateZipFilePath)
-			end try
-			try
-				do shell script "rm -rf " & (quoted form of appUpdateTempFilePath)
-			end try
+			do shell script "rm -rf " & (quoted form of appUpdateZipFilePath) & " " & (quoted form of appUpdateTempFilePath)
 			
 			
 			try
-				set curlPID to (do shell script "curl --connect-timeout 5 -sL " & baseUpdatesURL & appUpdateZipFilename & " -o " & (quoted form of appUpdateZipFilePath) & " &> /dev/null & echo $!")
+				set curlPID to (do shell script "curl --connect-timeout 5 -sL " & (quoted form of (baseUpdatesURL & appUpdateZipFilename)) & " -o " & (quoted form of appUpdateZipFilePath) & " > /dev/null 2>&1 & echo $!")
 				delay 0.5
 				
 				try
@@ -309,21 +303,16 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 				end try
 				delay 0.5
 				
-				set curlIsRunning to ((do shell script ("ps -p " & curlPID & " &> /dev/null; echo $?")) as number)
+				set curlIsRunning to ((do shell script ("ps -p " & curlPID & " > /dev/null 2>&1; echo $?")) as number)
 				if (curlIsRunning is equal to 0) then
 					try
 						repeat
-							set curlIsRunning to ((do shell script ("ps -p " & curlPID & " &> /dev/null; echo $?")) as number)
+							set curlIsRunning to ((do shell script ("ps -p " & curlPID & " > /dev/null 2>&1; echo $?")) as number)
 							delay 0.5
 							if (curlIsRunning is not equal to 0) then exit repeat
 						end repeat
 					on error
-						try
-							do shell script "killall curl"
-						end try
-						try
-							do shell script ("rm -f " & (quoted form of appUpdateZipFilePath))
-						end try
+						do shell script ("killall curl; rm -f " & (quoted form of appUpdateZipFilePath))
 					end try
 				end if
 				
@@ -344,21 +333,11 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 				end try
 				delay 0.5
 			on error
-				try
-					do shell script "killall curl"
-				end try
-				try
-					do shell script ("rm -f " & (quoted form of appUpdateZipFilePath))
-				end try
+				do shell script ("killall curl; rm -f " & (quoted form of appUpdateZipFilePath))
 			end try
 			
 			
-			try
-				do shell script ("ditto -x -k --noqtn " & (quoted form of appUpdateZipFilePath) & " " & (quoted form of tmpPathBase))
-			end try
-			try
-				do shell script ("rm -f " & (quoted form of appUpdateZipFilePath))
-			end try
+			do shell script ("ditto -x -k --noqtn " & (quoted form of appUpdateZipFilePath) & " " & (quoted form of tmpPathBase) & "; rm -f " & (quoted form of appUpdateZipFilePath))
 			
 			try
 				((appUpdateTempFilePath as POSIX file) as alias)
@@ -366,11 +345,10 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 				set updatedAppVersion to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' " & (quoted form of (appUpdateTempFilePath & "/Contents/Info.plist")))) as string)
 				
 				if (updatedAppVersion is equal to latestVersion) then
-					try
-						do shell script ("touch " & (quoted form of appUpdateTempFilePath))
-					end try
-					
-					do shell script "osascript -e '
+					do shell script ("
+touch " & (quoted form of appUpdateTempFilePath) & "
+
+echo '
 use scripting additions
 
 set updaterAppFilePath to \"" & (launchDirectory & updaterAppFileName) & "\"
@@ -391,7 +369,7 @@ try
 	
 	set appUpdateTempFileStructure to \"\"
 	try
-		set appUpdateTempFileStructure to (do shell script (\"cd \" & (quoted form of appUpdateTempFilePath) & \"; ls -1Rsk\"))
+		set appUpdateTempFileStructure to (do shell script (\"cd \" & (quoted form of appUpdateTempFilePath) & \"; ls -Rsk\"))
 	end try
 	
 	try
@@ -406,7 +384,7 @@ try
 		try
 			set updaterInstallAppFileStructure to \"\"
 			try
-				set updaterInstallAppFileStructure to (do shell script (\"cd \" & (quoted form of updaterAppFilePath) & \"; ls -1Rsk\") user name \"" & adminUsername & "\" password \"" & adminPassword & "\" with administrator privileges)
+				set updaterInstallAppFileStructure to (do shell script (\"cd \" & (quoted form of updaterAppFilePath) & \"; ls -Rsk\") user name \"" & adminUsername & "\" password \"" & adminPassword & "\" with administrator privileges)
 			end try
 			if (appUpdateTempFileStructure is equal to updaterInstallAppFileStructure) then exit repeat
 		end try
@@ -431,7 +409,7 @@ on error
 	end try
 end try
 
-' &> /dev/null &"
+' | osascript > /dev/null 2>&1 &")
 					
 					set shouldUpdateOtherApps to false
 					
@@ -442,16 +420,10 @@ end try
 						do shell script ("touch " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdatedItself"))) user name adminUsername password adminPassword with administrator privileges
 					end try
 				else
-					try
-						do shell script "afplay /System/Library/Sounds/Basso.aiff"
-					end try
-					do shell script "rm -rf " & (quoted form of appUpdateTempFilePath)
+					do shell script "afplay /System/Library/Sounds/Basso.aiff; rm -rf " & (quoted form of appUpdateTempFilePath)
 				end if
 			on error
-				try
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
-				end try
-				do shell script "rm -rf " & (quoted form of appUpdateTempFilePath)
+				do shell script "afplay /System/Library/Sounds/Basso.aiff; rm -rf " & (quoted form of appUpdateTempFilePath)
 			end try
 		end if
 	end if
@@ -480,7 +452,7 @@ end try
 						
 						set thisScriptCurrentVersion to "0" -- Always update app if fails to get current version (possibly from previous bad update)
 						try
-							set thisScriptCurrentVersionLine to (do shell script "cat " & (quoted form of thisScriptInstallPath) & " | grep '# Version: '")
+							set thisScriptCurrentVersionLine to (do shell script "grep -m 1 '# Version: ' " & (quoted form of thisScriptInstallPath))
 							
 							if (thisScriptCurrentVersionLine contains "# Version: ") then
 								set thisScriptCurrentVersion to ((text 12 thru -1 of thisScriptCurrentVersionLine) as string)
@@ -506,15 +478,10 @@ end try
 							set thisScriptUpdateZipFilePath to (tmpPath & thisScriptUpdateZipFilename)
 							set thisScriptUpdateTempFilePath to (tmpPathBase & "/" & thisAppName & ".sh")
 							
-							try
-								do shell script "rm -f " & (quoted form of thisScriptUpdateZipFilePath)
-							end try
-							try
-								do shell script "rm -f " & (quoted form of thisScriptUpdateTempFilePath)
-							end try
+							do shell script "rm -f " & (quoted form of thisScriptUpdateZipFilePath) & " " & (quoted form of thisScriptUpdateTempFilePath)
 							
 							try
-								set curlPID to (do shell script "curl --connect-timeout 5 -sL " & baseUpdatesURL & thisScriptUpdateZipFilename & " -o " & (quoted form of thisScriptUpdateZipFilePath) & " &> /dev/null & echo $!")
+								set curlPID to (do shell script "curl --connect-timeout 5 -sL " & (quoted form of (baseUpdatesURL & thisScriptUpdateZipFilename)) & " -o " & (quoted form of thisScriptUpdateZipFilePath) & " > /dev/null 2>&1 & echo $!")
 								delay 0.5
 								
 								try
@@ -534,21 +501,16 @@ end try
 								end try
 								delay 0.5
 								
-								set curlIsRunning to ((do shell script ("ps -p " & curlPID & " &> /dev/null; echo $?")) as number)
+								set curlIsRunning to ((do shell script ("ps -p " & curlPID & " > /dev/null 2>&1; echo $?")) as number)
 								if (curlIsRunning is equal to 0) then
 									try
 										repeat
-											set curlIsRunning to ((do shell script ("ps -p " & curlPID & " &> /dev/null; echo $?")) as number)
+											set curlIsRunning to ((do shell script ("ps -p " & curlPID & " > /dev/null 2>&1; echo $?")) as number)
 											delay 0.5
 											if (curlIsRunning is not equal to 0) then exit repeat
 										end repeat
 									on error
-										try
-											do shell script "killall curl"
-										end try
-										try
-											do shell script ("rm -f " & (quoted form of thisScriptUpdateZipFilePath))
-										end try
+										do shell script ("killall curl; rm -f " & (quoted form of thisScriptUpdateZipFilePath))
 									end try
 								end if
 								
@@ -569,27 +531,17 @@ end try
 								end try
 								delay 0.5
 							on error
-								try
-									do shell script "killall curl"
-								end try
-								try
-									do shell script ("rm -f " & (quoted form of thisScriptUpdateZipFilePath))
-								end try
+								do shell script ("killall curl; rm -f " & (quoted form of thisScriptUpdateZipFilePath))
 							end try
 							
-							try
-								do shell script ("ditto -x -k --noqtn " & (quoted form of thisScriptUpdateZipFilePath) & " " & (quoted form of tmpPathBase))
-							end try
-							try
-								do shell script ("rm -f " & (quoted form of thisScriptUpdateZipFilePath))
-							end try
+							do shell script ("ditto -x -k --noqtn " & (quoted form of thisScriptUpdateZipFilePath) & " " & (quoted form of tmpPathBase) & "; rm -f " & (quoted form of thisScriptUpdateZipFilePath))
 							
 							try
 								((thisScriptUpdateTempFilePath as POSIX file) as alias)
 								
 								set thisUpdatedScriptVersion to "0"
 								try
-									set thisScriptUpdatedVersionLine to (do shell script "cat " & (quoted form of thisScriptUpdateTempFilePath) & " | grep '# Version: '")
+									set thisScriptUpdatedVersionLine to (do shell script "grep -m 1 '# Version: ' " & (quoted form of thisScriptUpdateTempFilePath))
 									
 									if (thisScriptUpdatedVersionLine contains "# Version: ") then
 										set thisUpdatedScriptVersion to ((text 12 thru -1 of thisScriptUpdatedVersionLine) as string)
@@ -598,10 +550,7 @@ end try
 								
 								if (thisUpdatedScriptVersion is equal to thisScriptLatestVersion) then
 									try
-										do shell script ("xattr -c " & (quoted form of thisScriptUpdateTempFilePath))
-									end try
-									try
-										do shell script ("chmod +x " & (quoted form of thisAppUpdateTempFilePath))
+										do shell script ("xattr -c " & (quoted form of thisScriptUpdateTempFilePath) & "; chmod +x " & (quoted form of thisScriptUpdateTempFilePath))
 									end try
 									
 									try
@@ -660,15 +609,10 @@ end try
 										set thisAppUpdateZipFilePath to (tmpPath & thisAppUpdateZipFilename)
 										set thisAppUpdateTempFilePath to (tmpPathBase & "/" & thisAppName & ".app")
 										
-										try
-											do shell script "rm -f " & (quoted form of thisAppUpdateZipFilePath)
-										end try
-										try
-											do shell script "rm -rf " & (quoted form of thisAppUpdateTempFilePath)
-										end try
+										do shell script "rm -rf " & (quoted form of thisAppUpdateZipFilePath) & " " & (quoted form of thisAppUpdateTempFilePath)
 										
 										try
-											set curlPID to (do shell script "curl --connect-timeout 5 -sL " & baseUpdatesURL & thisAppUpdateZipFilename & " -o " & (quoted form of thisAppUpdateZipFilePath) & " &> /dev/null & echo $!")
+											set curlPID to (do shell script "curl --connect-timeout 5 -sL " & (quoted form of (baseUpdatesURL & thisAppUpdateZipFilename)) & " -o " & (quoted form of thisAppUpdateZipFilePath) & " > /dev/null 2>&1 & echo $!")
 											delay 0.5
 											
 											try
@@ -688,21 +632,16 @@ end try
 											end try
 											delay 0.5
 											
-											set curlIsRunning to ((do shell script ("ps -p " & curlPID & " &> /dev/null; echo $?")) as number)
+											set curlIsRunning to ((do shell script ("ps -p " & curlPID & " > /dev/null 2>&1; echo $?")) as number)
 											if (curlIsRunning is equal to 0) then
 												try
 													repeat
-														set curlIsRunning to ((do shell script ("ps -p " & curlPID & " &> /dev/null; echo $?")) as number)
+														set curlIsRunning to ((do shell script ("ps -p " & curlPID & " > /dev/null 2>&1; echo $?")) as number)
 														delay 0.5
 														if (curlIsRunning is not equal to 0) then exit repeat
 													end repeat
 												on error
-													try
-														do shell script "killall curl"
-													end try
-													try
-														do shell script ("rm -f " & (quoted form of thisAppUpdateZipFilePath))
-													end try
+													do shell script ("killall curl; rm -f " & (quoted form of thisAppUpdateZipFilePath))
 												end try
 											end if
 											
@@ -723,20 +662,10 @@ end try
 											end try
 											delay 0.5
 										on error
-											try
-												do shell script "killall curl"
-											end try
-											try
-												do shell script ("rm -f " & (quoted form of thisAppUpdateZipFilePath))
-											end try
+											do shell script ("killall curl; rm -f " & (quoted form of thisAppUpdateZipFilePath))
 										end try
 										
-										try
-											do shell script ("ditto -x -k --noqtn " & (quoted form of thisAppUpdateZipFilePath) & " " & (quoted form of tmpPathBase))
-										end try
-										try
-											do shell script ("rm -f " & (quoted form of thisAppUpdateZipFilePath))
-										end try
+										do shell script ("ditto -x -k --noqtn " & (quoted form of thisAppUpdateZipFilePath) & " " & (quoted form of tmpPathBase) & "; rm -f " & (quoted form of thisAppUpdateZipFilePath))
 										
 										try
 											((thisAppUpdateTempFilePath as POSIX file) as alias)
@@ -755,7 +684,7 @@ end try
 												
 												set thisAppUpdateTempFileStructure to ""
 												try
-													set thisAppUpdateTempFileStructure to (do shell script ("cd " & (quoted form of thisAppUpdateTempFilePath) & "; ls -1Rsk"))
+													set thisAppUpdateTempFileStructure to (do shell script ("cd " & (quoted form of thisAppUpdateTempFilePath) & "; ls -Rsk"))
 												end try
 												
 												try
@@ -773,7 +702,7 @@ end try
 														-- Generating the install path file structure alone seems to delay enough to avoid the issue, but this loop makes it extra safe.
 														set thisAppInstallFileStructure to ""
 														try
-															set thisAppInstallFileStructure to (do shell script ("cd " & (quoted form of thisAppInstallPath) & "; ls -1Rsk") user name adminUsername password adminPassword with administrator privileges)
+															set thisAppInstallFileStructure to (do shell script ("cd " & (quoted form of thisAppInstallPath) & "; ls -Rsk") user name adminUsername password adminPassword with administrator privileges)
 														end try
 														if (thisAppUpdateTempFileStructure is equal to thisAppInstallFileStructure) then
 															try

@@ -16,23 +16,23 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.8-2
 
 -- App Icon is “Broom” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -214,7 +214,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -264,7 +264,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 							try
-								do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+								do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 							end try
 						end try
 						quit
@@ -313,7 +313,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 					try
-						do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+						do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 					end try
 				end try
 				quit
@@ -484,18 +484,18 @@ THIS MAC WILL BE SHUT DOWN AFTER THE PROCESS IS COMPLETE." buttons {"Don't Clean
 	
 	set serialNumber to ""
 	try
-		set serialNumber to (do shell script "/usr/libexec/PlistBuddy -c 'Print 0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")
+		set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print 0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
 	end try
 	
 	if (serialNumber is not equal to "") then
 		try
 			repeat
 				try
-					do shell script "ping -t 5 -c 1 www.apple.com" -- Require that Internet is connected DEP status to get checked.
+					do shell script "ping -t 5 -c 1 www.apple.com" -- Require that internet is connected DEP status to get checked.
 					exit repeat
 				on error
 					try
-						display dialog "You must be connected to the Internet to be able to check for Remote Management.
+						display dialog "You must be connected to the internet to be able to check for Remote Management.
 
 The rest of “Cleanup After QA Complete” cannot be run and this Mac CANNOT BE SOLD until it has been confirmed that Remote Management is not enabled on this Mac.
 
@@ -504,7 +504,7 @@ Make sure you're connected to either the “Free Geek” or “FG Reuse” Wi-Fi
 
 If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
 
-Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the Internet connection to be established.
+Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
 
 If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Quit", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName giving up after 30
 					on error
@@ -536,10 +536,44 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 				end try
 			end try
 			
-			if (remoteManagementOutput is not equal to "") then
+			if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
 				try
-					set AppleScript's text item delimiters to {linefeed, return}
-					set remoteManagementOutputParts to (every text item of remoteManagementOutput)
+					set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
+				end try
+			else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
+				try
+					do shell script ("mkdir " & (quoted form of buildInfoPath))
+				end try
+				try
+					do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within a short time of the last valid admin permissions run though.
+				end try
+			end if
+			
+			if (remoteManagementOutput contains " - Request too soon.") then -- Don't allow completion if rate limited and there was no previous cached output to use.
+				set progress description to "
+❌	UNABLE to Check for Remote Management"
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				end try
+				set nextAllowedProfilesShowTime to "23 hours after last successful check"
+				try
+					set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
+				end try
+				display alert ("Cannot Cleanup After QA Complete
+
+Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
+
+Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform Free Geek I.T." buttons {"Shut Down"} as critical
+				tell application "System Events" to shut down with state saving preference
+				
+				quit
+				delay 10
+			else if (remoteManagementOutput is not equal to "") then
+				try
+					set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
 					
 					if ((count of remoteManagementOutputParts) > 3) then
 						set progress description to "
@@ -573,8 +607,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 						
 						set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
 						if ((count of remoteManagementOrganizationContactInfo) > 0) then
-							set AppleScript's text item delimiters to "
-		"
+							set AppleScript's text item delimiters to (linefeed & tab & tab)
 							set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as string)
 						end if
 						
@@ -664,61 +697,63 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 	
 	-- RESET SAFARI & TERMINAL
 	try
-		do shell script ("rm -rf /Users/" & adminUsername & "/Library/Safari; " & ¬
-			"rm -rf '/Users/" & adminUsername & "/Library/Caches/Apple - Safari - Safari Extensions Gallery'; " & ¬
-			"rm -rf /Users/" & adminUsername & "/Library/Caches/Metadata/Safari; " & ¬
-			"rm -rf /Users/" & adminUsername & "/Library/Caches/com.apple.Safari; " & ¬
-			"rm -rf /Users/" & adminUsername & "/Library/Caches/com.apple.WebKit.PluginProcess; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Cookies/Cookies.binarycookies; " & ¬
-			"rm -rf '/Users/" & adminUsername & "/Library/Preferences/Apple - Safari - Safari Extensions Gallery'; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.LSSharedFileList.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.RSS.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.SafeBrowsing.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.SandboxBroker.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.SafariBookmarksSyncAgent.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.SafariCloudHistoryPushAgent.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.WebFoundation.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.WebKit.PluginHost.plist; " & ¬
-			"rm -f /Users/" & adminUsername & "/Library/Preferences/com.apple.WebKit.PluginProcess.plist; " & ¬
-			"rm -rf /Users/" & adminUsername & "/Library/PubSub/Database; " & ¬
-			"rm -rf '/Users/" & adminUsername & "/Library/Saved Application State/com.apple.Safari.savedState'; " & ¬
-			"rm -f /Users/" & adminUsername & "/.bash_history; " & ¬
-			"rm -rf /Users/" & adminUsername & "/.bash_sessions; " & ¬
-			"rm -f /Users/" & adminUsername & "/.zsh_history; " & ¬
-			"rm -f '/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt'; " & ¬
-			"rm -rf '/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
+		do shell script ("rm -rf /Users/" & adminUsername & "/Library/Safari " & ¬
+			"'/Users/" & adminUsername & "/Library/Caches/Apple - Safari - Safari Extensions Gallery' " & ¬
+			"/Users/" & adminUsername & "/Library/Caches/Metadata/Safari " & ¬
+			"/Users/" & adminUsername & "/Library/Caches/com.apple.Safari " & ¬
+			"/Users/" & adminUsername & "/Library/Caches/com.apple.WebKit.PluginProcess " & ¬
+			"/Users/" & adminUsername & "/Library/Cookies/Cookies.binarycookies " & ¬
+			"'/Users/" & adminUsername & "/Library/Preferences/Apple - Safari - Safari Extensions Gallery' " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.LSSharedFileList.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.RSS.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.SafeBrowsing.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.Safari.SandboxBroker.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.SafariBookmarksSyncAgent.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.SafariCloudHistoryPushAgent.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.WebFoundation.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.WebKit.PluginHost.plist " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/com.apple.WebKit.PluginProcess.plist " & ¬
+			"/Users/" & adminUsername & "/Library/PubSub/Database " & ¬
+			"'/Users/" & adminUsername & "/Library/Saved Application State/com.apple.Safari.savedState' " & ¬
+			"/Users/" & adminUsername & "/.bash_history " & ¬
+			"/Users/" & adminUsername & "/.bash_sessions " & ¬
+			"/Users/" & adminUsername & "/.zsh_history " & ¬
+			"/Users/" & adminUsername & "/.zsh_sessions " & ¬
+			"'/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt' " & ¬
+			"'/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
 	end try
-	try
-		do shell script ("rm -rf /Users/" & demoUsername & "/Library/Safari; " & ¬
-			"rm -rf '/Users/" & demoUsername & "/Library/Caches/Apple - Safari - Safari Extensions Gallery'; " & ¬
-			"rm -rf /Users/" & demoUsername & "/Library/Caches/Metadata/Safari; " & ¬
-			"rm -rf /Users/" & demoUsername & "/Library/Caches/com.apple.Safari; " & ¬
-			"rm -rf /Users/" & demoUsername & "/Library/Caches/com.apple.WebKit.PluginProcess; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Cookies/Cookies.binarycookies; " & ¬
-			"rm -rf '/Users/" & demoUsername & "/Library/Preferences/Apple - Safari - Safari Extensions Gallery'; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.LSSharedFileList.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.RSS.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.SafeBrowsing.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.SandboxBroker.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.SafariBookmarksSyncAgent.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.SafariCloudHistoryPushAgent.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.WebFoundation.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.WebKit.PluginHost.plist; " & ¬
-			"rm -f /Users/" & demoUsername & "/Library/Preferences/com.apple.WebKit.PluginProcess.plist; " & ¬
-			"rm -rf /Users/" & demoUsername & "/Library/PubSub/Database; " & ¬
-			"rm -rf '/Users/" & demoUsername & "/Library/Saved Application State/com.apple.Safari.savedState'; " & ¬
-			"rm -f /Users/" & demoUsername & "/.bash_history; " & ¬
-			"rm -rf /Users/" & demoUsername & "/.bash_sessions; " & ¬
-			"rm -f /Users/" & demoUsername & "/.zsh_history")
+	
+	try -- Put this in a "try" block since deleting Safari stuff may results in "Operation not permitted", but the rest will work and don't want to cause a script error.
+		do shell script ("rm -rf /Users/" & demoUsername & "/Library/Safari " & ¬
+			"'/Users/" & demoUsername & "/Library/Caches/Apple - Safari - Safari Extensions Gallery' " & ¬
+			"/Users/" & demoUsername & "/Library/Caches/Metadata/Safari " & ¬
+			"/Users/" & demoUsername & "/Library/Caches/com.apple.Safari " & ¬
+			"/Users/" & demoUsername & "/Library/Caches/com.apple.WebKit.PluginProcess " & ¬
+			"/Users/" & demoUsername & "/Library/Cookies/Cookies.binarycookies " & ¬
+			"'/Users/" & demoUsername & "/Library/Preferences/Apple - Safari - Safari Extensions Gallery' " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.LSSharedFileList.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.RSS.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.SafeBrowsing.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.Safari.SandboxBroker.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.SafariBookmarksSyncAgent.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.SafariCloudHistoryPushAgent.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.WebFoundation.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.WebKit.PluginHost.plist " & ¬
+			"/Users/" & demoUsername & "/Library/Preferences/com.apple.WebKit.PluginProcess.plist " & ¬
+			"/Users/" & demoUsername & "/Library/PubSub/Database " & ¬
+			"'/Users/" & demoUsername & "/Library/Saved Application State/com.apple.Safari.savedState' " & ¬
+			"/Users/" & demoUsername & "/.bash_history " & ¬
+			"/Users/" & demoUsername & "/.bash_sessions " & ¬
+			"/Users/" & demoUsername & "/.zsh_history " & ¬
+			"/Users/" & demoUsername & "/.zsh_sessions")
 	end try
 	
 	-- DELETE ALL PRINTERS
 	try
 		set printerIDsText to (do shell script "lpstat -p | awk '{ print $2 }'")
-		set AppleScript's text item delimiters to {linefeed, return}
-		repeat with thisPrinterID in (every text item of printerIDsText)
+		repeat with thisPrinterID in (paragraphs of printerIDsText)
 			try
 				do shell script ("lpadmin -x " & thisPrinterID)
 			end try
@@ -728,8 +763,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 	-- REMOVE ALL SHARED FOLDERS & SHAREPOINT GROUPS
 	try
 		set sharedFolderNames to (do shell script "sharing -l | grep 'name:		' | cut -c 8-")
-		set AppleScript's text item delimiters to {linefeed, return}
-		repeat with thisSharedFolderName in (every text item of sharedFolderNames)
+		repeat with thisSharedFolderName in (paragraphs of sharedFolderNames)
 			try
 				do shell script ("sharing -r " & (quoted form of thisSharedFolderName)) user name adminUsername password adminPassword with administrator privileges
 			end try
@@ -737,8 +771,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 	end try
 	try
 		set sharePointGroups to (do shell script "dscl . -list /Groups | grep com.apple.sharepoint.group")
-		set AppleScript's text item delimiters to {linefeed, return}
-		repeat with thisSharePointGroupName in (every text item of sharePointGroups)
+		repeat with thisSharePointGroupName in (paragraphs of sharePointGroups)
 			try
 				do shell script ("dseditgroup -o delete " & (quoted form of thisSharePointGroupName)) user name adminUsername password adminPassword with administrator privileges
 			end try
@@ -747,7 +780,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 	
 	-- DELETING ALL TOUCH ID FINGERPRINTS
 	try
-		do shell script "bioutil -p -s <<< 'Y'" user name adminUsername password adminPassword with administrator privileges
+		do shell script "echo 'Y' | bioutil -p -s" user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	-- MUTE VOLUME WHILE FILES ARE MOVED AND TRASH IS EMPTIED
@@ -805,8 +838,8 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 		set currentDriveName to intendedDriveName
 		tell application "System Events" to set currentDriveName to (name of startup disk)
 		if (currentDriveName is not equal to intendedDriveName) then
-			do shell script "/usr/sbin/diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName) user name adminUsername password adminPassword with administrator privileges
-			if (isCatalinaOrNewer) then do shell script "/usr/sbin/diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")) user name adminUsername password adminPassword with administrator privileges
+			do shell script "diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName) user name adminUsername password adminPassword with administrator privileges
+			if (isCatalinaOrNewer) then do shell script "diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")) user name adminUsername password adminPassword with administrator privileges
 		end if
 	end try
 	
@@ -1125,7 +1158,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 			display alert "STILL Failed to Trash Desktop Apps with Finder" message ("Will try another delete method after you click OK.
 On Catalina, you will have to allow Desktop access.
 
-Please send the following error message to Pico:
+Please send the following error message to Free Geek I.T.:
 " & deleteFilesWithFinderErrorMessage & "
 Error Number: " & deleteFilesWithFinderErrorNumber) as critical
 		end try
@@ -1138,7 +1171,7 @@ Error Number: " & deleteFilesWithFinderErrorNumber) as critical
 	end try
 	
 	try
-		do shell script ("rm -f /memtest.log; rm -f /Users/Shared/memtest.log") user name adminUsername password adminPassword with administrator privileges -- Just in case memtest was canceled.
+		do shell script ("rm -f /memtest.log /Users/Shared/memtest.log") user name adminUsername password adminPassword with administrator privileges -- Just in case memtest was canceled.
 	end try
 	
 	-- EMPTY THE TRASH
@@ -1167,9 +1200,6 @@ Error Number: " & deleteFilesWithFinderErrorNumber) as critical
 	set progress description to "
 ✅	Finished Cleaning Up After QA Complete"
 	
-	set modelName to (text 19 thru -1 of (do shell script "system_profiler SPHardwareDataType | grep '      Model Name: '"))
-	set isHeadlessMac to ((modelName is equal to "Mac mini") or (modelName is equal to "Mac Pro"))
-	
 	delay 0.5
 	
 	try
@@ -1193,27 +1223,12 @@ Error Number: " & deleteFilesWithFinderErrorNumber) as critical
 		end try
 	end if
 	
-	if ((not designedForSnapshotReset) and isCatalinaOrNewer and (not isBigSurOrNewer)) then -- Catalina installs using the cloning method are the only ones the sticker is needed for. New Catalina installs using the startosinstall method can be Snapshot reset.
-		try
-			activate
-		end try
-		display alert "Remember to add a solid color sticker to the Keeper Label so that Free Geek Sales staff know that this Mac has macOS 10.15 “Catalina” installed on it." message "Free Geek Sales staff need to know when macOS 10.15 “Catalina” is installed onto a Mac so that they can include a handout with important setup information for our customers." buttons {"I've added a solid color sticker to the Keeper Label"} default button 1
-	end if
-	
-	if (isHeadlessMac) then
-		set resetMethod to "“fgreset”"
-		if designedForSnapshotReset then set resetMethod to "Snapshot Reset"
-		try
-			activate
-		end try
-		display dialog "You've got one more step since you've refurbished a " & modelName & "!
-
-Since this computer will not be turned on and running in The Free Geek Store, we need to perform " & resetMethod & " here in MacLand before delivering it to The Free Geek Store.
-
-" & resetMethod & " is only performed in MacLand for Mac Pro's and Mac mini's, it should not be run in MacLand for any other kinds of Macs unless instructed to do so.
-
-For help with performing " & resetMethod & ", please consult an instructor." with title ("Remember to Perform " & resetMethod) buttons {"OK"} default button 1
-	end if
+	set resetMethod to "“fgreset”"
+	if designedForSnapshotReset then set resetMethod to "Snapshot Reset"
+	try
+		activate
+	end try
+	display alert "Don't forget to " & resetMethod & " this Mac!" message "Since this computer will not be turned on and running in The Free Geek Store, " & resetMethod & " must be done before delivering it to The Free Geek Store."
 	
 	try
 		try
@@ -1230,9 +1245,7 @@ This Mac will Shut Down in 15 Seconds…" buttons {"Don't Shut Down", "Shut Down
 		tell application "System Events" to shut down with state saving preference
 	end try
 	
-	try
-		do shell script "rm -rf '/Users/" & demoUsername & "/Applications/Cleanup After QA Complete.app'"
-	end try
+	do shell script "rm -rf '/Users/" & demoUsername & "/Applications/Cleanup After QA Complete.app'"
 else
 	try
 		activate

@@ -16,24 +16,24 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.3.1-2
 
 -- App Icon is “Donut” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 use framework "Cocoa"
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -170,7 +170,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -217,7 +217,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 						try
-							do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+							do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 						end try
 					end try
 					quit
@@ -265,7 +265,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 			try
-				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		end try
 		quit
@@ -586,11 +586,7 @@ if (shouldRunGPUStressTest) then
 							set didGetScreenBounds to false
 							do shell script "touch " & (quoted form of tmpFileForScreenBounds)
 							try
-								do shell script "open -a '/Applications/TextEdit.app' " & (quoted form of tmpFileForScreenBounds)
-							on error
-								try
-									do shell script "open -a '/System/Applications/TextEdit.app' " & (quoted form of tmpFileForScreenBounds)
-								end try
+								do shell script "open -b com.apple.TextEdit " & (quoted form of tmpFileForScreenBounds)
 							end try
 							delay (textEditAttemptCount - 0.5)
 							tell application ("Text" & "Edit") -- This stops Script Editor from opening TextEdit automatially.
@@ -635,9 +631,7 @@ if (shouldRunGPUStressTest) then
 						if (application ("Text" & "Edit") is running) then tell application ("Text" & "Edit") to quit
 					end timeout
 				end try
-				try
-					do shell script "rm -f " & (quoted form of tmpFileForScreenBounds)
-				end try
+				do shell script "rm -f " & (quoted form of tmpFileForScreenBounds)
 			end if
 			
 			if ((count of setupAppsErrorMessages) is equal to 0) then
@@ -907,9 +901,7 @@ if (shouldRunGPUStressTest) then
 					quit
 					delay 10
 				else
-					set AppleScript's text item delimiters to "
-
-"
+					set AppleScript's text item delimiters to (linefeed & linefeed)
 					try
 						activate
 					end try
@@ -993,9 +985,11 @@ if (shouldRunGPUStressTest) then
 						set progress additional description to ""
 						try
 							set picturesFolderPath to ((POSIX path of (path to pictures folder)) & (name of me) & "/")
-							set screenshotDate to (do shell script "date +'%F at %I.%M.%S %p'")
+							set screenshotDate to (do shell script "date +'%F at %-I.%M.%S %p'")
 							do shell script "mkdir " & (quoted form of picturesFolderPath) & "; /usr/sbin/screencapture -x " & (quoted form of (picturesFolderPath & (name of me) & " Completed - Screen Shot " & screenshotDate & ".png")) & " " & (quoted form of (picturesFolderPath & (name of me) & " Completed (2nd Screen) - Screen Shot " & screenshotDate & ".png"))
-							do shell script "afplay /System/Library/Sounds/Glass.aiff"
+							try
+								do shell script "afplay /System/Library/Sounds/Glass.aiff"
+							end try
 						on error (errorMessage) number (errorNumber)
 							if (errorNumber is equal to -128) then error errorMessage number errorNumber
 						end try
@@ -1051,9 +1045,11 @@ if (shouldRunGPUStressTest) then
 ⏱	" & singularTestDurationDisplay & " " & (name of me) & " only ran for " & testFailTimeDisplay & "."
 					try
 						set picturesFolderPath to ((POSIX path of (path to pictures folder)) & (name of me) & "/")
-						set screenshotDate to (do shell script "date +'%F at %I.%M.%S %p'")
+						set screenshotDate to (do shell script "date +'%F at %-I.%M.%S %p'")
 						do shell script "mkdir " & (quoted form of picturesFolderPath) & "; /usr/sbin/screencapture -x " & (quoted form of (picturesFolderPath & (name of me) & " Failed 1 - Screen Shot " & screenshotDate & ".png")) & " " & (quoted form of (picturesFolderPath & (name of me) & " Failed 1 (2nd Screen) - Screen Shot " & screenshotDate & ".png"))
-						do shell script "afplay /System/Library/Sounds/Basso.aiff"
+						try
+							do shell script "afplay /System/Library/Sounds/Basso.aiff"
+						end try
 					on error (errorMessage) number (errorNumber)
 						if (errorNumber is equal to -128) then error errorMessage number errorNumber
 					end try
@@ -1089,7 +1085,7 @@ if (shouldRunGPUStressTest) then
 👉 CONSULT INSTRUCTOR IF GPU STRESS TEST FAILED ‼️" buttons {"Quit"} default button 1 with title "Failed " & singularTestDurationDisplay & " " & (name of me)
 					try
 						set picturesFolderPath to ((POSIX path of (path to pictures folder)) & (name of me) & "/")
-						set screenshotDate to (do shell script "date +'%F at %I.%M.%S %p'")
+						set screenshotDate to (do shell script "date +'%F at %-I.%M.%S %p'")
 						do shell script "mkdir " & (quoted form of picturesFolderPath) & "; /usr/sbin/screencapture -x " & (quoted form of (picturesFolderPath & (name of me) & " Failed 2 - Screen Shot " & screenshotDate & ".png")) & " " & (quoted form of (picturesFolderPath & (name of me) & " Failed 2 (2nd Screen) - Screen Shot " & screenshotDate & ".png"))
 					on error (errorMessage) number (errorNumber)
 						if (errorNumber is equal to -128) then error errorMessage number errorNumber
@@ -1122,7 +1118,7 @@ if (shouldRunGPUStressTest) then
 ⏱	" & singularTestDurationDisplay & " " & (name of me) & " only ran for " & testStopTimeDisplay & "."
 				try
 					set picturesFolderPath to ((POSIX path of (path to pictures folder)) & (name of me) & "/")
-					set screenshotDate to (do shell script "date +'%F at %I.%M.%S %p'")
+					set screenshotDate to (do shell script "date +'%F at %-I.%M.%S %p'")
 					do shell script "mkdir " & (quoted form of picturesFolderPath) & "; /usr/sbin/screencapture -x " & (quoted form of (picturesFolderPath & (name of me) & " Stopped - Screen Shot " & screenshotDate & ".png")) & " " & (quoted form of (picturesFolderPath & (name of me) & " Stopped (2nd Screen) - Screen Shot " & screenshotDate & ".png"))
 				end try
 				try
@@ -1175,9 +1171,7 @@ if (shouldRunGPUStressTest) then
 		end try
 	end if
 end if
-try
-	do shell script "rm -f /Users/Tester/_geeks3d_gputest_log.txt"
-end try
+do shell script "rm -f /Users/Tester/_geeks3d_gputest_log.txt"
 try
 	tell application "System Events" to tell dock preferences to set autohide to false
 end try

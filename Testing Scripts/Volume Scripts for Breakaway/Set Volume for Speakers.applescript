@@ -1,6 +1,6 @@
 -- By: Pico Mitchell
 -- For: MacLand @ Free Geek
--- Last Updated: December 30th, 2021
+-- Last Updated: February 22nd, 2022
 --
 -- MIT License
 --
@@ -17,7 +17,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 
 try

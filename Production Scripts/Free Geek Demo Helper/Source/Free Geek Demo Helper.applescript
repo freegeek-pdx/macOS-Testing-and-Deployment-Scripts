@@ -16,11 +16,11 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.11-2
 
 -- Build Flag: LSUIElement
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 
 set currentBundleIdentifier to "UNKNOWN"
@@ -149,7 +149,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	-- But still, double check here that it got reset to it's correct state (in case Automation Guide was force quit or something weird/sneaky).
 	set demoUsernameIsAdmin to true
 	try
-		set demoUsernameIsAdmin to ((do shell script ("id -Gn " & (quoted form of demoUsername))) contains " admin ")
+		set demoUsernameIsAdmin to ((do shell script ("dsmemberutil checkmembership -U " & (quoted form of demoUsername) & " -G 'admin'")) is equal to "user is a member of the group")
 	end try
 	if (demoUsernameIsAdmin) then
 		try
@@ -216,7 +216,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -262,7 +262,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -309,10 +309,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		-- Touch desktop symlink to make sure icons stay correct (sometimes they go generic).
 		try
-			do shell script "touch -h " & (quoted form of ("/Users/" & demoUsername & "/Desktop/QA Helper.app"))
-		end try
-		try
-			do shell script "touch -h " & (quoted form of cleanupAfterQACompleteDesktopPath)
+			do shell script "touch -h " & (quoted form of ("/Users/" & demoUsername & "/Desktop/QA Helper.app")) & " " & (quoted form of cleanupAfterQACompleteDesktopPath)
 		end try
 		
 		-- Set desktop app icon positions since they can lose their positions a restart.
@@ -342,7 +339,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	
 	if (not setupLaunchedDemoHelper) then
 		try
-			set idleTime to (((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:HIDIdleTime' /dev/stdin <<< \"$(ioreg -arc IOHIDSystem -k HIDIdleTime -d 1)\"") as number) / 1000 / 1000 / 1000)
+			set idleTime to (((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:HIDIdleTime' /dev/stdin <<< \"$(ioreg -arc IOHIDSystem -k HIDIdleTime -d 1)\""))) as number) / 1000 / 1000 / 1000)
 		end try
 		
 		try
@@ -369,25 +366,6 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	end if
 	
 	if (setupLaunchedDemoHelper or upTenMinsOrLess or (idleTime ≥ 900)) then
-		set osName to "macOS"
-		considering numeric strings
-			if ((systemVersion ≥ "10.11") and (systemVersion < "10.12")) then
-				set osName to "OS X El Capitan"
-			else if ((systemVersion ≥ "10.12") and (systemVersion < "10.13")) then
-				set osName to "macOS Sierra"
-			else if ((systemVersion ≥ "10.13") and (systemVersion < "10.14")) then
-				set osName to "macOS High Sierra"
-			else if ((systemVersion ≥ "10.14") and (systemVersion < "10.15")) then
-				set osName to "macOS Mojave"
-			else if ((systemVersion ≥ "10.15") and (systemVersion < "10.16")) then
-				set osName to "macOS Catalina"
-			else if ((systemVersion ≥ "11.0") and (systemVersion < "12.0")) then
-				set osName to "macOS Big Sur"
-			else if ((systemVersion ≥ "12.0") and (systemVersion < "13.0")) then
-				set osName to "macOS Monterey"
-			end if
-		end considering
-		
 		set modelID to "Mac"
 		set serialNumber to "UNKNOWNSERIAL-" & (random number from 100 to 999)
 		
@@ -422,53 +400,35 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		-- HIDE ADMIN USER
 		try
-			if ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :dsAttrTypeNative\\:IsHidden:0' /dev/stdin <<< \"$(dscl -plist . -read /Users/" & adminUsername & " IsHidden 2> /dev/null)\" 2> /dev/null")) is not equal to "1") then
+			if ((do shell script ("dscl -plist . -read /Users/" & adminUsername & " IsHidden 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null; exit 0")) is not equal to "1") then
 				do shell script ("dscl . -create /Users/" & adminUsername & " IsHidden 1") user name adminUsername password adminPassword with administrator privileges
 			end if
 		end try
 		
-		-- DISABLE SLEEP
 		try
-			do shell script "pmset -a sleep 0 displaysleep 0" user name adminUsername password adminPassword with administrator privileges
+			do shell script "
+# DISABLE SLEEP
+pmset -a sleep 0 displaysleep 0
+
+# SET GLOBAL LANGUAGE AND LOCALE
+defaults write '/Library/Preferences/.GlobalPreferences' AppleLanguages -array 'en-US'
+defaults write '/Library/Preferences/.GlobalPreferences' AppleLocale -string 'en_US'
+defaults write '/Library/Preferences/.GlobalPreferences' AppleMeasurementUnits -string 'Inches'
+defaults write '/Library/Preferences/.GlobalPreferences' AppleMetricUnits -bool false
+defaults write '/Library/Preferences/.GlobalPreferences' AppleTemperatureUnit -string 'Fahrenheit'
+defaults write '/Library/Preferences/.GlobalPreferences' AppleTextDirection -bool false
+" user name adminUsername password adminPassword with administrator privileges
 		end try
 		
-		-- SET LANGUAGE AND LOCALE
-		try
-			do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleLanguages -array 'en-US'" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleLocale -string 'en_US'" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleMeasurementUnits -string 'Inches'" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleMetricUnits -bool false" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleTemperatureUnit -string 'Fahrenheit'" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleTextDirection -bool false" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write NSGlobalDomain AppleLanguages -array 'en-US'"
-		end try
-		try
-			do shell script "defaults write NSGlobalDomain AppleLocale -string 'en_US'"
-		end try
-		try
-			do shell script "defaults write NSGlobalDomain AppleMeasurementUnits -string 'Inches'"
-		end try
-		try
-			do shell script "defaults write NSGlobalDomain AppleMetricUnits -bool false"
-		end try
-		try
-			do shell script "defaults write NSGlobalDomain AppleTemperatureUnit -string 'Fahrenheit'"
-		end try
-		try
-			do shell script "defaults write NSGlobalDomain AppleTextDirection -bool false"
-		end try
+		-- SET USER LANGUAGE AND LOCALE
+		do shell script "
+defaults write NSGlobalDomain AppleLanguages -array 'en-US'
+defaults write NSGlobalDomain AppleLocale -string 'en_US'
+defaults write NSGlobalDomain AppleMeasurementUnits -string 'Inches'
+defaults write NSGlobalDomain AppleMetricUnits -bool false
+defaults write NSGlobalDomain AppleTemperatureUnit -string 'Fahrenheit'
+defaults write NSGlobalDomain AppleTextDirection -bool false
+"
 		
 		-- DELETE ALL LOCAL SNAPSHOTS (ONLY IF reset Snapshot DOES NOT EXIST)
 		try
@@ -481,8 +441,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			else
 				try
 					set allLocalSnapshots to do shell script "tmutil listlocalsnapshots / | cut -d '.' -f 4"
-					set AppleScript's text item delimiters to {linefeed, return}
-					repeat with thisLocalSnapshot in (every text item of allLocalSnapshots)
+					repeat with thisLocalSnapshot in (paragraphs of allLocalSnapshots)
 						try
 							-- Have to delete each Snapshot individually on High Sierra
 							do shell script ("tmutil deletelocalsnapshots " & (quoted form of (thisLocalSnapshot as string)))
@@ -503,12 +462,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		end try
 		
 		-- SET MENUBAR CLOCK FORMAT
-		try
-			do shell script "defaults write com.apple.menuextra.clock FlashDateSeparators -bool false"
-		end try
-		try
-			do shell script "defaults write com.apple.menuextra.clock IsAnalog -bool false"
-		end try
+		do shell script "defaults write com.apple.menuextra.clock FlashDateSeparators -bool false; defaults write com.apple.menuextra.clock IsAnalog -bool false"
 		set currentClockFormat to "UNKNOWN CLOCK FORMAT"
 		set intendedClockFormat to "EEE MMM d  h:mm:ss a"
 		try
@@ -516,33 +470,27 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		end try
 		if (currentClockFormat is not equal to intendedClockFormat) then
 			if (isBigSurOrNewer) then
-				# Need to set these keys AND DateFormat on macOS 11 Big Sur, but older versions of macOS only use DateFormat.
-				try
-					do shell script "defaults write com.apple.menuextra.clock Show24Hour -bool false"
-				end try
-				try
-					do shell script "defaults write com.apple.menuextra.clock ShowAMPM -bool true"
-				end try
-				try
-					do shell script "defaults write com.apple.menuextra.clock ShowDayOfMonth -bool true"
-				end try
-				try
-					do shell script "defaults write com.apple.menuextra.clock ShowDayOfWeek -bool true"
-				end try
-				try
-					do shell script "defaults write com.apple.menuextra.clock ShowSeconds -bool true" # Must still set format after setting these prefs (and seconds won't get updated if we ONLY set the format).
-				end try
+				-- Need to set these keys AND DateFormat on macOS 11 Big Sur, but older versions of macOS only use DateFormat.
+				do shell script "
+defaults write com.apple.menuextra.clock Show24Hour -bool false
+defaults write com.apple.menuextra.clock ShowAMPM -bool true
+defaults write com.apple.menuextra.clock ShowDayOfMonth -bool true
+defaults write com.apple.menuextra.clock ShowDayOfWeek -bool true
+defaults write com.apple.menuextra.clock ShowSeconds -bool true
+" -- Must still set format after setting these prefs (and seconds won't get updated if we ONLY set the format).
 			end if
 			
-			do shell script ("defaults write com.apple.menuextra.clock DateFormat -string " & (quoted form of intendedClockFormat))
+			do shell script ("
+defaults write com.apple.menuextra.clock DateFormat -string " & (quoted form of intendedClockFormat) & "
+defaults export com.apple.menuextra.clock -") -- Seems that restarting SystemUIServer or ControlCenter does not always update the menubar clock. Exporting the prefs (just to stdout) may help to forcibly sync the prefs to make the restart work better.
 			
-			do shell script "defaults read com.apple.menuextra.clock" # Seems that restarting SystemUIServer or ControlCenter does not always update the menubar clock. Reading the prefs may help sync them to make the restart work.
-			
-			if (isBigSurOrNewer) then
-				do shell script "killall ControlCenter" # Restarting ControlCenter is required to make changes take effect immediately on macOS 11 Big Sur or newer.
-			else
-				do shell script "killall SystemUIServer" # Restarting SystemUIServer is required to make changes take effect immediately on macOS 10.15 Catalina or older.
-			end if
+			try
+				if (isBigSurOrNewer) then
+					do shell script "killall ControlCenter" -- Restarting ControlCenter is required to make changes take effect immediately on macOS 11 Big Sur or newer.
+				else
+					do shell script "killall SystemUIServer" -- Restarting SystemUIServer is required to make changes take effect immediately on macOS 10.15 Catalina or older.
+				end if
+			end try
 		end if
 		
 		-- DISABLE REOPEN WINDOWS ON LOGIN
@@ -553,29 +501,19 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		-- DISABLE AUTOMATIC OS & APP STORE  UPDATES
 		-- Keeping AutomaticCheckEnabled and AutomaticDownload enabled is required for EFIAllowListAll to be able to be updated when EFIcheck is run by our scripts, the rest should be disabled.
 		try
-			do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticCheckEnabled -bool true" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticDownload -bool true" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' ConfigDataInstall -bool false" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' CriticalUpdateInstall -bool false" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false" user name adminUsername password adminPassword with administrator privileges
-		end try
-		if (isMojaveOrNewer) then
-			try
+			do shell script "
+defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticCheckEnabled -bool true
+defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticDownload -bool true
+defaults write '/Library/Preferences/com.apple.SoftwareUpdate' ConfigDataInstall -bool false
+defaults write '/Library/Preferences/com.apple.SoftwareUpdate' CriticalUpdateInstall -bool false
+defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false
+" user name adminUsername password adminPassword with administrator privileges
+			if (isMojaveOrNewer) then
 				do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticallyInstallMacOSUpdates -bool false" user name adminUsername password adminPassword with administrator privileges
-			end try
-		else
-			try
+			else
 				do shell script "defaults write '/Library/Preferences/com.apple.commerce' AutoUpdateRestartRequired -bool false" user name adminUsername password adminPassword with administrator privileges
-			end try
-		end if
+			end if
+		end try
 		
 		-- DO NOT SHOW INTERNAL/BOOT DRIVE ON DESKTOP AND SET NEW FINDER WINDOWS TO COMPUTER
 		tell application "Finder" to tell Finder preferences
@@ -584,25 +522,16 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			set desktop shows removable media to true
 			set desktop shows connected servers to true
 		end tell
-		try
-			do shell script "defaults write com.apple.finder NewWindowTarget -string 'PfCm'"
-		end try
-		try
-			do shell script "defaults delete com.apple.finder NewWindowTargetPath"
-		end try
+		do shell script "defaults delete com.apple.finder NewWindowTargetPath; defaults write com.apple.finder NewWindowTarget -string 'PfCm'"
 		
 		-- SET SCREEN ZOOM TO USE SCROLL GESTURE WITH MODIFIER KEY, ZOOM FULL SCREEN, AND MOVE CONTINUOUSLY WITH POINTER
 		-- This can only work on High Sierra, the pref is protected on Mojave and newer: https://eclecticlight.co/2020/03/04/how-macos-10-14-and-later-overrides-write-permission-on-some-files/
 		if (not isMojaveOrNewer) then
-			try
-				do shell script "defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true"
-			end try
-			try
-				do shell script "defaults write com.apple.universalaccess closeViewZoomMode -int 0"
-			end try
-			try
-				do shell script "defaults write com.apple.universalaccess closeViewPanningMode -int 0"
-			end try
+			do shell script "
+defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true
+defaults write com.apple.universalaccess closeViewZoomMode -int 0
+defaults write com.apple.universalaccess closeViewPanningMode -int 0
+"
 		end if
 		
 		-- SET DESIRED MOUSE SETTINGS
@@ -624,8 +553,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		-- HIDE ANY SYSTEM PREFERENCES BADGES FOR ANY UPDATES (such as Big Sur)
 		try
 			if ((do shell script "defaults read com.apple.systempreferences AttentionPrefBundleIDs") is not equal to "0") then
-				do shell script "defaults write com.apple.systempreferences AttentionPrefBundleIDs 0"
-				do shell script "killall Dock"
+				do shell script "defaults write com.apple.systempreferences AttentionPrefBundleIDs 0; killall Dock"
 			end if
 		end try
 		
@@ -643,13 +571,11 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			
 			if ((currentTouchBarPresentationModeGlobal is not equal to "fullControlStrip") or (currentTouchBarPresentationModeFnModes does not contain "fullControlStrip = functionKeys")) then
 				try
-					do shell script "defaults write com.apple.touchbar.agent PresentationModeGlobal fullControlStrip"
-				end try
-				try
-					do shell script "defaults write com.apple.touchbar.agent PresentationModeFnModes -dict fullControlStrip functionKeys"
-				end try
-				try
-					do shell script "killall ControlStrip"
+					do shell script "
+defaults write com.apple.touchbar.agent PresentationModeGlobal fullControlStrip
+defaults write com.apple.touchbar.agent PresentationModeFnModes -dict fullControlStrip functionKeys
+killall ControlStrip
+"
 				end try
 			end if
 		end try
@@ -662,56 +588,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			end try
 			
 			if ((currentHIToolboxAppleDictationAutoEnable is not equal to "0")) then
-				try
-					do shell script "defaults write com.apple.HIToolbox AppleDictationAutoEnable -int 0"
-				end try
-			end if
-		end try
-		
-		-- HIDE ALL SETUP ASSISTANT SCREENS (Don't want to see any Setup Assistant screens, such as after an OS Update)
-		try
-			set currentDidntSeeSetupScreenPrefs to "UNKNOWN"
-			try
-				set currentDidntSeeSetupScreenPrefs to (do shell script "defaults read com.apple.SetupAssistant | grep -x '    DidSee.* = 0;'")
-			end try
-			
-			if ((currentDidntSeeSetupScreenPrefs contains "DidSee") and (currentDidntSeeSetupScreenPrefs contains "= 0;")) then
-				repeat with thisDidntSeeSetupScreenPref in (words of currentDidntSeeSetupScreenPrefs)
-					if (thisDidntSeeSetupScreenPref starts with "DidSee") then
-						try
-							do shell script ("defaults write com.apple.SetupAssistant " & thisDidntSeeSetupScreenPref & " -bool true")
-						end try
-					end if
-				end repeat
-			end if
-			
-			set currentLastSeenSetupScreenPrefs to "UNKNOWN"
-			try
-				set currentLastSeenSetupScreenPrefs to (do shell script "defaults read com.apple.SetupAssistant | grep '^    LastSeen.* ='")
-			end try
-			
-			if (currentLastSeenSetupScreenPrefs contains "LastSeen") then
-				repeat with thisLastSeenSetupScreenPref in (words of currentLastSeenSetupScreenPrefs)
-					if (thisLastSeenSetupScreenPref starts with "LastSeen") then
-						if (thisLastSeenSetupScreenPref contains "BuildVersion") then
-							try
-								do shell script ("defaults write com.apple.SetupAssistant " & thisLastSeenSetupScreenPref & " -string \"$(sw_vers -buildVersion)\"")
-							end try
-						else if (thisLastSeenSetupScreenPref contains "ProductVersion") then
-							try
-								do shell script ("defaults write com.apple.SetupAssistant " & thisLastSeenSetupScreenPref & " -string " & (quoted form of systemVersion))
-							end try
-						end if
-					end if
-				end repeat
+				do shell script "defaults write com.apple.HIToolbox AppleDictationAutoEnable -int 0"
 			end if
 		end try
 		
 		-- REMOVE ALL SHARED FOLDERS & SHAREPOINT GROUPS
 		try
 			set sharedFolderNames to (do shell script "sharing -l | grep 'name:		' | cut -c 8-")
-			set AppleScript's text item delimiters to {linefeed, return}
-			repeat with thisSharedFolderName in (every text item of sharedFolderNames)
+			repeat with thisSharedFolderName in (paragraphs of sharedFolderNames)
 				try
 					do shell script ("sharing -r " & (quoted form of thisSharedFolderName)) user name adminUsername password adminPassword with administrator privileges
 				end try
@@ -719,8 +603,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		end try
 		try
 			set sharePointGroups to (do shell script "dscl . -list /Groups | grep com.apple.sharepoint.group")
-			set AppleScript's text item delimiters to {linefeed, return}
-			repeat with thisSharePointGroupName in (every text item of sharePointGroups)
+			repeat with thisSharePointGroupName in (paragraphs of sharePointGroups)
 				try
 					do shell script ("dseditgroup -o delete " & (quoted form of thisSharePointGroupName)) user name adminUsername password adminPassword with administrator privileges
 				end try
@@ -734,15 +617,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		set intendedComputerName to "Free Geek - " & modelID & " - " & serialNumber
 		if (currentComputerName is not equal to intendedComputerName) then
 			try
-				do shell script "scutil --set ComputerName " & (quoted form of intendedComputerName) user name adminUsername password adminPassword with administrator privileges
-			end try
-			try
 				set newLocalHostName to "FreeGeek-" & modelID & "-" & serialNumber
 				set AppleScript's text item delimiters to {",", space}
 				set newLocalHostNameParts to (every text item of newLocalHostName)
 				set AppleScript's text item delimiters to ""
 				set newLocalHostName to (newLocalHostNameParts as string)
-				do shell script "scutil --set LocalHostName " & (quoted form of newLocalHostName) user name adminUsername password adminPassword with administrator privileges
+				do shell script ("
+scutil --set ComputerName " & (quoted form of intendedComputerName) & "
+scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name adminUsername password adminPassword with administrator privileges
 			end try
 		end if
 		
@@ -897,21 +779,22 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		end try
 		
 		try
-			do shell script ("rm -f /private/var/db/softwareupdate/journal.plist; " & ¬
-				"rm -rf '/Users/Shared/Relocated Items'; " & ¬
-				"rm -f '/Users/" & adminUsername & "/Library/Application Support/App Store/updatejournal.plist'; " & ¬
-				"rm -f /Users/" & adminUsername & "/.bash_history; " & ¬
-				"rm -rf /Users/" & adminUsername & "/.bash_sessions; " & ¬
-				"rm -f /Users/" & adminUsername & "/.zsh_history; " & ¬
-				"rm -f '/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt'; " & ¬
-				"rm -rf '/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
+			do shell script ("rm -rf /private/var/db/softwareupdate/journal.plist " & ¬
+				"'/Users/Shared/Relocated Items' " & ¬
+				"'/Users/" & adminUsername & "/Library/Application Support/App Store/updatejournal.plist' " & ¬
+				"/Users/" & adminUsername & "/.bash_history " & ¬
+				"/Users/" & adminUsername & "/.bash_sessions " & ¬
+				"/Users/" & adminUsername & "/.zsh_history " & ¬
+				"/Users/" & adminUsername & "/.zsh_sessions " & ¬
+				"'/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt' " & ¬
+				"'/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
 		end try
-		try
-			do shell script ("rm -f '/Users/" & demoUsername & "/Library/Application Support/App Store/updatejournal.plist'; " & ¬
-				"rm -f /Users/" & demoUsername & "/.bash_history; " & ¬
-				"rm -rf /Users/" & demoUsername & "/.bash_sessions; " & ¬
-				"rm -f /Users/" & demoUsername & "/.zsh_history")
-		end try
+		
+		do shell script ("rm -rf '/Users/" & demoUsername & "/Library/Application Support/App Store/updatejournal.plist' " & ¬
+			"/Users/" & demoUsername & "/.bash_history " & ¬
+			"/Users/" & demoUsername & "/.bash_sessions " & ¬
+			"/Users/" & demoUsername & "/.zsh_history " & ¬
+			"/Users/" & demoUsername & "/.zsh_sessions")
 		
 		-- TRASH DESKTOP FILES WITH FINDER INSTEAD OF RM SO FOLDER ACCESS IS NOT NECESSARY ON CATALINA AND NEWER
 		try
@@ -973,24 +856,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 </plist>' | plutil -convert binary1 - -o - | xxd -p | tr -d '[:space:]')\""
 			end try
 		else
-			try
-				do shell script "defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplayLock -bool true"
-			end try
-			try
-				do shell script "defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplaySleep -bool true"
-			end try
-			try
-				do shell script "defaults -currentHost write com.apple.notificationcenterui dndMirroring -bool true"
-			end try
-			try
-				do shell script "defaults -currentHost write com.apple.notificationcenterui dndEnd -float 1439"
-			end try
-			try
-				do shell script "defaults -currentHost write com.apple.notificationcenterui dndStart -float 0"
-			end try
-			try
-				do shell script "defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool false"
-			end try
+			do shell script "
+defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplayLock -bool true
+defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplaySleep -bool true
+defaults -currentHost write com.apple.notificationcenterui dndMirroring -bool true
+defaults -currentHost write com.apple.notificationcenterui dndEnd -float 1439
+defaults -currentHost write com.apple.notificationcenterui dndStart -float 0
+defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool false
+"
 		end if
 		try
 			do shell script "killall usernoted"
@@ -1156,12 +1029,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		try
 			(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
 		on error
-			if ((year of the (current date)) < 2021) then
+			if ((year of the (current date)) < 2022) then
 				try
-					do shell script "systemsetup -setusingnetworktime off" user name adminUsername password adminPassword with administrator privileges
-				end try
-				try
-					do shell script "systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
+					do shell script "systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
 				end try
 			end if
 		end try
@@ -1209,7 +1079,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			end try
 			
 			
-			-- Wait for Internet before launching QA Helper to ensure that QA Helper can always update itself to the latest version.
+			-- Wait for internet before launching QA Helper to ensure that QA Helper can always update itself to the latest version.
 			repeat 60 times
 				try
 					do shell script "ping -c 1 www.google.com"
@@ -1262,12 +1132,12 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		repeat -- dialogs timeout when screen is asleep or locked (just in case)
 			set isAwake to true
 			try
-				set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+				set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 			end try
 			
 			set isUnlocked to true
 			try
-				set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+				set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 			end try
 			
 			if (isAwake and isUnlocked) then
@@ -1397,12 +1267,12 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 				repeat -- dialogs timeout when screen is asleep or locked (just in case)
 					set isAwake to true
 					try
-						set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+						set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 					end try
 					
 					set isUnlocked to true
 					try
-						set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+						set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 					end try
 					
 					if (isAwake and isUnlocked) then
@@ -1513,7 +1383,7 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 			end tell
 			
 			if (isCatalinaOrNewer and (not hasILifeSlideshows)) then
-				try # iLifeSlideshows does not show up in the System Events screen savers list on 10.15 Catalina, so check that the path exists and we will manually set the prefs below.
+				try -- iLifeSlideshows does not show up in the System Events screen savers list on 10.15 Catalina, so check that the path exists and we will manually set the prefs below.
 					(("/System/Library/Frameworks/ScreenSaver.framework/PlugIns/iLifeSlideshows.appex" as POSIX file) as alias)
 					set hasILifeSlideshows to true
 				end try
@@ -1576,29 +1446,37 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 					set AppleScript's text item delimiters to "{iLS}"
 					set randomScreenSaverNameParts to (every text item of randomScreenSaverName)
 					if ((count of randomScreenSaverNameParts) is equal to 2) then
-						do shell script "defaults -currentHost write com.apple.ScreenSaverPhotoChooser ShufflesPhotos -bool YES"
 						set randomScreenSaverName to (first item of randomScreenSaverNameParts)
 						set iLifeSlideShowStyleKey to (item 2 of randomScreenSaverNameParts)
-						do shell script "defaults -currentHost write com.apple.ScreenSaver.iLifeSlideShows styleKey " & (quoted form of iLifeSlideShowStyleKey)
+						
 						set photoFolderPath to ((text item (random number from 1 to (count of photoFolders)) of photoFolders) as string)
 						if ((last character of photoFolderPath) is equal to "/") then set photoFolderPath to (text 1 thru -2 of photoFolderPath)
-						do shell script "defaults -currentHost write com.apple.ScreenSaverPhotoChooser SelectedFolderPath " & (quoted form of photoFolderPath)
+						
+						do shell script ("
+defaults -currentHost write com.apple.ScreenSaverPhotoChooser ShufflesPhotos -bool YES
+defaults -currentHost write com.apple.ScreenSaver.iLifeSlideShows styleKey " & (quoted form of iLifeSlideShowStyleKey) & "
+defaults -currentHost write com.apple.ScreenSaverPhotoChooser SelectedFolderPath " & (quoted form of photoFolderPath))
+						
 						set AppleScript's text item delimiters to "/"
 						set photoFolderPathParts to (every text item of photoFolderPath)
 						set photoFolderName to ((last text item of photoFolderPathParts) as string)
 						set photoParentFolderName to ((text item -2 of photoFolderPathParts) as string)
 						try
 							if (photoParentFolderName is equal to "Default Collections") then
-								do shell script "defaults -currentHost write com.apple.ScreenSaverPhotoChooser SelectedSource -int 3"
-								do shell script "defaults -currentHost delete com.apple.ScreenSaverPhotoChooser CustomFolderDict"
+								do shell script "
+defaults -currentHost write com.apple.ScreenSaverPhotoChooser SelectedSource -int 3
+defaults -currentHost delete com.apple.ScreenSaverPhotoChooser CustomFolderDict
+"
 							else
-								do shell script "defaults -currentHost write com.apple.ScreenSaverPhotoChooser SelectedSource -int 4"
-								do shell script "defaults -currentHost write com.apple.ScreenSaverPhotoChooser CustomFolderDict '<dict>
+								do shell script "
+defaults -currentHost write com.apple.ScreenSaverPhotoChooser SelectedSource -int 4
+defaults -currentHost write com.apple.ScreenSaverPhotoChooser CustomFolderDict '<dict>
 	<key>name</key>
 	<string>" & photoFolderName & "</string>
 	<key>identifier</key>
 	<string>" & photoFolderPath & "</string>
-</dict>'"
+</dict>'
+"
 							end if
 						end try
 						try
@@ -1615,16 +1493,18 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 							end tell
 							
 							if (isCatalinaOrNewer and (randomScreenSaverName is equal to "iLifeSlideshows")) then
-								# For some reason iLifeSlideshows is not in the list of screen savers in Catalina and therefore cannot be set with AppleScript.
-								# So lets set the preferences manually.
-								do shell script "defaults -currentHost write com.apple.screensaver moduleDict '<dict>
+								-- For some reason iLifeSlideshows is not in the list of screen savers in Catalina and therefore cannot be set with AppleScript.
+								-- So lets set the preferences manually.
+								do shell script "
+defaults -currentHost write com.apple.screensaver moduleDict '<dict>
 	<key>moduleName</key>
 	<string>iLifeSlideshows</string>
 	<key>path</key>
 	<string>/System/Library/Frameworks/ScreenSaver.framework/PlugIns/iLifeSlideshows.appex</string>
 	<key>type</key>
 	<string>0</string>
-</dict>'"
+</dict>'
+"
 								set screenSaverDescription to randomScreenSaverName
 							else
 								set current screen saver to (screen saver named randomScreenSaverName)

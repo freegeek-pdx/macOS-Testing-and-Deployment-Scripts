@@ -29,7 +29,9 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2021.12.30-1'
+readonly SCRIPT_VERSION='2022.4.8-1'
+
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
 DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc.
 readonly DARWIN_MAJOR_VERSION
@@ -37,7 +39,7 @@ readonly DARWIN_MAJOR_VERSION
 critical_error_occurred=false
 
 if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone' || -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]] && \
-   [[ "$3" == '/' && "${EUID:-$(id -u)}" == '0' && "$(dscl . -list /Users 2> /dev/null | grep -v '^_' | xargs)" == 'daemon nobody root' ]]; then
+   [[ "$3" == '/' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant.
 	
 	log_path='/Users/Shared/Build Info/Prepare OS Log.txt'
 	if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]]; then # The log file will have already been started when run on boot via LaunchDaemon, so we do not want to delete it.
@@ -81,22 +83,13 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		ditto "$2/fg-error-occurred" "${error_occurred_resources_install_path}"
 		chmod +x "${error_occurred_resources_install_path}/fg-error-occurred.sh"
 		
-		echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>Label</key>
-	<string>org.freegeek.fg-error-occurred</string>
-	<key>Program</key>
-	<string>${error_occurred_resources_install_path}/fg-error-occurred.sh</string>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-</dict>
-</plist>" > '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist'
+		PlistBuddy \
+			-c 'Add :Label string org.freegeek.fg-error-occurred' \
+			-c "Add :Program string ${error_occurred_resources_install_path}/fg-error-occurred.sh" \
+			-c 'Add :RunAtLoad bool true' \
+			-c 'Add :StandardOutPath string /dev/null' \
+			-c 'Add :StandardErrorPath string /dev/null' \
+			'/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist' &> /dev/null
 	fi
 
 
@@ -211,22 +204,13 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			ditto "$2/fg-snapshot-reset" "${snapshot_reset_resources_install_path}"
 			chmod +x "${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh"
 			
-			echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>Label</key>
-	<string>org.freegeek.fg-snapshot-reset</string>
-	<key>Program</key>
-	<string>${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh</string>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-</dict>
-</plist>" > '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist'
+			PlistBuddy \
+				-c 'Add :Label string org.freegeek.fg-snapshot-reset' \
+				-c "Add :Program string ${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh" \
+				-c 'Add :RunAtLoad bool true' \
+				-c 'Add :StandardOutPath string /dev/null' \
+				-c 'Add :StandardErrorPath string /dev/null' \
+				'/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' &> /dev/null
 			
 			if [[ ! -f "${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh" || ! -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' ]]; then
 				write_to_log 'ERROR: Failed to Setup Reset Snapshot LaunchDaemon'
@@ -344,29 +328,17 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 					# To workaround this issue, the LaunchDaemon will now reboot the computer whenever the date is manipulated to make sure macOS runs the LaunchDaemon on the intended StartCalendarInterval.
 					# See REBOOT AFTER DATE IS SET BACK IN TIME comments in fg-snapshot-preserver for more information about this.
 					# This means that StartCalendarInterval and StartInterval could actually be used together, but now there is no real benefit to switching back to that over the existing StartCalendarInterval setup.
-					echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>Label</key>
-	<string>org.freegeek.fg-snapshot-preserver</string>
-	<key>Program</key>
-	<string>${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh</string>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>StartCalendarInterval</key>
-	<array>$(for (( start_calendar_interval_minute = 0; start_calendar_interval_minute < 60; start_calendar_interval_minute += 5 )); do echo "
-		<dict>
-			<key>Minute</key>
-			<integer>${start_calendar_interval_minute}</integer>
-		</dict>"; done)
-	</array>
-</dict>
-</plist>" > '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist'
+					echo "
+Add :Label string org.freegeek.fg-snapshot-preserver
+Add :Program string ${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh
+Add :RunAtLoad bool true
+Add :StandardOutPath string /dev/null
+Add :StandardErrorPath string /dev/null
+Add :StartCalendarInterval array
+$(for (( start_calendar_interval_minute = 55; start_calendar_interval_minute >= 0; start_calendar_interval_minute -= 5 )); do echo "Add :StartCalendarInterval:0 dict
+Add :StartCalendarInterval:0:Minute integer ${start_calendar_interval_minute}"; done)
+Save
+" | PlistBuddy '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist' &> /dev/null
 
 					if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]]; then
 						# Do not need to load right away if started via LaunchDaemon since we will restart.
@@ -453,24 +425,24 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		
 		write_to_log 'Setting Computer Name'
 
+		sp_hardware_plist_path="${TMPDIR:-/private/tmp/}fg-prepare-os-sp-hardware.plist"
 		for (( get_model_id_attempt = 0; get_model_id_attempt < 60; get_model_id_attempt ++ )); do
-			sp_hardware_output="$(system_profiler SPHardwareDataType)"
-			
-			sp_model_id_output="$(echo "${sp_hardware_output}" | grep 'Model Identifier:')"
-			model_id="${sp_model_id_output#*: }"
+			rm -rf "${sp_hardware_plist_path}"
+			system_profiler -xml SPHardwareDataType > "${sp_hardware_plist_path}"
+
+			model_id="$(PlistBuddy -c 'Print :0:_items:0:machine_model' "${sp_hardware_plist_path}" 2> /dev/null)"
 			
 			if [[ "${model_id}" == *'Mac'* ]]; then
-				sp_serial_number_output="$(echo "${sp_hardware_output}" | grep 'Serial Number (system):')"
-				serial_number="${sp_serial_number_output#*: }"
+				serial_number="$(PlistBuddy -c 'Print :0:_items:0:serial_number' "${sp_hardware_plist_path}" 2> /dev/null)"
 				
 				if [[ -z "${serial_number}" || "${serial_number}" == 'Not Available' ]]; then
-					sp_serial_number_output="$(echo "${sp_hardware_output}" | grep 'Serial Number (processor tray):')"
-					serial_number="${sp_serial_number_output#*: }"
+					serial_number="$(PlistBuddy -c 'Print :0:_items:0:riser_serial_number' "${sp_hardware_plist_path}" 2> /dev/null)"
 
 					if [[ -z "${serial_number}" || "${serial_number}" == 'Not Available' ]]; then
 						serial_number="UNKNOWNSERIAL-$(jot -r 1 100 999)"
 					fi
 				fi
+				rm -f "${sp_hardware_plist_path}"
 
 				serial_number="${serial_number//[[:space:]]/}"
 
@@ -503,6 +475,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 				sleep 1
 			fi
 		done
+		rm -f "${sp_hardware_plist_path}"
 
 
 		write_to_log 'Setting Custom Global Preferences'
@@ -620,7 +593,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			# See comments in fg-snapshot-reset for more info about deleting crypto user references on macOS 10.15 Catalina.
 
 			chmod +x "$2/Tools/mkuser.sh"
-			create_hidden_admin_user_error="$("$2/Tools/mkuser.sh" "${create_hidden_admin_user_options[@]}" <<< "${hidden_admin_user_password}" 2>&1)" # Redirect stderr to save to variable.
+			create_hidden_admin_user_error="$(echo "${hidden_admin_user_password}" | "$2/Tools/mkuser.sh" "${create_hidden_admin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
 			create_hidden_admin_user_exit_code="$?" # Do not check "create_user" exit code directly by putting the function within an "if" since we want to print it as well when an error occurs.
 
 			if (( create_hidden_admin_user_exit_code != 0 )) || [[ "$(id -u "${hidden_admin_user_account_name}" 2> /dev/null)" != '501' ]]; then # Confirm hidden_admin_user_account_name was assigned UID 501 to be sure all is as expected.
@@ -639,7 +612,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			
 			create_standard_autologin_user_options=( '--account-name' "${standard_autologin_user_account_name}" )
 			create_standard_autologin_user_options+=( '--full-name' "${standard_autologin_user_full_name}" )
-			create_standard_autologin_user_options+=( '--generated-uid' '0CAA0000-0A00-0000-BA00-0B000C00B00D' ) # All but the last character of this GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT208050
+			create_standard_autologin_user_options+=( '--generated-uid' 'B0ABCAB0-D000-00C0-A0D0-00000CA000C0' ) # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT201548 (which is different from the one above)
 			create_standard_autologin_user_options+=( '--stdin-password' )
 			create_standard_autologin_user_options+=( '--password-hint' "The password is \"${standard_autologin_user_password}\"." )
 			create_standard_autologin_user_options+=( '--picture' "${fg_user_picture_path}" )
@@ -652,7 +625,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			create_standard_autologin_user_options+=( '--suppress-status-messages' ) # Don't output stdout messages, but we will still get stderr to save to variable.
 
 			chmod +x "$2/Tools/mkuser.sh"
-			create_standard_autologin_user_error="$("$2/Tools/mkuser.sh" "${create_standard_autologin_user_options[@]}" <<< "${standard_autologin_user_password}" 2>&1)" # Redirect stderr to save to variable.
+			create_standard_autologin_user_error="$(echo "${standard_autologin_user_password}" | "$2/Tools/mkuser.sh" "${create_standard_autologin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
 			create_standard_autologin_user_exit_code="$?" # Do not check "create_user" exit code directly by putting the function within an "if" since we want to print it as well when an error occurs.
 
 			if (( create_standard_autologin_user_exit_code != 0 )) || [[ "$(id -u "${standard_autologin_user_account_name}" 2> /dev/null)" != '502' ]]; then # Confirm standard_autologin_user_account_name was assigned UID 502 to be sure all is as expected.
@@ -660,7 +633,6 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 				write_to_log "ERROR: \"${standard_autologin_user_account_name}\" User Not Created (${create_standard_autologin_user_error})"
 				critical_error_occurred=true
 			fi
-
 		fi
 
 
@@ -672,7 +644,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			for this_home_folder in '/Users/'*; do
 				if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
 					this_username="$(dscl . -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
-					this_uid="$(/usr/libexec/PlistBuddy -c 'Print :dsAttrTypeStandard\:UniqueID:0' /dev/stdin <<< "$(dscl -plist . -read "/Users/${this_username}" UniqueID 2> /dev/null)" 2> /dev/null)"
+					this_uid="$(dscl -plist . -read "/Users/${this_username}" UniqueID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)"
 
 					if [[ -n "${this_uid}" && -d "${this_home_folder}/Library" ]]; then
 
@@ -870,12 +842,8 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 									fi
 								done
 
-								for this_user_app in "${this_user_apps_folder}/"*'.app'; do
-									if [[ -d "${this_user_app}" ]]; then
-										xattr -drs com.apple.quarantine "${this_user_app}" # Still remove all Quarantine flags in case app came from DMG instead of unzipped with "ditto -x -k --noqtn".
-										touch "${this_user_app}"
-									fi
-								done
+								xattr -drs com.apple.quarantine "${this_user_apps_folder}/"*'.app' &> /dev/null # Still remove all Quarantine flags in case app came from DMG instead of unzipped with "ditto -x -k --noqtn".
+								touch "${this_user_apps_folder}/"*'.app' &> /dev/null
 
 								chown -R "${this_username}" "${this_user_apps_folder}"
 								
@@ -918,29 +886,18 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 									mkdir -p "${this_user_launch_agents_folder}"
 
-									echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>Label</key>
-	<string>org.freegeek.Automation-Guide</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/usr/bin/open</string>
-		<string>-n</string>
-		<string>-a</string>
-		<string>${this_user_apps_folder}/Automation Guide.app</string>
-	</array>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>StartInterval</key>
-	<integer>300</integer>
-</dict>
-</plist>" > "${this_user_launch_agents_folder}/org.freegeek.Automation-Guide.plist"
+									PlistBuddy \
+										-c 'Add :Label string org.freegeek.Automation-Guide' \
+										-c 'Add :ProgramArguments array' \
+										-c 'Add :ProgramArguments: string /usr/bin/open' \
+										-c 'Add :ProgramArguments: string -n' \
+										-c 'Add :ProgramArguments: string -a' \
+										-c "Add :ProgramArguments: string '${this_user_apps_folder}/Automation Guide.app'" \
+										-c 'Add :RunAtLoad bool true' \
+										-c 'Add :StartInterval integer 300' \
+										-c 'Add :StandardOutPath string /dev/null' \
+										-c 'Add :StandardErrorPath string /dev/null' \
+										"${this_user_launch_agents_folder}/org.freegeek.Automation-Guide.plist" &> /dev/null
 
 									chown -R "${this_username}" "${this_user_launch_agents_folder}"
 								fi

@@ -16,11 +16,11 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.2.22-1
 
 -- Build Flag: LSUIElement
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 use framework "Cocoa"
 

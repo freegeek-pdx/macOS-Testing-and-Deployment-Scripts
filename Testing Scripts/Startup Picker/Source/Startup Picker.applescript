@@ -16,23 +16,23 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.11-1
 
 -- App Icon is “Green Apple” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -155,7 +155,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -201,7 +201,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 							try
-								do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+								do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 							end try
 						end try
 						quit
@@ -249,7 +249,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -278,7 +278,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			set hardwareItems to (first property list item of property list item "_items" of first property list item)
 			set shortModelName to ((value of property list item "machine_name" of hardwareItems) as string)
 			set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
-			set modelIdentifierNumber to (do shell script "sed 's/[^0-9,]//g' <<< " & (quoted form of modelIdentifier))
+			set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
 			set AppleScript's text item delimiters to ","
 			set modelNumberParts to (every text item of modelIdentifierNumber)
 			set modelIdentifierMajorNumber to ((item 1 of modelNumberParts) as number)
@@ -289,7 +289,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			
 			if (((shortModelName is equal to "iMac") and ((modelIdentifierNumber is equal to "14,4") or (modelIdentifierMajorNumber ≥ 15))) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 11)) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then set supportsBigSur to true
 			
-			if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((shortModelName is equal to "MacBook Pro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then set supportsMonterey to true
+			if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((shortModelName is equal to "MacBook Pro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro") or (shortModelName is equal to "Mac Studio")) then set supportsMonterey to true
 		end tell
 	on error (modelInfoErrorMessage)
 		log "Model Info Error: " & modelInfoErrorMessage
@@ -319,8 +319,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		set selectedStartupDiskName to "UNKNOWN"
 		set selectedStartupDiskVersion to "0"
 		
-		set AppleScript's text item delimiters to {linefeed, return}
-		set systemVersionPlists to (every text item of (do shell script "ls -1 /Volumes/*/System/Library/CoreServices/SystemVersion.plist | sort"))
+		set systemVersionPlists to (paragraphs of (do shell script "ls /Volumes/*/System/Library/CoreServices/SystemVersion.plist | sort"))
 		
 		set hdStartupDiskOptions to {}
 		set testBootStartupDiskOptions to {}
@@ -393,8 +392,8 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		set startupDiskOptions to {}
 		if ((count of hdStartupDiskOptions) > 0) then
-			set AppleScript's text item delimiters to {linefeed, return}
-			set hdStartupDiskOptions to (every text item of (do shell script ("echo " & (quoted form of (hdStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+			set hdStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (hdStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
 			
 			set defaultStartupDiskSelection to (first item of hdStartupDiskOptions)
 			
@@ -404,8 +403,8 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		set separatorLine to "———————————————————————"
 		
 		if ((count of otherStartupDiskOptions) > 0) then
-			set AppleScript's text item delimiters to {linefeed, return}
-			set otherStartupDiskOptions to (every text item of (do shell script ("echo " & (quoted form of (otherStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+			set otherStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (otherStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
 			
 			if ((count of startupDiskOptions) > 0) then
 				set startupDiskOptions to startupDiskOptions & {separatorLine} & otherStartupDiskOptions
@@ -415,8 +414,8 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		end if
 		
 		if ((count of installerStartupDiskOptions) > 0) then
-			set AppleScript's text item delimiters to {linefeed, return}
-			set installerStartupDiskOptions to (every text item of (do shell script ("echo " & (quoted form of (installerStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+			set installerStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (installerStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
 			
 			if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of installerStartupDiskOptions)
 			
@@ -428,8 +427,8 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		end if
 		
 		if ((count of testBootStartupDiskOptions) > 0) then
-			set AppleScript's text item delimiters to {linefeed, return}
-			set testBootStartupDiskOptions to (every text item of (do shell script ("echo " & (quoted form of (testBootStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+			set testBootStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (testBootStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
 			
 			if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of testBootStartupDiskOptions)
 			
@@ -442,13 +441,12 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		set incompatibleStartupDisksNote to ""
 		if ((incompatibleStartupDiskOptions count) > 0) then
-			set AppleScript's text item delimiters to {linefeed, return}
-			set incompatibleStartupDiskOptions to (every text item of (do shell script ("echo " & (quoted form of (incompatibleStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+			set incompatibleStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (incompatibleStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
 			
 			set pluralizeDisks to ""
 			if ((incompatibleStartupDiskOptions count) > 1) then set pluralizeDisks to "s"
-			set AppleScript's text item delimiters to "
-	"
+			set AppleScript's text item delimiters to (linefeed & tab)
 			set incompatibleStartupDisksNote to "Excluded Incompatible Startup Disk" & pluralizeDisks & ":
 	" & (incompatibleStartupDiskOptions as string)
 		end if
@@ -486,7 +484,7 @@ No Startup Disks Detected"
 					set AppleScript's text item delimiters to " ("
 					set selectedStartupDiskParts to (every text item of (selectedStartupDisk as string))
 					set selectedStartupDiskName to ((text items 1 thru -2 of selectedStartupDiskParts) as string)
-					set selectedStartupDiskVersion to (do shell script "sed 's/[^0-9.]//g' <<< " & (quoted form of ((last text item of selectedStartupDiskParts) as string)))
+					set selectedStartupDiskVersion to (do shell script "echo " & (quoted form of ((last text item of selectedStartupDiskParts) as string)) & " | tr -dc '[:digit:].'")
 					try
 						try
 							activate
@@ -525,7 +523,7 @@ Error Selecting Drive to Set as Startup Disk" buttons {"Quit", "Start Over"} can
 		
 		considering numeric strings
 			if (selectedStartupDiskVersion ≥ "11.0") then
-				# macOS 11 Big Sur and newer installers do not show up in Startup Disk, so do not waste time trying to set them.
+				-- macOS 11 Big Sur and newer installers do not show up in Startup Disk, so do not waste time trying to set them.
 				set didNotTryToSetStartupDisk to true
 			end if
 		end considering

@@ -16,23 +16,23 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.7-1
 
 -- Build Flag: LSUIElement
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 use framework "Cocoa"
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -160,7 +160,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -206,7 +206,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -467,9 +467,9 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 			do shell script "defaults delete eficheck"
 		end try
 		try
-			set efiCheckPID to (do shell script "/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check &> /dev/null & echo $!" user name adminUsername password adminPassword with administrator privileges)
+			set efiCheckPID to (do shell script "/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check > /dev/null 2>&1 & echo $!" user name adminUsername password adminPassword with administrator privileges)
 			delay 1
-			set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " &> /dev/null; echo $?")) as number)
+			set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " > /dev/null 2>&1; echo $?")) as number)
 			if (efiCheckIsRunning is equal to 0) then
 				repeat
 					try -- EFIcheck may open UserNotificationCenter with a "Your computer has detected a potential problem" alert if EFI Firmware is out-of-date.
@@ -495,7 +495,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 						end if
 					end try
 					
-					set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " &> /dev/null; echo $?")) as number)
+					set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " > /dev/null 2>&1; echo $?")) as number)
 					delay 0.5
 					if (efiCheckIsRunning is not equal to 0) then exit repeat
 				end repeat
@@ -514,53 +514,35 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	
 	-- HIDE ADMIN USER
 	try
-		if ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :dsAttrTypeNative\\:IsHidden:0' /dev/stdin <<< \"$(dscl -plist . -read /Users/" & adminUsername & " IsHidden 2> /dev/null)\" 2> /dev/null")) is not equal to "1") then
+		if ((do shell script ("dscl -plist . -read /Users/" & adminUsername & " IsHidden | xmllint --xpath '//string[1]/text()' -; exit 0")) is not equal to "1") then
 			do shell script ("dscl . -create /Users/" & adminUsername & " IsHidden 1") user name adminUsername password adminPassword with administrator privileges
 		end if
 	end try
 	
-	-- DISABLE SLEEP
 	try
-		do shell script "pmset -a sleep 0 displaysleep 0" user name adminUsername password adminPassword with administrator privileges
+		do shell script "
+# DISABLE SLEEP
+pmset -a sleep 0 displaysleep 0
+
+# SET GLOBAL LANGUAGE AND LOCALE
+defaults write '/Library/Preferences/.GlobalPreferences' AppleLanguages -array 'en-US'
+defaults write '/Library/Preferences/.GlobalPreferences' AppleLocale -string 'en_US'
+defaults write '/Library/Preferences/.GlobalPreferences' AppleMeasurementUnits -string 'Inches'
+defaults write '/Library/Preferences/.GlobalPreferences' AppleMetricUnits -bool false
+defaults write '/Library/Preferences/.GlobalPreferences' AppleTemperatureUnit -string 'Fahrenheit'
+defaults write '/Library/Preferences/.GlobalPreferences' AppleTextDirection -bool false
+" user name adminUsername password adminPassword with administrator privileges
 	end try
 	
-	-- SET LANGUAGE AND LOCALE
-	try
-		do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleLanguages -array 'en-US'" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleLocale -string 'en_US'" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleMeasurementUnits -string 'Inches'" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleMetricUnits -bool false" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleTemperatureUnit -string 'Fahrenheit'" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/.GlobalPreferences' AppleTextDirection -bool false" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write NSGlobalDomain AppleLanguages -array 'en-US'"
-	end try
-	try
-		do shell script "defaults write NSGlobalDomain AppleLocale -string 'en_US'"
-	end try
-	try
-		do shell script "defaults write NSGlobalDomain AppleMeasurementUnits -string 'Inches'"
-	end try
-	try
-		do shell script "defaults write NSGlobalDomain AppleMetricUnits -bool false"
-	end try
-	try
-		do shell script "defaults write NSGlobalDomain AppleTemperatureUnit -string 'Fahrenheit'"
-	end try
-	try
-		do shell script "defaults write NSGlobalDomain AppleTextDirection -bool false"
-	end try
+	-- SET USER LANGUAGE AND LOCALE
+	do shell script "
+defaults write NSGlobalDomain AppleLanguages -array 'en-US'
+defaults write NSGlobalDomain AppleLocale -string 'en_US'
+defaults write NSGlobalDomain AppleMeasurementUnits -string 'Inches'
+defaults write NSGlobalDomain AppleMetricUnits -bool false
+defaults write NSGlobalDomain AppleTemperatureUnit -string 'Fahrenheit'
+defaults write NSGlobalDomain AppleTextDirection -bool false
+"
 	
 	-- DELETE ALL LOCAL SNAPSHOTS
 	if (isCatalinaOrNewer) then
@@ -570,8 +552,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	else
 		try
 			set allLocalSnapshots to do shell script "tmutil listlocalsnapshots / | cut -d '.' -f 4"
-			set AppleScript's text item delimiters to {linefeed, return}
-			repeat with thisLocalSnapshot in (every text item of allLocalSnapshots)
+			repeat with thisLocalSnapshot in (paragraphs of allLocalSnapshots)
 				try
 					-- Have to delete each Snapshot individually on High Sierra
 					do shell script ("tmutil deletelocalsnapshots " & (quoted form of (thisLocalSnapshot as string)))
@@ -584,12 +565,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	try
 		do shell script "systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
 	end try
-	try
-		do shell script "defaults write com.apple.menuextra.clock FlashDateSeparators -bool false"
-	end try
-	try
-		do shell script "defaults write com.apple.menuextra.clock IsAnalog -bool false"
-	end try
+	do shell script "defaults write com.apple.menuextra.clock FlashDateSeparators -bool false; defaults write com.apple.menuextra.clock IsAnalog -bool false"
 	set currentClockFormat to "UNKNOWN CLOCK FORMAT"
 	set intendedClockFormat to "EEE MMM d  h:mm:ss a"
 	try
@@ -597,33 +573,27 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	end try
 	if (currentClockFormat is not equal to intendedClockFormat) then
 		if (isBigSurOrNewer) then
-			# Need to set these keys AND DateFormat on macOS 11 Big Sur, but older versions of macOS only use DateFormat.
-			try
-				do shell script "defaults write com.apple.menuextra.clock Show24Hour -bool false"
-			end try
-			try
-				do shell script "defaults write com.apple.menuextra.clock ShowAMPM -bool true"
-			end try
-			try
-				do shell script "defaults write com.apple.menuextra.clock ShowDayOfMonth -bool true"
-			end try
-			try
-				do shell script "defaults write com.apple.menuextra.clock ShowDayOfWeek -bool true"
-			end try
-			try
-				do shell script "defaults write com.apple.menuextra.clock ShowSeconds -bool true" # Must still set format after setting these prefs (and seconds won't get updated if we ONLY set the format).
-			end try
+			-- Need to set these keys AND DateFormat on macOS 11 Big Sur, but older versions of macOS only use DateFormat.
+			do shell script "
+defaults write com.apple.menuextra.clock Show24Hour -bool false
+defaults write com.apple.menuextra.clock ShowAMPM -bool true
+defaults write com.apple.menuextra.clock ShowDayOfMonth -bool true
+defaults write com.apple.menuextra.clock ShowDayOfWeek -bool true
+defaults write com.apple.menuextra.clock ShowSeconds -bool true
+" -- Must still set format after setting these prefs (and seconds won't get updated if we ONLY set the format).
 		end if
 		
-		do shell script ("defaults write com.apple.menuextra.clock DateFormat -string " & (quoted form of intendedClockFormat))
+		do shell script ("
+defaults write com.apple.menuextra.clock DateFormat -string " & (quoted form of intendedClockFormat) & "
+defaults export com.apple.menuextra.clock -") -- Seems that restarting SystemUIServer or ControlCenter does not always update the menubar clock. Exporting the prefs (just to stdout) may help to forcibly sync the prefs to make the restart work better.
 		
-		do shell script "defaults read com.apple.menuextra.clock" # Seems that restarting SystemUIServer or ControlCenter does not always update the menubar clock. Reading the prefs may help sync them to make the restart work.
-		
-		if (isBigSurOrNewer) then
-			do shell script "killall ControlCenter" # Restarting ControlCenter is required to make changes take effect immediately on macOS 11 Big Sur or newer.
-		else
-			do shell script "killall SystemUIServer" # Restarting SystemUIServer is required to make changes take effect immediately on macOS 10.15 Catalina or older.
-		end if
+		try
+			if (isBigSurOrNewer) then
+				do shell script "killall ControlCenter" -- Restarting ControlCenter is required to make changes take effect immediately on macOS 11 Big Sur or newer.
+			else
+				do shell script "killall SystemUIServer" -- Restarting SystemUIServer is required to make changes take effect immediately on macOS 10.15 Catalina or older.
+			end if
+		end try
 	end if
 	
 	-- DISABLE REOPEN WINDOWS ON LOGIN
@@ -634,29 +604,19 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	-- DISABLE AUTOMATIC OS & APP STORE  UPDATES
 	-- Keeping AutomaticCheckEnabled and AutomaticDownload enabled is required for EFIAllowListAll to be able to be updated when EFIcheck is run by our scripts, the rest should be disabled.
 	try
-		do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticCheckEnabled -bool true" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticDownload -bool true" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' ConfigDataInstall -bool false" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' CriticalUpdateInstall -bool false" user name adminUsername password adminPassword with administrator privileges
-	end try
-	try
-		do shell script "defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false" user name adminUsername password adminPassword with administrator privileges
-	end try
-	if (isMojaveOrNewer) then
-		try
+		do shell script "
+defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticCheckEnabled -bool true
+defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticDownload -bool true
+defaults write '/Library/Preferences/com.apple.SoftwareUpdate' ConfigDataInstall -bool false
+defaults write '/Library/Preferences/com.apple.SoftwareUpdate' CriticalUpdateInstall -bool false
+defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false
+" user name adminUsername password adminPassword with administrator privileges
+		if (isMojaveOrNewer) then
 			do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticallyInstallMacOSUpdates -bool false" user name adminUsername password adminPassword with administrator privileges
-		end try
-	else
-		try
+		else
 			do shell script "defaults write '/Library/Preferences/com.apple.commerce' AutoUpdateRestartRequired -bool false" user name adminUsername password adminPassword with administrator privileges
-		end try
-	end if
+		end if
+	end try
 	
 	-- DO NOT SHOW INTERNAL/BOOT DRIVE ON DESKTOP AND SET NEW FINDER WINDOWS TO COMPUTER
 	tell application "Finder" to tell Finder preferences
@@ -665,25 +625,16 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		set desktop shows removable media to true
 		set desktop shows connected servers to true
 	end tell
-	try
-		do shell script "defaults write com.apple.finder NewWindowTarget -string 'PfCm'"
-	end try
-	try
-		do shell script "defaults delete com.apple.finder NewWindowTargetPath"
-	end try
+	do shell script "defaults delete com.apple.finder NewWindowTargetPath; defaults write com.apple.finder NewWindowTarget -string 'PfCm'"
 	
 	-- SET SCREEN ZOOM TO USE SCROLL GESTURE WITH MODIFIER KEY, ZOOM FULL SCREEN, AND MOVE CONTINUOUSLY WITH POINTER
 	-- This can only work on High Sierra, the pref is protected on Mojave and newer: https://eclecticlight.co/2020/03/04/how-macos-10-14-and-later-overrides-write-permission-on-some-files/
 	if (not isMojaveOrNewer) then
-		try
-			do shell script "defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true"
-		end try
-		try
-			do shell script "defaults write com.apple.universalaccess closeViewZoomMode -int 0"
-		end try
-		try
-			do shell script "defaults write com.apple.universalaccess closeViewPanningMode -int 0"
-		end try
+		do shell script "
+defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true
+defaults write com.apple.universalaccess closeViewZoomMode -int 0
+defaults write com.apple.universalaccess closeViewPanningMode -int 0
+"
 	end if
 	
 	-- SET DESIRED MOUSE SETTINGS
@@ -705,8 +656,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	-- HIDE ANY SYSTEM PREFERENCES BADGES FOR ANY UPDATES (such as Big Sur)
 	try
 		if ((do shell script "defaults read com.apple.systempreferences AttentionPrefBundleIDs") is not equal to "0") then
-			do shell script "defaults write com.apple.systempreferences AttentionPrefBundleIDs 0"
-			do shell script "killall Dock"
+			do shell script "defaults write com.apple.systempreferences AttentionPrefBundleIDs 0; killall Dock"
 		end if
 	end try
 	
@@ -724,13 +674,11 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		
 		if ((currentTouchBarPresentationModeGlobal is not equal to "fullControlStrip") or (currentTouchBarPresentationModeFnModes does not contain "fullControlStrip = functionKeys")) then
 			try
-				do shell script "defaults write com.apple.touchbar.agent PresentationModeGlobal fullControlStrip"
-			end try
-			try
-				do shell script "defaults write com.apple.touchbar.agent PresentationModeFnModes -dict fullControlStrip functionKeys"
-			end try
-			try
-				do shell script "killall ControlStrip"
+				do shell script "
+defaults write com.apple.touchbar.agent PresentationModeGlobal fullControlStrip
+defaults write com.apple.touchbar.agent PresentationModeFnModes -dict fullControlStrip functionKeys
+killall ControlStrip
+"
 			end try
 		end if
 	end try
@@ -743,56 +691,14 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		end try
 		
 		if ((currentHIToolboxAppleDictationAutoEnable is not equal to "0")) then
-			try
-				do shell script "defaults write com.apple.HIToolbox AppleDictationAutoEnable -int 0"
-			end try
-		end if
-	end try
-	
-	-- HIDE ALL SETUP ASSISTANT SCREENS (Don't want to see any Setup Assistant screens, such as after an OS Update)
-	try
-		set currentDidntSeeSetupScreenPrefs to "UNKNOWN"
-		try
-			set currentDidntSeeSetupScreenPrefs to (do shell script "defaults read com.apple.SetupAssistant | grep -x '    DidSee.* = 0;'")
-		end try
-		
-		if ((currentDidntSeeSetupScreenPrefs contains "DidSee") and (currentDidntSeeSetupScreenPrefs contains "= 0;")) then
-			repeat with thisDidntSeeSetupScreenPref in (words of currentDidntSeeSetupScreenPrefs)
-				if (thisDidntSeeSetupScreenPref starts with "DidSee") then
-					try
-						do shell script ("defaults write com.apple.SetupAssistant " & thisDidntSeeSetupScreenPref & " -bool true")
-					end try
-				end if
-			end repeat
-		end if
-		
-		set currentLastSeenSetupScreenPrefs to "UNKNOWN"
-		try
-			set currentLastSeenSetupScreenPrefs to (do shell script "defaults read com.apple.SetupAssistant | grep '^    LastSeen.* ='")
-		end try
-		
-		if (currentLastSeenSetupScreenPrefs contains "LastSeen") then
-			repeat with thisLastSeenSetupScreenPref in (words of currentLastSeenSetupScreenPrefs)
-				if (thisLastSeenSetupScreenPref starts with "LastSeen") then
-					if (thisLastSeenSetupScreenPref contains "BuildVersion") then
-						try
-							do shell script ("defaults write com.apple.SetupAssistant " & thisLastSeenSetupScreenPref & " -string \"$(sw_vers -buildVersion)\"")
-						end try
-					else if (thisLastSeenSetupScreenPref contains "ProductVersion") then
-						try
-							do shell script ("defaults write com.apple.SetupAssistant " & thisLastSeenSetupScreenPref & " -string " & (quoted form of systemVersion))
-						end try
-					end if
-				end if
-			end repeat
+			do shell script "defaults write com.apple.HIToolbox AppleDictationAutoEnable -int 0"
 		end if
 	end try
 	
 	-- REMOVE ALL SHARED FOLDERS & SHAREPOINT GROUPS
 	try
 		set sharedFolderNames to (do shell script "sharing -l | grep 'name:		' | cut -c 8-")
-		set AppleScript's text item delimiters to {linefeed, return}
-		repeat with thisSharedFolderName in (every text item of sharedFolderNames)
+		repeat with thisSharedFolderName in (paragraphs of sharedFolderNames)
 			try
 				do shell script ("sharing -r " & (quoted form of thisSharedFolderName)) user name adminUsername password adminPassword with administrator privileges
 			end try
@@ -800,8 +706,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	end try
 	try
 		set sharePointGroups to (do shell script "dscl . -list /Groups | grep com.apple.sharepoint.group")
-		set AppleScript's text item delimiters to {linefeed, return}
-		repeat with thisSharePointGroupName in (every text item of sharePointGroups)
+		repeat with thisSharePointGroupName in (paragraphs of sharePointGroups)
 			try
 				do shell script ("dseditgroup -o delete " & (quoted form of thisSharePointGroupName)) user name adminUsername password adminPassword with administrator privileges
 			end try
@@ -815,12 +720,11 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	set intendedComputerName to ("Free Geek - " & thisDriveName & " - " & serialNumber)
 	if (currentComputerName is not equal to intendedComputerName) then
 		try
-			do shell script "scutil --set ComputerName " & (quoted form of intendedComputerName) user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
 			set AppleScript's text item delimiters to ""
 			set intendedLocalHostName to "FreeGeek-" & ((words of thisDriveName) as string) & "-" & serialNumber
-			do shell script "scutil --set LocalHostName " & (quoted form of intendedLocalHostName) user name adminUsername password adminPassword with administrator privileges
+			do shell script ("
+scutil --set ComputerName " & (quoted form of intendedComputerName) & "
+scutil --set LocalHostName " & (quoted form of intendedLocalHostName)) user name adminUsername password adminPassword with administrator privileges
 		end try
 	end if
 	
@@ -926,35 +830,33 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	do shell script "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO" user name adminUsername password adminPassword with administrator privileges
 	
 	try
-		do shell script "defaults delete eficheck"
+		do shell script "defaults delete eficheck; tccutil reset SystemPolicyAllFiles"
 	end try
 	
 	try
-		do shell script "tccutil reset SystemPolicyAllFiles"
+		do shell script ("rm -rf /private/var/db/softwareupdate/journal.plist " & ¬
+			"'/Users/Shared/Relocated Items' " & ¬
+			"'/Users/" & adminUsername & "/Library/Application Support/App Store/updatejournal.plist' " & ¬
+			"/Users/" & adminUsername & "/Library/Preferences/ByHost/* " & ¬
+			"/Users/" & adminUsername & "/.bash_history " & ¬
+			"/Users/" & adminUsername & "/.bash_sessions " & ¬
+			"/Users/" & adminUsername & "/.zsh_history " & ¬
+			"/Users/" & adminUsername & "/.zsh_sessions " & ¬
+			"/Users/" & adminUsername & "/_geeks3d_gputest_log.txt " & ¬
+			"'/Users/" & adminUsername & "/Library/Application Support/keyboard-test'* " & ¬
+			"'/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt' " & ¬
+			"'/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	try
-		do shell script ("rm -f /private/var/db/softwareupdate/journal.plist; " & ¬
-			"rm -rf '/Users/Shared/Relocated Items'; " & ¬
-			"rm -f '/Users/" & adminUsername & "/Library/Application Support/App Store/updatejournal.plist'; " & ¬
-			"rm -rf /Users/" & adminUsername & "/Library/Preferences/ByHost/*; " & ¬
-			"rm -f /Users/" & adminUsername & "/.bash_history; " & ¬
-			"rm -rf /Users/" & adminUsername & "/.bash_sessions; " & ¬
-			"rm -f /Users/" & adminUsername & "/.zsh_history; " & ¬
-			"rm -f /Users/" & adminUsername & "/_geeks3d_gputest_log.txt; " & ¬
-			"rm -rf /Users/" & adminUsername & "/Library/Application\\ Support/keyboard-test*; " & ¬
-			"rm -f '/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt'; " & ¬
-			"rm -rf '/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
-	end try
-	
-	try
-		do shell script ("rm -f '/Users/" & currentUsername & "/Library/Application Support/App Store/updatejournal.plist'; " & ¬
-			"rm -rf /Users/" & currentUsername & "/Library/Preferences/ByHost/*; " & ¬
-			"rm -f /Users/" & currentUsername & "/.bash_history; " & ¬
-			"rm -rf /Users/" & currentUsername & "/.bash_sessions; " & ¬
-			"rm -f /Users/" & currentUsername & "/.zsh_history; " & ¬
-			"rm -f /Users/" & currentUsername & "/_geeks3d_gputest_log.txt; " & ¬
-			"rm -rf /Users/" & currentUsername & "/Library/Application\\ Support/keyboard-test*")
+		do shell script ("rm -rf '/Users/" & currentUsername & "/Library/Application Support/App Store/updatejournal.plist' " & ¬
+			"/Users/" & currentUsername & "/Library/Preferences/ByHost/* " & ¬
+			"/Users/" & currentUsername & "/.bash_history " & ¬
+			"/Users/" & currentUsername & "/.bash_sessions " & ¬
+			"/Users/" & currentUsername & "/.zsh_history " & ¬
+			"/Users/" & currentUsername & "/.zsh_sessions " & ¬
+			"/Users/" & currentUsername & "/_geeks3d_gputest_log.txt " & ¬
+			"'/Users/" & currentUsername & "/Library/Application Support/keyboard-test'*")
 	end try
 	
 	-- TRASH DESKTOP FILES WITH FINDER INSTEAD OF RM SO FOLDER ACCESS IS NOT NECESSARY ON CATALINA AND NEWER
@@ -987,25 +889,15 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	
 	-- DISABLE NOTIFICATIONS
 	try
-		do shell script "defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplayLock -bool true"
-	end try
-	try
-		do shell script "defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplaySleep -bool true"
-	end try
-	try
-		do shell script "defaults -currentHost write com.apple.notificationcenterui dndMirroring -bool true"
-	end try
-	try
-		do shell script "defaults -currentHost write com.apple.notificationcenterui dndEnd -float 1439"
-	end try
-	try
-		do shell script "defaults -currentHost write com.apple.notificationcenterui dndStart -float 0"
-	end try
-	try
-		do shell script "defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool false"
-	end try
-	try
-		do shell script "killall usernoted"
+		do shell script "
+defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplayLock -bool true
+defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplaySleep -bool true
+defaults -currentHost write com.apple.notificationcenterui dndMirroring -bool true
+defaults -currentHost write com.apple.notificationcenterui dndEnd -float 1439
+defaults -currentHost write com.apple.notificationcenterui dndStart -float 0
+defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool false
+killall usernoted
+"
 	end try
 	try
 		with timeout of 1 second
@@ -1147,75 +1039,38 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		end if
 	end try
 	
-	if ((year of the (current date)) < 2021) then
+	if ((year of the (current date)) < 2022) then
 		try
-			do shell script "systemsetup -setusingnetworktime off" user name adminUsername password adminPassword with administrator privileges
-		end try
-		try
-			do shell script "systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
+			do shell script "systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
 		end try
 	end if
 	
 	try -- Don't quit apps if "TESTING" flag folder exists on desktop
 		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
 	on error
-		set shouldQuitFirmwareChecker to true
-		try
-			do shell script "pgrep Installer" user name adminUsername password adminPassword with administrator privileges
-			set shouldQuitFirmwareChecker to false
-		end try
-		
-		set shouldQuitRestoreOS to true
-		try
-			do shell script "pgrep asr" user name adminUsername password adminPassword with administrator privileges
-			set shouldQuitRestoreOS to false
-		end try
-		try
-			do shell script "pgrep diskutil" user name adminUsername password adminPassword with administrator privileges
-			set shouldQuitRestoreOS to false
-		end try
-		
 		try
 			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
 			if ((count of listOfRunningApps) > 0) then
 				try
 					repeat with thisAppName in listOfRunningApps
-						set shouldQuitThisApp to true
-						if (((thisAppName as string) is equal to "Firmware Checker") or ((thisAppName as string) is equal to "Installer")) then
-							set shouldQuitThisApp to shouldQuitFirmwareChecker
-						else if (((thisAppName as string) is equal to "Restore OS") or ((thisAppName as string) is equal to "Disk Utility")) then
-							set shouldQuitThisApp to shouldQuitRestoreOS
-						end if
-						
-						if (shouldQuitThisApp) then
-							try
-								if (application thisAppName is running) then
-									with timeout of 1 second
-										tell application thisAppName to quit
-									end timeout
-								end if
-							end try
-						end if
+						try
+							if (application thisAppName is running) then
+								with timeout of 1 second
+									tell application thisAppName to quit
+								end timeout
+							end if
+						end try
 					end repeat
 				end try
 				delay 3
 				try
 					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
 					repeat with thisAppName in listOfRunningApps
-						set shouldQuitThisApp to true
-						if (((thisAppName as string) is equal to "Firmware Checker") or ((thisAppName as string) is equal to "Installer")) then
-							set shouldQuitThisApp to shouldQuitFirmwareChecker
-						else if (((thisAppName as string) is equal to "Restore OS") or ((thisAppName as string) is equal to "Disk Utility")) then
-							set shouldQuitThisApp to shouldQuitRestoreOS
-						end if
-						
-						if (shouldQuitThisApp) then
-							repeat 2 times
-								try
-									do shell script "pkill -f " & (quoted form of thisAppName)
-								end try
-							end repeat
-						end if
+						repeat 2 times
+							try
+								do shell script "pkill -f " & (quoted form of thisAppName)
+							end try
+						end repeat
 					end repeat
 				end try
 			end if
@@ -1344,8 +1199,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 			((buildInfoPath as POSIX file) as alias)
 			
 			try
-				set AppleScript's text item delimiters to {linefeed, return}
-				set buildInfoFGflags to (every text item of (do shell script "ls -1 /Users/Shared/Build\\ Info/.fg*"))
+				set buildInfoFGflags to (paragraphs of (do shell script ("ls " & (quoted form of (buildInfoPath & ".fg")) & "*")))
 				
 				repeat with thisBuildInfoFGflag in buildInfoFGflags
 					if (thisBuildInfoFGflag starts with (buildInfoPath & ".fgLaunchAfterSetup-")) then
@@ -1376,7 +1230,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 			end try
 			
 			try
-				do shell script "ls -1 /Users/Shared/Build\\ Info/.fg*"
+				do shell script (do shell script ("ls " & (quoted form of (buildInfoPath & ".fg")) & "*"))
 			on error -- Only delete "Build Info" if no more .fg flag files are left.
 				try
 					do shell script ("rm -rf " & (quoted form of buildInfoPath)) user name adminUsername password adminPassword with administrator privileges
@@ -1400,7 +1254,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	on error
 		try
 			if (freeGeekUpdaterExists) then
-				-- Wait for Internet before launching Free Geek Updater to ensure that updates can be retrieved.
+				-- Wait for internet before launching Free Geek Updater to ensure that updates can be retrieved.
 				repeat 60 times
 					try
 						do shell script "ping -c 1 www.google.com"

@@ -3,7 +3,7 @@
 #
 # Created by Pico Mitchell on 4/30/17.
 # For MacLand @ Free Geek
-# Version: 2021.12.31-1
+# Version: 2022.4.8-1
 #
 # MIT License
 #
@@ -19,6 +19,8 @@
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
+
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
 readonly ADMIN_USERNAME='fg-admin'
 ADMIN_PASSWORD='[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]'
@@ -252,19 +254,18 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
         prevent_scrolling_past_progress_display
 
         for dscl_list_users_attempt in {1..30}; do
-            dscl_list_users_before_output="$(dscl . -list '/Users' 2> /dev/null | grep -v '^_')"
-            
-            if [[ -z "${dscl_list_users_before_output}" ]]; then
+            if [[ -z "$(dscl . -list /Users 2> /dev/null)" ]]; then
                 prevent_scrolling_past_progress_display
-                if $DEBUG_MODE; then echo "Waiting for Open Directory (Attempt $dscl_list_users_attempt)..."; fi
+                if $DEBUG_MODE; then echo "Waiting for Open Directory (Attempt ${dscl_list_users_attempt})..."; fi
                 # Wait and try again to make sure everything is fully loaded and ready after loading opendirectoryd
                 sleep 1
             else
                 debug_log_and_step 'launchctl_load_opendirectoryd_output' "${launchctl_load_opendirectoryd_output}"
 
+                dscl_list_users_before_output="$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
                 # Remove "Guest" user from list because we will attempt to delete it no matter what and don't want its existence to complicate checking for actual allowed users.
                 dscl_list_users_before_output="${dscl_list_users_before_output//Guest/}"
-                dscl_list_users_before_output="$(echo -e "${dscl_list_users_before_output}" | sort | xargs)"
+                dscl_list_users_before_output="$(echo "${dscl_list_users_before_output}" | sort | xargs)"
                 debug_log_and_step 'dscl_list_users_before_output' "${dscl_list_users_before_output}"
                 prevent_scrolling_past_progress_display
                 break
@@ -272,7 +273,7 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
         done
         
         # Do not add "Guest" in the approved list because it's ignored from dscl_list_users_before_output
-        allowed_before_usernames="$(echo -e "daemon\nnobody\nroot\n${ADMIN_USERNAME}\n${DEMO_USERNAME}" | sort -u | xargs)"
+        allowed_before_usernames="$(echo -e "${ADMIN_USERNAME}\n${DEMO_USERNAME}" | sort -u | xargs)"
         debug_log_and_step 'allowed_before_usernames' "${allowed_before_usernames}"
         
         if [[ "${dscl_list_users_before_output}" == "${allowed_before_usernames}" ]]; then
@@ -291,7 +292,7 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             demo_user_uid="$(id -u "${DEMO_USERNAME}" 2> /dev/null)"
             
             # This SHOULD always work (unless DEMO_USERNAME and ADMIN_USERNAME are the same) because DEMO_USERNAME will never be last Administrator or last Secure Token User.
-            # BUT, it fails 10.13 with an error about being last Administrator or last Secure Token User, even though it's not. It works on 10.14 though.
+            # BUT, it fails on 10.13 with an error about being last Administrator or last Secure Token User, even though it's not. It works on 10.14 though.
             sysadminctl_delete_demo_output="$(sudo sysadminctl -deleteUser "${DEMO_USERNAME}" 2>&1)"
             debug_log_and_step 'sysadminctl_delete_demo_output' "${sysadminctl_delete_demo_output}"
             prevent_scrolling_past_progress_display
@@ -385,27 +386,25 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             fi
         fi
 
-        dscl_list_users_after_output="$(dscl . -list '/Users' 2> /dev/null | grep -v '^_' | sort | xargs)"
+        dscl_list_users_after_output="$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
         debug_log_and_step 'dscl_list_users_after_output' "${dscl_list_users_after_output}"
         prevent_scrolling_past_progress_display
 
-        dscl_read_admin_members_after_output="$(/usr/libexec/PlistBuddy -c 'Print :dsAttrTypeStandard\:GroupMembers' /dev/stdin <<< "$(dscl -plist . -read '/Groups/admin' GroupMembers 2> /dev/null)" 2> /dev/null | awk '(($NF != "{") && ($NF != "}")) { print $NF }' | sort | xargs)"
+        dscl_read_admin_members_after_output="$(PlistBuddy -c 'Print :dsAttrTypeStandard\:GroupMembers' /dev/stdin <<< "$(dscl -plist . -read '/Groups/admin' GroupMembers 2> /dev/null)" 2> /dev/null | awk '(($NF != "{") && ($NF != "}")) { print $NF }' | sort | xargs)"
         debug_log_and_step 'dscl_read_admin_members_after_output' "${dscl_read_admin_members_after_output}"
         prevent_scrolling_past_progress_display
 
-        dscl_read_admin_membership_after_output="$(/usr/libexec/PlistBuddy -c 'Print :dsAttrTypeStandard\:GroupMembership' /dev/stdin <<< "$(dscl -plist . -read '/Groups/admin' GroupMembership 2> /dev/null)" 2> /dev/null | awk '(($NF != "{") && ($NF != "}")) { print $NF }' | sort | xargs)"
+        dscl_read_admin_membership_after_output="$(PlistBuddy -c 'Print :dsAttrTypeStandard\:GroupMembership' /dev/stdin <<< "$(dscl -plist . -read '/Groups/admin' GroupMembership 2> /dev/null)" 2> /dev/null | awk '(($NF != "{") && ($NF != "}")) { print $NF }' | sort | xargs)"
         debug_log_and_step 'dscl_read_admin_membership_after_output' "${dscl_read_admin_membership_after_output}"
         prevent_scrolling_past_progress_display
 
-        dscl_read_root_user_guid_output="$(/usr/libexec/PlistBuddy -c 'Print :dsAttrTypeStandard\:GeneratedUID:0' /dev/stdin <<< "$(dscl -plist . -read '/Users/root' GeneratedUID 2> /dev/null)" 2> /dev/null)"
+        dscl_read_root_user_guid_output="$(dscl -plist . -read '/Users/root' GeneratedUID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)"
         debug_log_and_step 'dscl_read_root_user_guid_output' "${dscl_read_root_user_guid_output}"
         prevent_scrolling_past_progress_display
         
-        allowed_after_usernames='daemon nobody root'
         allowed_after_admin_membership='root'
         allowed_after_admin_members="${dscl_read_root_user_guid_output}"
         
-        debug_log_and_step 'allowed_after_usernames' "${allowed_after_usernames}"
         debug_log_and_step 'allowed_after_admin_members' "${allowed_after_admin_members}"
         debug_log_and_step 'allowed_after_admin_membership' "${allowed_after_admin_membership}"
 
@@ -414,7 +413,7 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
         fgreset_progress_display="${fgreset_progress_display/Deleting User Accounts - PLEASE WAIT, THIS MAY TAKE A FEW MOMENTS.../Deleting User Accounts...\\033[K}"
         display_progress_and_hide_system_log
 
-        if [[ "${dscl_list_users_after_output}" == "${allowed_after_usernames}" && "${dscl_read_admin_members_after_output}" == "${allowed_after_admin_members}" && "${dscl_read_admin_membership_after_output}" == "${allowed_after_admin_membership}" && "$1" != 'debug_fail_account' ]]; then
+        if [[ -z "${dscl_list_users_after_output}" && "${dscl_read_admin_members_after_output}" == "${allowed_after_admin_members}" && "${dscl_read_admin_membership_after_output}" == "${allowed_after_admin_membership}" && "$1" != 'debug_fail_account' ]]; then
             fgreset_progress_display+="
 
     ${ANSI_GREEN}Successfully Deleted User Accounts${CLEAR_ANSI}
@@ -573,9 +572,6 @@ ${ANSI_YELLOW}>> USER ACCOUNTS DEBUG INFO >>
 
 dscl_list_users_before_output:
 ${dscl_list_users_before_output}
-
-allowed_after_usernames:
-${allowed_after_usernames}
 
 allowed_after_admin_members:
 ${allowed_after_admin_members}

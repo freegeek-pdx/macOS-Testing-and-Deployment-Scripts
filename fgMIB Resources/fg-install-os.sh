@@ -19,19 +19,19 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-readonly SCRIPT_VERSION='2021.12.31-1'
+readonly SCRIPT_VERSION='2022.4.11-1'
+
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
 readonly SCRIPT_DIR="${0%/*}" # Do not use dirname since it won't exist in recoveryOS and this script will always be launched by full path so this should always work.
 
 IS_RECOVERY_OS="$([[ -d '/System/Installation' && ! -f '/usr/bin/pico' ]] && echo 'true' || echo 'false')" # The specified folder should exist in recoveryOS and the file should not.
 readonly IS_RECOVERY_OS
 
-BOOTED_DARWIN_MAJOR_VERSION="$(sw_vers -buildVersion | cut -c -2 | tr -cd '[:digit:]')" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc. ("uname -r" is not available in recoveryOS).
+BOOTED_DARWIN_MAJOR_VERSION="$(sw_vers -buildVersion | cut -c -2 | tr -dc '[:digit:]')" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc. ("uname -r" is not available in recoveryOS).
 readonly BOOTED_DARWIN_MAJOR_VERSION
 
 caffeinate_pid=''
-
-PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add /usr/libexec to PATH for easy access to PlistBuddy.
 
 if $IS_RECOVERY_OS; then
 	# Disable sleep in recoveryOS.
@@ -111,13 +111,21 @@ if [[ -z "${MODEL_ID}" ]]; then MODEL_ID='UNKNOWN Model Identifier'; fi
 readonly MODEL_ID
 
 SHORT_MODEL_NAME="${MODEL_ID//[0-9,]/}"
-short_model_name_end_components=( 'Pro' 'Air' 'mini' )
-for this_short_model_name_end_component in "${short_model_name_end_components[@]}"; do
-	if [[ "${SHORT_MODEL_NAME}" == *"${this_short_model_name_end_component}" ]]; then
-		SHORT_MODEL_NAME="${SHORT_MODEL_NAME/${this_short_model_name_end_component}/ ${this_short_model_name_end_component}}"
-		break
-	fi
-done
+if [[ "${SHORT_MODEL_NAME}" == 'Mac' ]]; then
+	SHORT_MODEL_NAME='Mac Studio' # The Mac Studio has a "MacXX,Y" Model Identifier without any "Studio" suffix (https://twitter.com/ClassicII_MrMac/status/1506146498198835206).
+	# It's unclear if this is going to be a new style for all new Apple Silicon Macs from this point on or if the Mac Studio is actually internally considered a no suffix model,
+	# like the MacBook (this person thinks all future Macs will be idenfied without a suffix, but I dunno: https://mobile.twitter.com/khronokernel/status/1501411685482958853)
+	# TODO: Will need to keep an eye on this when future Apple Silicon Macs are released to see if all models will only get a "MacXX,Y" Model ID,
+	# in which case we'll likely need to check the local Marketing Model Name here to extract the Short Model Name when "system_profiler" isn't available.
+else
+	short_model_name_end_components=( 'Pro' 'Air' 'mini' )
+	for this_short_model_name_end_component in "${short_model_name_end_components[@]}"; do
+		if [[ "${SHORT_MODEL_NAME}" == *"${this_short_model_name_end_component}" ]]; then
+			SHORT_MODEL_NAME="${SHORT_MODEL_NAME/${this_short_model_name_end_component}/ ${this_short_model_name_end_component}}"
+			break
+		fi
+	done
+fi
 readonly SHORT_MODEL_NAME
 
 readonly MODEL_ID_NUMBER="${MODEL_ID//[^0-9,]/}"
@@ -182,7 +190,7 @@ load_specs_overview() {
 
 				if [[ "${EUID:-$(id -u)}" == '0' ]]; then # If running as root, check for the cached Marketing Model Name from the current user and if not found check for it from any and all other users.
 					local current_user_id
-					current_user_id="$(scutil <<< 'show State:/Users/ConsoleUser' | awk '($1 == "UID") { print $NF; exit }')"
+					current_user_id="$(echo 'show State:/Users/ConsoleUser' | scutil | awk '($1 == "UID") { print $NF; exit }')"
 					local current_user_name
 					if [[ "${current_user_id}" && "${current_user_id}" != '0' ]]; then
 						current_user_name="$(dscl /Search -search /Users UniqueID "${current_user_id}" | awk '{ print $1; exit }')"
@@ -206,7 +214,7 @@ load_specs_overview() {
 							if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
 								user_name_for_home="$(dscl /Search -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
 								if [[ -n "${user_name_for_home}" ]]; then
-									user_id_for_home="$(PlistBuddy -c 'Print :dsAttrTypeStandard\:UniqueID:0' /dev/stdin <<< "$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null)" 2> /dev/null)"
+									user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)"
 									if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' && ( -z "${current_user_name}" || "${current_user_name}" != "${user_name_for_home}" ) ]]; then # No need to check current user in this loop since it was already checked.
 										possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${model_characters_of_serial_number}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${user_id_for_home}" sudo -u "${user_name_for_home}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
 										if [[ -n "${possible_marketing_model_name}" && "${possible_marketing_model_name}" == "${SHORT_MODEL_NAME}"* ]]; then
@@ -268,7 +276,7 @@ load_specs_overview() {
 							if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
 								user_name_for_home="$(dscl /Search -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
 								if [[ -n "${user_name_for_home}" ]]; then
-									user_id_for_home="$(PlistBuddy -c 'Print :dsAttrTypeStandard\:UniqueID:0' /dev/stdin <<< "$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null)" 2> /dev/null)"
+									user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)"
 									if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' ]]; then
 										user_id_for_cache="${user_id_for_home}"
 										user_name_for_cache="${user_name_for_home}"
@@ -395,10 +403,12 @@ set_date_time_from_internet() {
 }
 
 set_date_time_and_prompt_for_internet_if_year_not_correct() {
-	if $IS_RECOVERY_OS && (( $(date '+%Y') < 2021 )); then # Do not try to set date/time in full OS since using "systemsetup" would require "sudo" (and it's pretty safe to assume date/time is correct when in full OS).
+	actual_current_year="${SCRIPT_VERSION%%.*}" # Get the actual current year from the script version so it's always up-to-date.
+
+	if $IS_RECOVERY_OS && (( $(date '+%Y') < actual_current_year )); then # Do not try to set date/time in full OS since using "systemsetup" would require "sudo" (and it's pretty safe to assume date/time is correct when in full OS).
 		set_date_time_from_internet
 
-		while (( $(date '+%Y') < 2021 )); do
+		while (( $(date '+%Y') < actual_current_year )); do
 			load_specs_overview
 			ansi_clear_screen
 			echo -e "${FG_MIB_HEADER}${specs_overview}
@@ -482,22 +492,13 @@ copy_customization_resources() {
 		if ditto "${SCRIPT_DIR}/install-packages" "${customization_resources_install_path}"; then
 			chmod +x "${customization_resources_install_path}/fg-install-packages.sh"
 
-			echo '<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>org.freegeek.fg-install-packages</string>
-	<key>Program</key>
-	<string>/Users/Shared/fg-install-packages/fg-install-packages.sh</string>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-</dict>
-</plist>' > "${install_volume_path}/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist"
+			PlistBuddy \
+				-c 'Add :Label string org.freegeek.fg-install-packages' \
+				-c 'Add :Program string /Users/Shared/fg-install-packages/fg-install-packages.sh' \
+				-c 'Add :RunAtLoad bool true' \
+				-c 'Add :StandardOutPath string /dev/null' \
+				-c 'Add :StandardErrorPath string /dev/null' \
+				"${install_volume_path}/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist" &> /dev/null
 
 			if [[ -f "${install_volume_path}/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist" && -d "${customization_resources_install_path}" ]]; then
 				touch "${install_volume_path}/private/var/db/.AppleSetupDone"
@@ -932,7 +933,6 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 						clean_install_to_customize_path="${possible_clean_install_to_customize_path}"
 
 						if [[ -z "${clean_install_to_customize_path}" || ! -d "${clean_install_to_customize_path}" ]]; then
-							ansi_clear_screen
 							last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Selected Clean Installation No Longer Exists ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${ANSI_RED}\n     ${ANSI_BOLD}PATH:${ANSI_RED} ${os_installer_path}${CLEAR_ANSI}"
 
 							clean_install_to_customize_path=''
@@ -1024,7 +1024,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 	readonly SUPPORTS_CATALINA # Catalina supports same as Mojave
 	SUPPORTS_BIG_SUR="$([[ ( "${MODEL_ID}" == 'iMac14,4' ) || ( "${SHORT_MODEL_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '15' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook Pro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '11' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook Air' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${SHORT_MODEL_NAME}" == 'Mac mini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${SHORT_MODEL_NAME}" == 'Mac Pro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${SHORT_MODEL_NAME}" == 'iMac Pro' ) ]] && echo 'true' || echo 'false')"
 	readonly SUPPORTS_BIG_SUR
-	SUPPORTS_MONTEREY="$([[ ( "${SHORT_MODEL_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '16' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID}" == 'MacBookPro11,4' ) || ( "${MODEL_ID}" == 'MacBookPro11,5' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook Pro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '12' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook Air' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${SHORT_MODEL_NAME}" == 'Mac mini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${SHORT_MODEL_NAME}" == 'Mac Pro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${SHORT_MODEL_NAME}" == 'iMac Pro' ) ]] && echo 'true' || echo 'false')"
+	SUPPORTS_MONTEREY="$([[ ( "${SHORT_MODEL_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '16' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID}" == 'MacBookPro11,4' ) || ( "${MODEL_ID}" == 'MacBookPro11,5' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook Pro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '12' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook Air' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${SHORT_MODEL_NAME}" == 'Mac mini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${SHORT_MODEL_NAME}" == 'Mac Pro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${SHORT_MODEL_NAME}" == 'iMac Pro' ) || ( "${SHORT_MODEL_NAME}" == 'Mac Studio' ) ]] && echo 'true' || echo 'false')"
 	readonly SUPPORTS_MONTEREY
 
 	os_installer_search_group_prefixes=(
@@ -1051,7 +1051,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 		for this_os_installer_path in "${this_os_installer_search_group_paths[@]}"; do
 			if [[ -f "${this_os_installer_path}" ]]; then
 				this_os_installer_app_path="${this_os_installer_path%.app/*}.app"
-				this_os_installer_darwin_major_version="$(PlistBuddy -c 'Print :DTSDKBuild' "${this_os_installer_app_path}/Contents/Info.plist" 2> /dev/null | cut -c -2 | tr -cd '[:digit:]')"
+				this_os_installer_darwin_major_version="$(PlistBuddy -c 'Print :DTSDKBuild' "${this_os_installer_app_path}/Contents/Info.plist" 2> /dev/null | cut -c -2 | tr -dc '[:digit:]')"
 				if (( this_os_installer_darwin_major_version >= 10 )); then
 					if (( this_os_installer_darwin_major_version < BOOTED_DARWIN_MAJOR_VERSION )); then
 						echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Older Than Running OS${CLEAR_ANSI}"
@@ -1230,7 +1230,6 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 					os_installer_path="${possible_os_installer_path}"
 
 					if [[ -z "${os_installer_path}" || ! -f "${os_installer_path}" ]]; then
-						ansi_clear_screen
 						last_choose_os_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Selected macOS Installer No Longer Exists ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${ANSI_RED}\n     ${ANSI_BOLD}PATH:${ANSI_RED} ${os_installer_path%.app/*}.app${CLEAR_ANSI}"
 
 						os_installer_path=''
@@ -1716,7 +1715,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 										echo -e "${xartutil_output}\n" # Show current keys to technician.
 									fi
 
-									xartutil --erase-all <<< 'yes'
+									echo 'yes' | xartutil --erase-all
 
 									echo '' # Add line break after prompt was automatically confirmed with "yes".
 
@@ -1756,7 +1755,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 
 									echo -e "\n    ${ANSI_CYAN}${ANSI_BOLD}Creating Fusion Drive...${CLEAR_ANSI}"
 
-									if diskutil resetFusion <<< 'Yes'; then
+									if echo 'Yes' | diskutil resetFusion; then
 										erase_did_succeed=true
 									else
 										# I have seen that a messed up APFS Container can cause "diskutil eraseDisk" to fail (assuming it would affect "diskutil resetFusion" as well),
@@ -1780,7 +1779,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 											fi
 										done
 
-										if $did_delete_apfs_container && diskutil resetFusion <<< 'Yes'; then
+										if $did_delete_apfs_container && echo 'Yes' | diskutil resetFusion; then
 											erase_did_succeed=true
 										fi
 									fi
@@ -1979,11 +1978,11 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 								admin_username="$(id -un)" # We will use the current username as authorizing admin user if it is and admin and has a Secure Token (and is also a Volume Owner on Apple Silicon).
 								diskutil_apfs_users_output="$($IS_APPLE_SILICON && diskutil apfs listUsers /)" # Only need this output to check for Volume Owners on Apple Silicon.
 								all_admin_usernames="$(PlistBuddy -c 'Print :dsAttrTypeStandard\:GroupMembership' /dev/stdin <<< "$(dscl -plist /Search -read '/Groups/admin' GroupMembership 2> /dev/null)" 2> /dev/null | awk '(($NF != "{") && ($NF != "root") && ($NF != "}")) { print $NF }')"
-								if [[ $'\n'"${all_admin_usernames}"$'\n' != *$'\n'"${admin_username}"$'\n'* || "$(sysadminctl -secureTokenStatus "${admin_username}" 2>&1)" != *'is ENABLED for'* ]] || ( $IS_APPLE_SILICON && ! echo "${diskutil_apfs_users_output}" | grep -A 2 "$(PlistBuddy -c 'Print :dsAttrTypeStandard\:GeneratedUID:0' /dev/stdin <<< "$(dscl -plist /Search -read "/Users/${admin_username}" GeneratedUID 2> /dev/null)" 2> /dev/null)$" | grep -q 'Volume Owner: Yes$' ); then
+								if [[ $'\n'"${all_admin_usernames}"$'\n' != *$'\n'"${admin_username}"$'\n'* || "$(sysadminctl -secureTokenStatus "${admin_username}" 2>&1)" != *'is ENABLED for'* ]] || ( $IS_APPLE_SILICON && ! echo "${diskutil_apfs_users_output}" | grep -A 2 "$(dscl -plist /Search -read "/Users/${admin_username}" GeneratedUID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)$" | grep -q 'Volume Owner: Yes$' ); then
 									IFS=$'\n'
 									for this_admin_username in $all_admin_usernames; do
 										if [[ "${this_admin_username}" != '_'* ]]; then
-											if [[ "$(sysadminctl -secureTokenStatus "${this_admin_username}" 2>&1)" == *'is ENABLED for'* ]] && ( ! $IS_APPLE_SILICON || echo "${diskutil_apfs_users_output}" | grep -A 2 "$(PlistBuddy -c 'Print :dsAttrTypeStandard\:GeneratedUID:0' /dev/stdin <<< "$(dscl -plist /Search -read "/Users/${this_admin_username}" GeneratedUID 2> /dev/null)" 2> /dev/null)$" | grep -q 'Volume Owner: Yes$' ); then
+											if [[ "$(sysadminctl -secureTokenStatus "${this_admin_username}" 2>&1)" == *'is ENABLED for'* ]] && ( ! $IS_APPLE_SILICON || echo "${diskutil_apfs_users_output}" | grep -A 2 "$(dscl -plist /Search -read "/Users/${this_admin_username}" GeneratedUID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)$" | grep -q 'Volume Owner: Yes$' ); then
 												# If current user was not admin or did not have a Secure Token,
 												# check all admin users for Secure Tokens and use the first admin with a Secure Token.
 												admin_username="${this_admin_username}"
@@ -2006,7 +2005,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 								os_installer_options+=( '--user' "${admin_username}" )
 
 								# Let the technician know which admin password is required since the installer prompt does not specify it.
-								echo -e "    ${ANSI_PURPLE}${ANSI_BOLD}NOTICE:${ANSI_PURPLE} You will be prompted for ${ANSI_BOLD}${admin_username}${ANSI_PURPLE}'s $($IS_APPLE_SILICON && echo "${diskutil_apfs_users_output}" | grep -A 2 "$(PlistBuddy -c 'Print :dsAttrTypeStandard\:GeneratedUID:0' /dev/stdin <<< "$(dscl -plist /Search -read "/Users/${admin_username}" GeneratedUID 2> /dev/null)" 2> /dev/null)$" | grep -q 'Volume Owner: Yes$' && echo '(Volume Owner) ')admin password.${CLEAR_ANSI}\n"
+								echo -e "    ${ANSI_PURPLE}${ANSI_BOLD}NOTICE:${ANSI_PURPLE} You will be prompted for ${ANSI_BOLD}${admin_username}${ANSI_PURPLE}'s $($IS_APPLE_SILICON && echo "${diskutil_apfs_users_output}" | grep -A 2 "$(dscl -plist /Search -read "/Users/${admin_username}" GeneratedUID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)$" | grep -q 'Volume Owner: Yes$' && echo '(Volume Owner) ')admin password.${CLEAR_ANSI}\n"
 							fi
 						fi
 

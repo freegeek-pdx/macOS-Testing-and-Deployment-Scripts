@@ -16,10 +16,12 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
+
 PROJECT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)/.."
 readonly PROJECT_DIR
 
-if ! WIFI_PASSWORD="$(/usr/libexec/PlistBuddy -c 'Print :wifi_password' "${PROJECT_DIR}/../Build Tools/Free Geek Passwords.plist")" || [[ -z "${WIFI_PASSWORD}" ]]; then
+if ! WIFI_PASSWORD="$(PlistBuddy -c 'Print :wifi_password' "${PROJECT_DIR}/../Build Tools/Free Geek Passwords.plist")" || [[ -z "${WIFI_PASSWORD}" ]]; then
 	echo 'FAILED TO GET WI-FI PASSWORD'
 	exit 1
 fi
@@ -39,7 +41,7 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 			
 			# DO NOT JUST COPY "fg-install-os" SCRIPT SINCE WI-FI PASSWORD PLACEHOLDER NEED TO BE REPLACED WITH THE ACTUAL OBFUSCATED WI-FI PASSWORD.
 			# CANNOT USE "base64", "openssl base64", "xxd", or "uuencode"/"uudecode" TO OBFUSCATE WI-FI PASSWORD IN "fg-install-os" SINCE THEY ARE NOT IN RECOVERY, SO MUST USE A "tr" SHIFT.
-			sed "s/'\[COPY RESOURCES SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD\]'/\"\$(tr '\!-~' 'P-~\!-O' <<< '$(echo -n "${WIFI_PASSWORD}" | tr '\!-~' 'P-~\!-O')')\"/" "${PROJECT_DIR}/fg-install-os.sh" > "${this_fgMIB_volume}/fg-install-os"
+			sed "s/'\[COPY RESOURCES SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD\]'/\"\$(echo '$(echo -n "${WIFI_PASSWORD}" | tr '\!-~' 'P-~\!-O')' | tr '\!-~' 'P-~\!-O')\"/" "${PROJECT_DIR}/fg-install-os.sh" > "${this_fgMIB_volume}/fg-install-os"
 			
 			chmod +x "${this_fgMIB_volume}/fg-install-os"
 			

@@ -16,23 +16,23 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.11-1
 
 -- App Icon is “Microscope” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -148,7 +148,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -199,7 +199,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -272,10 +272,7 @@ repeat
 		set marketingModelNameXMLpath to tmpPath & "marketingModelName.xml"
 		set bluetoothInfoPath to tmpPath & "bluetoothInfo.plist"
 		
-		do shell script "rm -f " & (quoted form of hardwareInfoPath)
-		do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
-		do shell script "rm -f " & (quoted form of marketingModelNameXMLpath)
-		do shell script "rm -f " & (quoted form of bluetoothInfoPath)
+		do shell script "rm -f " & (quoted form of hardwareInfoPath) & " " & (quoted form of restOfSystemOverviewInfoPath) & " " & (quoted form of marketingModelNameXMLpath) & " " & (quoted form of bluetoothInfoPath)
 		
 		-- SYSTEM MODEL INFORMATION
 		
@@ -326,7 +323,7 @@ repeat
 						set isLaptop to true
 					end if
 					set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
-					set modelIdentifierNumber to (do shell script "sed 's/[^0-9,]//g' <<< " & (quoted form of modelIdentifier))
+					set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
 					set AppleScript's text item delimiters to ","
 					set modelNumberParts to (every text item of modelIdentifierNumber)
 					set modelIdentifierMajorNumber to ((item 1 of modelNumberParts) as number)
@@ -340,7 +337,7 @@ repeat
 					
 					if (((shortModelName is equal to "iMac") and ((modelIdentifierNumber is equal to "14,4") or (modelIdentifierMajorNumber ≥ 15))) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 11)) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then set supportsBigSur to true
 					
-					if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((shortModelName is equal to "MacBook Pro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then set supportsMonterey to true
+					if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((shortModelName is equal to "MacBook Pro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro") or (shortModelName is equal to "Mac Studio")) then set supportsMonterey to true
 					
 					set memorySize to ((value of property list item "physical_memory" of hardwareItems) as string)
 					
@@ -454,7 +451,7 @@ repeat
 				-- Still, just use "Chip" from system_profiler instead since it is the same info and outputs the correct info regardless of OS version.
 				-- For Apple Silicon, processorTotalCoreCount will looks like "proc 8:4:4" which means "8 cores (4 performance and 4 efficiency)"
 				
-				set processorTotalCoreCount to (do shell script "sed 's/[^0-9:]//g' <<< " & (quoted form of processorTotalCoreCount))
+				set processorTotalCoreCount to (do shell script "echo " & (quoted form of processorTotalCoreCount) & " | tr -dc '[:digit:]:'")
 				
 				set processorCoreTypesNote to ""
 				if (processorTotalCoreCount contains ":") then
@@ -530,8 +527,7 @@ repeat
 				set designCapacityMhA to 0
 				set designCycleCount to 0
 				set rawBatteryInfo to (do shell script "ioreg -rc AppleSmartBattery")
-				set AppleScript's text item delimiters to {linefeed, return}
-				set rawBatteryInfoParts to (every text item of rawBatteryInfo)
+				set rawBatteryInfoParts to (paragraphs of rawBatteryInfo)
 				
 				repeat with thisRawBatteryInfoPart in rawBatteryInfoParts
 					set maxCapacityOffset to (offset of "\"MaxCapacity\" = " in thisRawBatteryInfoPart) -- This is no longer correct and always lists "100" on Apple Silicon, but still check it because I'm not sure when/if "AppleRawMaxCapacity" is unavailable.
@@ -701,7 +697,7 @@ repeat
 		if (chipType is not equal to "UNKNOWN Chip") then
 			try
 				-- This local marketing model name only exists on Apple Silicon Macs.
-				set marketingModelName to (do shell script "/usr/libexec/PlistBuddy -c 'Print 0:product-name' /dev/stdin <<< \"$(ioreg -arc IOPlatformDevice -k product-name)\"")
+				set marketingModelName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print 0:product-name' /dev/stdin <<< \"$(ioreg -arc IOPlatformDevice -k product-name)\"")))
 				
 				if (marketingModelName is not equal to "") then
 					set didGetLocalMarketingModelName to true
@@ -717,7 +713,7 @@ repeat
 					-- If About This Mac has been opened, the Marketing Model Name will be cached in this user preference.
 					-- Since "defaults read" has no option to traverse into keys of dictionary values, use the whole "defaults export" output and parse it with "PlistBuddy" to get at the specific key of the "CPU Names" dictionary value that we want.
 					-- Using "defaults export" instead of accessing the plist file directly with "PlistBuddy" is important since preferences are not guaranteed to be written to disk if they were just set.
-					set cachedMarketingModelName to (do shell script "/usr/libexec/PlistBuddy -c \"Print :'CPU Names':" & serialNumberModelPart & "-en-US_US\" /dev/stdin <<< \"$(defaults export com.apple.SystemProfiler -)\"")
+					set cachedMarketingModelName to (do shell script ("bash -c " & (quoted form of ("/usr/libexec/PlistBuddy -c \"Print :'CPU Names':" & serialNumberModelPart & "-en-US_US\" /dev/stdin <<< \"$(defaults export com.apple.SystemProfiler -)\""))))
 					if (cachedMarketingModelName starts with shortModelName) then -- Make sure the value starts with the short model name, since technically anything could be set to this value manually.
 						set marketingModelName to cachedMarketingModelName
 						set marketingModelNameWasCached to true
@@ -736,12 +732,9 @@ repeat
 							end if
 						end if
 						try
-							if ((year of the (current date)) < 2021) then
+							if ((year of the (current date)) < 2022) then
 								try
-									do shell script "systemsetup -setusingnetworktime off" user name adminUsername password adminPassword with administrator privileges
-								end try
-								try
-									do shell script "systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
+									do shell script "systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
 								end try
 							end if
 							do shell script "curl -m 5 -sL https://support-sp.apple.com/sp/product?cc=" & serialNumberModelPart & " -o " & (quoted form of marketingModelNameXMLpath)
@@ -751,21 +744,15 @@ repeat
 							set tryCount to tryCount + 1
 							do shell script "rm -f " & (quoted form of marketingModelNameXMLpath)
 							if (downloadMarketingModelNameErrorNumber is equal to -128) then
-								try
-									do shell script "killall 'system_profiler'"
-								end try
-								do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
+								do shell script "killall 'system_profiler'; rm -f " & (quoted form of restOfSystemOverviewInfoPath)
 								quit
 								delay 10
 							end if
 							try
-								delay 1 -- Wait and try again in case still connecting to Internet.
+								delay 1 -- Wait and try again in case still connecting to internet.
 							on error (waitToDownloadMarketingModelNameErrorMessage) number (waitToDownloadMarketingModelNameErrorNumber)
 								if (waitToDownloadMarketingModelNameErrorNumber is equal to -128) then
-									try
-										do shell script "killall 'system_profiler'"
-									end try
-									do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
+									do shell script "killall 'system_profiler'; rm -f " & (quoted form of restOfSystemOverviewInfoPath)
 									quit
 									delay 10
 								end if
@@ -800,10 +787,7 @@ repeat
 					log "Marketing Model Name Error: " & marketingModelNameErrorMessage
 					do shell script "rm -f " & (quoted form of marketingModelNameXMLpath)
 					if (marketingModelNameErrorNumber is equal to -128) then
-						try
-							do shell script "killall 'system_profiler'"
-						end try
-						do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
+						do shell script "killall 'system_profiler'; rm -f " & (quoted form of restOfSystemOverviewInfoPath)
 						quit
 						delay 10
 					end if
@@ -890,13 +874,13 @@ repeat
 	‼️	         CHECK IF A DISC DRIVE IS INSTALLED								 ‼️
 	‼️	CHECK CONNECTIONS, REPLACE IF NECESSARY		‼️"
 		
-		if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 13)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 10)) or (shortModelName is equal to "MacBook Air") or ((shortModelName is equal to "Mac mini") and (((offset of "Server" in rawMarketingModelName) > 0) or (modelIdentifierMajorNumber ≥ 5))) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then
+		if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 13)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 10)) or (shortModelName is equal to "MacBook Air") or ((shortModelName is equal to "Mac mini") and (((offset of "Server" in rawMarketingModelName) > 0) or (modelIdentifierMajorNumber ≥ 5))) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro") or (shortModelName is equal to "Mac Studio")) then
 			set discDriveDetected to "N/A (Manufactured Without Disc Drive)"
 			set didGetDiscDriveInfo to true
 		end if
 		
 		set progress completed steps to (progress completed steps + 1)
-		set systemProfilerIsRunning to ((do shell script ("ps -p " & systemProfilerPID & " &> /dev/null; echo $?")) as number)
+		set systemProfilerIsRunning to ((do shell script ("ps -p " & systemProfilerPID & " > /dev/null 2>&1; echo $?")) as number)
 		if (systemProfilerIsRunning is equal to 0) then
 			try
 				set hourGlass to "⌛️"
@@ -908,16 +892,13 @@ repeat
 					end if
 					set progress description to "
 " & hourGlass & "	Gathering System Information"
-					set systemProfilerIsRunning to ((do shell script ("ps -p " & systemProfilerPID & " &> /dev/null; echo $?")) as number)
+					set systemProfilerIsRunning to ((do shell script ("ps -p " & systemProfilerPID & " > /dev/null 2>&1; echo $?")) as number)
 					delay 0.5
 					if (systemProfilerIsRunning is not equal to 0) then exit repeat
 				end repeat
 			on error (waitingForSystemProfilerMessage) number (waitingForSystemProfilerNumber)
 				log "Waiting for System Profiler Error: " & waitingForSystemProfilerMessage
-				try
-					do shell script "killall 'system_profiler'"
-				end try
-				do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
+				do shell script "killall 'system_profiler'; rm -f " & (quoted form of restOfSystemOverviewInfoPath)
 				if (waitingForSystemProfilerNumber is equal to -128) then
 					quit
 					delay 10
@@ -946,8 +927,7 @@ repeat
 							end try
 							try
 								set memoryType to ((value of property list item "dimm_type" of memoryInfo) as string) -- This top level "Type" (not within any Banks), will only exist when running natively on Apple Silicon.
-								set memoryType to (do shell script "sed 's/[^A-Za-z0-9]//g' <<< " & (quoted form of memoryType))
-								set memoryType to (do shell script "awk '{ print toupper($0) }' <<< " & (quoted form of memoryType))
+								set memoryType to (do shell script "echo " & (quoted form of memoryType) & " | tr -dc '[:alnum:]' | tr '[:lower:]' '[:upper:]'")
 								set memorySpeed to ""
 								set didGetMemoryInfo to true
 							on error
@@ -1158,8 +1138,7 @@ repeat
 								end if
 							end repeat
 							if ((count of hardDrivesList) > 0) then
-								set AppleScript's text item delimiters to "
-	"
+								set AppleScript's text item delimiters to (linefeed & tab)
 								set storageInfo to (hardDrivesList as string)
 							end if
 							set didGetHardDriveInfo to true
@@ -1196,7 +1175,7 @@ repeat
 								else if (thisGraphicsBusRaw is equal to "pcie") then
 									set thisGraphicsBus to "PCIe"
 								else
-									set thisGraphicsBus to (do shell script "awk '{ print toupper($0) }' <<< " & (quoted form of thisGraphicsBusRaw))
+									set thisGraphicsBus to (do shell script "echo " & (quoted form of thisGraphicsBusRaw) & " | tr '[:lower:]' '[:upper:]'")
 								end if
 								set thisGraphicsVRAM to "UNKNOWN"
 								set thisGraphicsCores to "UNKNOWN"
@@ -1251,8 +1230,7 @@ repeat
 								end if
 							end repeat
 							if ((count of graphicsList) is equal to 0) then error "No Graphics Found"
-							set AppleScript's text item delimiters to "
-	"
+							set AppleScript's text item delimiters to (linefeed & tab)
 							set graphicsInfo to (graphicsList as string)
 							set AppleScript's text item delimiters to {"Intel ", "NVIDIA ", "AMD "}
 							set graphicsInfoPartsWithoutBrands to (every text item of graphicsInfo)
@@ -1287,7 +1265,7 @@ repeat
 									end if
 									set possibleWiFiProtocols to (words of ((value of property list item "spairport_supported_phymodes" of thisWiFiInterface) as string))
 									repeat with thisPossibleWiFiProtocol in possibleWiFiProtocols
-										set uppercasePossibleWiFiProtocol to (do shell script "awk '{ print toupper($0) }' <<< " & (quoted form of (thisPossibleWiFiProtocol as string)))
+										set uppercasePossibleWiFiProtocol to (do shell script "echo " & (quoted form of (thisPossibleWiFiProtocol as string)) & " | tr '[:lower:]' '[:upper:]'")
 										if ((uppercasePossibleWiFiProtocol is not equal to "802.11") and (wiFiProtocolsList does not contain uppercasePossibleWiFiProtocol)) then
 											set (end of wiFiProtocolsList) to uppercasePossibleWiFiProtocol
 										end if
@@ -1635,10 +1613,38 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 				end try
 			end try
 			
-			if (remoteManagementOutput is not equal to "") then
+			if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
 				try
-					set AppleScript's text item delimiters to {linefeed, return}
-					set remoteManagementOutputParts to (every text item of remoteManagementOutput)
+					set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
+				end try
+			else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
+				try
+					do shell script ("mkdir " & (quoted form of buildInfoPath))
+				end try
+				try
+					do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within a short time of the last valid admin permissions run though.
+				end try
+			end if
+			
+			if (remoteManagementOutput contains " - Request too soon.") then -- Don't show success if rate limited and there was no previous cached output to use.
+				set progress description to "
+❌	UNABLE to Check for Remote Management"
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				end try
+				set nextAllowedProfilesShowTime to "23 hours after last successful check"
+				try
+					set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
+				end try
+				display alert ("Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
+
+Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform Free Geek I.T." as critical
+			else if (remoteManagementOutput is not equal to "") then
+				try
+					set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
 					
 					if ((count of remoteManagementOutputParts) > 3) then
 						set progress description to "
@@ -1672,8 +1678,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 						
 						set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
 						if ((count of remoteManagementOrganizationContactInfo) > 0) then
-							set AppleScript's text item delimiters to "
-		"
+							set AppleScript's text item delimiters to (linefeed & tab & tab)
 							set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as string)
 						end if
 						
@@ -1766,7 +1771,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 	
 	-- DISPLAY SYSTEM OVERVIEW
 	try
-		set modelInfo to (do shell script "sed 's/" & shortModelName & "/" & shortModelName & " " & modelIdentifierNumber & "/' <<< " & (quoted form of modelInfo))
+		set modelInfo to (do shell script "echo " & (quoted form of modelInfo) & " | sed 's/" & shortModelName & "/" & shortModelName & " " & modelIdentifierNumber & "/'")
 	end try
 	if (modelInfo does not contain modelIdentifierNumber) then set modelInfo to (modelIdentifierNumber & ": " & modelInfo)
 	
@@ -1900,11 +1905,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 					do shell script "open 'https://www.macrumors.com/2016/11/29/imac-broken-hinge-refunds-repair-program/'"
 				else if (showSystemInfoAppButton) then
 					try
-						do shell script "open -a '/Applications/Utilities/System Information.app'"
-					on error
-						try
-							do shell script "open -a '/System/Applications/Utilities/System Information.app'"
-						end try
+						do shell script "open -b com.apple.SystemProfiler"
 					end try
 				else if (showAboutMacWindowButton) then
 					try
@@ -1967,7 +1968,7 @@ try
 		(("/Applications/Audio Test.app" as POSIX file) as alias)
 		set (end of listOfAvailableTests) to "📢	Audio Test"
 	end try
-	if ((shortModelName is not equal to "Mac Pro") and (shortModelName is not equal to "Mac mini")) then
+	if ((shortModelName is not equal to "Mac Pro") and (shortModelName is not equal to "Mac mini") and (shortModelName is not equal to "Mac Studio")) then
 		try
 			(("/Applications/Microphone Test.app" as POSIX file) as alias)
 			set (end of listOfAvailableTests) to "🎙	Microphone Test"

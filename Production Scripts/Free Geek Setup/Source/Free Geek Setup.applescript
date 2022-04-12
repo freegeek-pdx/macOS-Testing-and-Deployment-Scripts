@@ -16,23 +16,23 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.11-2
 
 -- Build Flag: LSUIElement
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 use framework "Cocoa"
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -175,7 +175,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	-- But still, double check here that it got reset to it's correct state (in case Automation Guide was force quit or something weird/sneaky).
 	set demoUsernameIsAdmin to true
 	try
-		set demoUsernameIsAdmin to ((do shell script ("id -Gn " & (quoted form of demoUsername))) contains " admin ")
+		set demoUsernameIsAdmin to ((do shell script ("dsmemberutil checkmembership -U " & (quoted form of demoUsername) & " -G 'admin'")) is equal to "user is a member of the group")
 	end try
 	if (demoUsernameIsAdmin) then
 		try
@@ -242,7 +242,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -299,7 +299,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 									try
-										do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+										do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 									end try
 								end try
 								quit
@@ -350,7 +350,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 					try
-						do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+						do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 					end try
 				end try
 				quit
@@ -759,11 +759,11 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			(((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias) -- If just ran updater, then continue with setup. If not, we will launch updater.
 			
 			try
-				do shell script "rm -f /Users/Shared/Build\\ Info/.fgUpdater*" user name adminUsername password adminPassword with administrator privileges
+				do shell script ("rm -f " & (quoted form of (buildInfoPath & ".fgUpdater")) & "*") user name adminUsername password adminPassword with administrator privileges
 			end try
 		end if
 		
-		-- Wait for Internet before checking EFI Firmware since AllowList may need to be update, and before installing Rosetta on Apple Silicon, as well as before launching QA Helper (if on source drive) to ensure that QA Helper can always update itself to the latest version.
+		-- Wait for internet before checking EFI Firmware since AllowList may need to be update, and before installing Rosetta on Apple Silicon, as well as before launching QA Helper (if on source drive) to ensure that QA Helper can always update itself to the latest version.
 		repeat 60 times
 			try
 				do shell script "ping -c 1 www.google.com"
@@ -806,7 +806,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		set serialNumber to ""
 		try
-			set serialNumber to (do shell script "/usr/libexec/PlistBuddy -c 'Print 0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")
+			set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print 0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
 		end try
 		
 		if (serialNumber is not equal to "") then
@@ -832,10 +832,42 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 					end try
 				end try
 				
-				if (remoteManagementOutput is not equal to "") then
+				if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
 					try
-						set AppleScript's text item delimiters to {linefeed, return}
-						set remoteManagementOutputParts to (every text item of remoteManagementOutput)
+						set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
+					end try
+				else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
+					try
+						do shell script ("mkdir " & (quoted form of buildInfoPath))
+					end try
+					try
+						do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within a short time of the last valid admin permissions run though.
+					end try
+				end if
+				
+				if (remoteManagementOutput contains " - Request too soon.") then -- Don't allow setup if rate limited and there was no previous cached output to use.
+					try
+						activate
+					end try
+					try
+						do shell script "afplay /System/Library/Sounds/Basso.aiff"
+					end try
+					set nextAllowedProfilesShowTime to "23 hours after last successful check"
+					try
+						set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
+					end try
+					display alert ("Cannot Continue Setup
+
+Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
+
+Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform Free Geek I.T." buttons {"Shut Down"} as critical
+					tell application "System Events" to shut down with state saving preference
+					
+					quit
+					delay 10
+				else if (remoteManagementOutput is not equal to "") then
+					try
+						set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
 						
 						if ((count of remoteManagementOutputParts) > 3) then
 							set remoteManagementOrganizationName to "\"Unknown Organization\""
@@ -867,8 +899,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 							
 							set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
 							if ((count of remoteManagementOrganizationContactInfo) > 0) then
-								set AppleScript's text item delimiters to "
-		"
+								set AppleScript's text item delimiters to (linefeed & tab & tab)
 								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as string)
 							end if
 							
@@ -1025,7 +1056,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 							set shortModelName to ((value of property list item "machine_name" of hardwareItems) as string)
 							set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
 							set currentEFIfirmwareVersion to ((first word of ((value of property list item "boot_rom_version" of hardwareItems) as string)) as string) -- T2 Mac's have boot_rom_version's like "1037.100.362.0.0 (iBridge: 17.16.14281.0.0,0)" but we only care about the first part.
-							set modelIdentifierNumber to (do shell script "sed 's/[^0-9,]//g' <<< " & (quoted form of modelIdentifier))
+							set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
 							set AppleScript's text item delimiters to ","
 							set modelNumberParts to (every text item of modelIdentifierNumber)
 							set modelIdentifierMajorNumber to ((item 1 of modelNumberParts) as number)
@@ -1036,8 +1067,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 							try
 								set iBridgeItems to (first property list item of property list item "_items" of thisDataTypeProperties) -- Will just error for empty _items array when not a T1 or T2 Mac.
 								set iBridgeModelName to ((value of property list item "ibridge_model_name" of iBridgeItems) as string)
-								set iBridgeModelNumber to ((do shell script "sed 's/[^0-9]//g' <<< " & (quoted form of iBridgeModelName)) as number)
-								if (iBridgeModelNumber ≥ 2) then set isT2mac to true -- Catch 2 or newer for the future if and when T3 exists.
+								if (iBridgeModelName contains " T2 ") then set isT2mac to true
 							end try
 						else if ((thisDataType is equal to "SPSerialATADataType") or (thisDataType is equal to "SPNVMeDataType")) then
 							set sataItems to (property list item "_items" of thisDataTypeProperties)
@@ -1081,7 +1111,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 		
 		set bootFilesystemType to "apfs"
 		try
-			set bootFilesystemType to (do shell script "/usr/libexec/PlistBuddy -c 'Print :FilesystemType' /dev/stdin <<< \"$(diskutil info -plist /)\"")
+			set bootFilesystemType to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :FilesystemType' /dev/stdin <<< \"$(diskutil info -plist /)\"")))
 		end try
 		
 		if (isT2mac and (bootFilesystemType is not equal to "apfs")) then
@@ -1129,9 +1159,9 @@ The EFI Firmware will never be able to be properly updated when our customers ru
 			
 			set updateFirmwareMesssage to "You should not normally see this alert since the EFI Firmware should have been updated during the installation process.
 
-Although, it is possible to see this alert on first boot if this Mac's EFI Firmware is already newer than what shipped with this version of macOS and the EFI AllowList has not yet been updated from the Internet.
+Although, it is possible to see this alert on first boot if this Mac's EFI Firmware is already newer than what shipped with this version of macOS and the EFI AllowList has not yet been updated from the internet.
 
-If the EFI Firmware version listed above starts with a NUMBER, this is likely an issue of the EFI AllowList needing to be updated. If so, you should make sure you are connected to the Internet and then click the “Check Again” button below.
+If the EFI Firmware version listed above starts with a NUMBER, this is likely an issue of the EFI AllowList needing to be updated. If so, you should make sure you are connected to the internet and then click the “Check Again” button below.
 
 If the EFI Firmware version listed above starts with a LETTER, or you continue seeing this alert after multiple attempts, please inform and deliver this Mac to Free Geek I.T. for further research."
 			
@@ -1209,8 +1239,8 @@ The EFI Firmware or the EFI AllowList MUST be updated before this Mac can be sol
 			delay 0.2 -- Delay to make sure progress gets updated.
 			
 			try
-				do shell script "trimforce enable <<< $'y
-y'" user name adminUsername password adminPassword with administrator privileges
+				do shell script "echo 'y
+y' | trimforce enable" user name adminUsername password adminPassword with administrator privileges
 			end try
 		else
 			if (modelIdentifier starts with "iMac12,") then
@@ -1366,20 +1396,12 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 				end try
 			end if
 			
-			try
-				do shell script "launchctl unload " & (quoted form of fgSetupUserLaunchAgentPlistPath)
-			end try
-			try
-				do shell script "rm -f " & (quoted form of fgSetupUserLaunchAgentPlistPath)
-			end try
+			do shell script ("launchctl unload " & (quoted form of fgSetupUserLaunchAgentPlistPath) & "; rm -f " & (quoted form of fgSetupUserLaunchAgentPlistPath))
 			try
 				set pathToMe to (POSIX path of (path to me))
 				if ((offset of ".app" in pathToMe) > 0) then
 					try
-						do shell script "tccutil reset All org.freegeek.Free-Geek-Setup" user name adminUsername password adminPassword with administrator privileges
-					end try
-					try
-						do shell script "rm -rf " & (quoted form of pathToMe) user name adminUsername password adminPassword with administrator privileges
+						do shell script "tccutil reset All org.freegeek.Free-Geek-Setup; rm -rf " & (quoted form of pathToMe) user name adminUsername password adminPassword with administrator privileges
 					end try
 				end if
 			end try
@@ -1387,7 +1409,7 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 	on error
 		try
 			if (freeGeekUpdaterExists) then
-				-- Wait for Internet before launching Free Geek Updater to ensure that updates can be retrieved.
+				-- Wait for internet before launching Free Geek Updater to ensure that updates can be retrieved.
 				repeat 60 times
 					try
 						do shell script "ping -c 1 www.google.com"
@@ -1416,16 +1438,11 @@ on checkEFIfirmwareIsNotInAllowList()
 	set efiFirmwareIsNotInAllowList to false
 	
 	set efiCheckOutputPath to (tmpPath & "efiCheckOutput.txt")
+	do shell script "defaults delete eficheck; rm -f " & (quoted form of efiCheckOutputPath)
 	try
-		do shell script "rm -f " & (quoted form of efiCheckOutputPath)
-	end try
-	try
-		do shell script "defaults delete eficheck"
-	end try
-	try
-		set efiCheckPID to (do shell script "/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check &> " & (quoted form of efiCheckOutputPath) & " & echo $!" user name adminUsername password adminPassword with administrator privileges)
+		set efiCheckPID to (do shell script "/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check > " & (quoted form of efiCheckOutputPath) & " 2>&1 & echo $!" user name adminUsername password adminPassword with administrator privileges)
 		delay 1
-		set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " &> /dev/null; echo $?")) as number)
+		set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " > /dev/null 2>&1; echo $?")) as number)
 		if (efiCheckIsRunning is equal to 0) then
 			repeat
 				try -- EFIcheck may open UserNotificationCenter with a "Your computer has detected a potential problem" alert if EFI Firmware is out-of-date.
@@ -1451,7 +1468,7 @@ on checkEFIfirmwareIsNotInAllowList()
 					end if
 				end try
 				
-				set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " &> /dev/null; echo $?")) as number)
+				set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " > /dev/null 2>&1; echo $?")) as number)
 				delay 0.5
 				if (efiCheckIsRunning is not equal to 0) then exit repeat
 			end repeat
@@ -1464,9 +1481,7 @@ on checkEFIfirmwareIsNotInAllowList()
 			set efiFirmwareIsNotInAllowList to true
 		end if
 	end try
-	try
-		do shell script "rm -f " & (quoted form of efiCheckOutputPath)
-	end try
+	do shell script "rm -f " & (quoted form of efiCheckOutputPath)
 	
 	return efiFirmwareIsNotInAllowList
 end checkEFIfirmwareIsNotInAllowList

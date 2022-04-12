@@ -16,11 +16,11 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.3.1-1
 
 -- Build Flag: LSUIElement
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 
 set currentBundleIdentifier to "UNKNOWN"
@@ -128,7 +128,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 						
 						try
 							-- Mounting the reset Snapshot will prevent macOS from deleting it after 24 hours: https://eclecticlight.co/2021/03/28/last-week-on-my-mac-macos-at-20-apfs-at-4/#comment-59001
-							do shell script "mount_apfs -o rdonly,nobrowse -s " & (quoted form of resetSnapshotName) & " \"$(/usr/libexec/PlistBuddy -c 'Print :DeviceNode' /dev/stdin <<< \"$(diskutil info -plist '/System/Volumes/Data')\")\" '/Users/Shared/.fg-snapshot-preserver/mount'"
+							do shell script ("bash -c " & (quoted form of ("mount_apfs -o rdonly,nobrowse -s " & (quoted form of resetSnapshotName) & " \"$(/usr/libexec/PlistBuddy -c 'Print :DeviceNode' /dev/stdin <<< \"$(diskutil info -plist '/System/Volumes/Data')\")\" '/Users/Shared/.fg-snapshot-preserver/mount'")))
 							try
 								do shell script "echo \"$(date '+%D %T')	Snapshot Helper: Successfully Mounted Reset Snapshot\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'" user name adminUsername password adminPassword with administrator privileges
 							end try
@@ -148,22 +148,14 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 								
 								if (currentSafariAutoFillPasswords is not equal to "0") then
 									try
-										do shell script "killall Safari"
-									end try
-									try
-										do shell script "defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillPasswords -bool false"
-									end try
-									try
-										do shell script "defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillFromAddressBook -bool false"
-									end try
-									try
-										do shell script "defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillCreditCardData -bool false"
-									end try
-									try
-										do shell script "defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillMiscellaneousForms -bool false"
-									end try
-									try
-										do shell script "defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoOpenSafeDownloads -bool false"
+										do shell script ("
+killall Safari
+defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillPasswords -bool false
+defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillFromAddressBook -bool false
+defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillCreditCardData -bool false
+defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillMiscellaneousForms -bool false
+defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoOpenSafeDownloads -bool false
+")
 									end try
 								end if
 							end if
@@ -199,12 +191,12 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			repeat -- dialogs timeout when screen is asleep or locked (just in case)
 				set isAwake to true
 				try
-					set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+					set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 				end try
 				
 				set isUnlocked to true
 				try
-					set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+					set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 				end try
 				
 				if (isAwake and isUnlocked) then

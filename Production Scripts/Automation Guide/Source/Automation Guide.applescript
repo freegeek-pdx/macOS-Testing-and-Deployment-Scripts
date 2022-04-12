@@ -16,25 +16,25 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2021.12.30-1
+-- Version: 2022.4.11-1
 
 -- App Icon is “Guide Dog” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 -- Build Flag: LSUIElement
 
-use AppleScript version "2.4"
+use AppleScript version "2.7"
 use scripting additions
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\"") is equal to "4")
+		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
 	end try
 	
 	set isUnlocked to true
 	try
-		set isUnlocked to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\"") is not equal to "true")
+		set isUnlocked to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :IOConsoleUsers:0:CGSSessionScreenIsLocked' /dev/stdin <<< \"$(ioreg -ac IORegistryEntry -k IOConsoleUsers -d 1)\""))) is not equal to "true")
 	end try
 	
 	if (isAwake and isUnlocked) then
@@ -138,13 +138,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		
 		if ((currentTouchBarPresentationModeGlobal is not equal to "fullControlStrip") or (currentTouchBarPresentationModeFnModes does not contain "fullControlStrip = functionKeys")) then
 			try
-				do shell script "defaults write com.apple.touchbar.agent PresentationModeGlobal fullControlStrip"
-			end try
-			try
-				do shell script "defaults write com.apple.touchbar.agent PresentationModeFnModes -dict fullControlStrip functionKeys"
-			end try
-			try
-				do shell script "killall ControlStrip"
+				do shell script "defaults write com.apple.touchbar.agent PresentationModeGlobal fullControlStrip; defaults write com.apple.touchbar.agent PresentationModeFnModes -dict fullControlStrip functionKeys; killall ControlStrip"
 			end try
 		end if
 	end try
@@ -189,10 +183,10 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end if
 	
 	-- demoUsername will be made an Admin and have it's Full Name changed temporarily later during Automation Guide and will be changed back in Automation Guide.
-	-- But, make sure it starts a a regular user when Automatoin Guide is launched in case Automation Guide was quit or the Mac was shut down or rebooted during the process (when still set as admin).
+	-- But, make sure it starts a a regular user when Automation Guide is launched in case Automation Guide was quit or the Mac was shut down or rebooted during the process (when still set as admin).
 	set demoUsernameIsAdmin to true
 	try
-		set demoUsernameIsAdmin to ((do shell script ("id -Gn " & (quoted form of demoUsername))) contains " admin ")
+		set demoUsernameIsAdmin to ((do shell script ("dsmemberutil checkmembership -U " & (quoted form of demoUsername) & " -G 'admin'")) is equal to "user is a member of the group")
 	end try
 	if (demoUsernameIsAdmin) then
 		try
@@ -238,7 +232,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	
 	if (shouldShowStartPrompt) then
-		set osName to "macOS"
+		set osName to ("macOS " & systemVersion)
 		considering numeric strings
 			if ((systemVersion ≥ "10.13") and (systemVersion < "10.14")) then
 				set osName to "macOS 10.13 High Sierra"
@@ -331,7 +325,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' &> /dev/null &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -349,9 +343,8 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	try
 		if (freeGeekUpdaterExists) then
 			(((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias) -- If just ran updater, then continue with Automation Guide. If not, we will launch updater.
-			
 			try
-				do shell script "rm -f /Users/Shared/Build\\ Info/.fgUpdater*" user name adminUsername password adminPassword with administrator privileges
+				do shell script ("rm -f " & (quoted form of (buildInfoPath & ".fgUpdater")) & "*") user name adminUsername password adminPassword with administrator privileges
 			end try
 		end if
 		
@@ -409,7 +402,7 @@ NOTE: The currently logged in “" & demoUsername & "” user will be made an Ad
 				
 				set demoUsernameIsAdmin to false
 				try
-					set demoUsernameIsAdmin to ((do shell script ("id -Gn " & (quoted form of demoUsername))) contains " admin ")
+					set demoUsernameIsAdmin to ((do shell script ("dsmemberutil checkmembership -U " & (quoted form of demoUsername) & " -G 'admin'")) is equal to "user is a member of the group")
 				end try
 				if (not demoUsernameIsAdmin) then
 					try
@@ -531,7 +524,7 @@ After you've performed the manual steps described in the previous dialog, click 
 		
 		set demoUsernameIsAdmin to true
 		try
-			set demoUsernameIsAdmin to ((do shell script ("id -Gn " & (quoted form of demoUsername))) contains " admin ")
+			set demoUsernameIsAdmin to ((do shell script ("dsmemberutil checkmembership -U " & (quoted form of demoUsername) & " -G 'admin'")) is equal to "user is a member of the group")
 		end try
 		if (demoUsernameIsAdmin) then
 			try
@@ -550,9 +543,7 @@ After you've performed the manual steps described in the previous dialog, click 
 		end if
 		
 		if (userDidCompleteManualSteps) then
-			try
-				do shell script "rm -rf " & (quoted form of ("/Users/" & demoUsername & "/Desktop/" & (name of me) & ".app"))
-			end try
+			do shell script "rm -rf " & (quoted form of ("/Users/" & demoUsername & "/Desktop/" & (name of me) & ".app"))
 			
 			repeat with thisUserAppsToSymlinkOnDesktop in {"QA Helper", "Cleanup After QA Complete"}
 				try
@@ -585,26 +576,18 @@ After you've performed the manual steps described in the previous dialog, click 
 			try
 				do shell script ("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideRunning"))) user name adminUsername password adminPassword with administrator privileges
 			end try
-			try
-				-- Launch Cleanup After QA Complete AFTER Automation Guide is quit so we know it has been deleted.
-				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"/Users/" & demoUsername & "/Applications/Cleanup After QA Complete.app\\\"\"' &> /dev/null &"
-			end try
 			
-			try
-				do shell script "launchctl unload " & (quoted form of ("/Users/" & demoUsername & "/Library/LaunchAgents/org.freegeek.Automation-Guide.plist"))
-			end try
-			try
-				do shell script "rm -f " & (quoted form of ("/Users/" & demoUsername & "/Library/LaunchAgents/org.freegeek.Automation-Guide.plist"))
-			end try
-			
-			try
-				do shell script "rm -rf '/Users/" & demoUsername & "/Applications/" & (name of me) & ".app'"
-			end try
+			-- Launch Cleanup After QA Complete AFTER Automation Guide is quit so we know it has been deleted.
+			do shell script ("
+osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"/Users/" & demoUsername & "/Applications/Cleanup After QA Complete.app\\\"\"' > /dev/null 2>&1 &
+
+launchctl unload " & (quoted form of ("/Users/" & demoUsername & "/Library/LaunchAgents/org.freegeek.Automation-Guide.plist")) & "
+rm -rf " & (quoted form of ("/Users/" & demoUsername & "/Library/LaunchAgents/org.freegeek.Automation-Guide.plist")) & " " & (quoted form of ("/Users/" & demoUsername & "/Applications/" & (name of me) & ".app")))
 		end if
 	on error
 		try
 			if (freeGeekUpdaterExists) then
-				-- Wait for Internet before launching Free Geek Updater to ensure that updates can be retrieved.
+				-- Wait for internet before launching Free Geek Updater to ensure that updates can be retrieved.
 				repeat 60 times
 					try
 						do shell script "ping -c 1 www.google.com"

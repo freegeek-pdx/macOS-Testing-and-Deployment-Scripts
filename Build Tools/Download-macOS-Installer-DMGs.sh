@@ -16,20 +16,24 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
+
+readonly MIST_PATH='/usr/local/bin/mist'
+
 installer_dmgs_path="${HOME}/Documents/Programming/Free Geek/MacLand Images/macOS Installers"
 
 installer_names_to_download=( 'High Sierra' 'Catalina' 'Big Sur' 'Monterey' )
 
 for this_installer_name_to_download in "${installer_names_to_download[@]}"; do
     if [[ "${this_installer_name_to_download}" == *' beta' ]]; then
-        this_installer_info_plist="$(mist list -b -l -q -o plist "${this_installer_name_to_download}")"
+        this_installer_info_plist="$("${MIST_PATH}" list -b -l -q -o plist "${this_installer_name_to_download}")"
     else
-        this_installer_info_plist="$(mist list -l -q -o plist "${this_installer_name_to_download}")"
+        this_installer_info_plist="$("${MIST_PATH}" list -l -q -o plist "${this_installer_name_to_download}")"
     fi
 
-    this_installer_name="$(/usr/libexec/PlistBuddy -c 'Print :0:name' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
-    this_installer_build="$(/usr/libexec/PlistBuddy -c 'Print :0:build' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
-    this_installer_version="$(/usr/libexec/PlistBuddy -c 'Print :0:version' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
+    this_installer_name="$(PlistBuddy -c 'Print :0:name' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
+    this_installer_build="$(PlistBuddy -c 'Print :0:build' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
+    this_installer_version="$(PlistBuddy -c 'Print :0:version' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
 
     if [[ -n "${this_installer_name}" && -n "${this_installer_build}" && -n "${this_installer_version}" ]]; then
         this_installer_dmg_name="Install ${this_installer_name} ${this_installer_version}-${this_installer_build}.dmg"
@@ -40,9 +44,9 @@ for this_installer_name_to_download in "${installer_names_to_download[@]}"; do
             echo "\"${this_installer_dmg_name}\" needs to be downloaded..."
             rm -f "${installer_dmgs_path}/Install ${this_installer_name} "*'.dmg' # Delete any outdated installer dmgs.
             if [[ "${this_installer_name_to_download}" == *' beta' ]]; then
-                sudo mist download "${this_installer_name}" -b --image -o "${installer_dmgs_path}"
+                sudo "${MIST_PATH}" download "${this_installer_name}" -b --image -o "${installer_dmgs_path}"
             else
-                sudo mist download "${this_installer_name}" --image -o "${installer_dmgs_path}" 
+                sudo "${MIST_PATH}" download "${this_installer_name}" --image -o "${installer_dmgs_path}" 
             fi
         fi
     else

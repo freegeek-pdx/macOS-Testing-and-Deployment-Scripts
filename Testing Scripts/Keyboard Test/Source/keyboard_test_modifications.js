@@ -1,7 +1,7 @@
 /*
 * By: Pico Mitchell
 * For: MacLand @ Free Geek
-* Last Updated: December 30th, 2021
+* Last Updated: January 13th, 2022
 *
 * MIT License
 *
@@ -75,7 +75,7 @@ try
 }
 catch (loadError)
 {
-	var errorAlertReply = confirm('\t‼️ AN ERROR OCCURRED ‼️\n\nMake sure you\'re connected to the Internet.\n\n\tClick OK to Reload and Try Again\n\n\tClick Cancel to Quit and Open\n\tKeyboardTester.com in Safari');
+	var errorAlertReply = confirm('\t‼️ AN ERROR OCCURRED ‼️\n\nMake sure you\'re connected to the internet.\n\n\tClick OK to Reload and Try Again\n\n\tClick Cancel to Quit and Open\n\tKeyboardTester.com in Safari');
 	if (errorAlertReply)
 	{
 		document.body.style.display = 'none';

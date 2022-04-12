@@ -2,7 +2,7 @@
 
 # By: Pico Mitchell
 # For: MacLand @ Free Geek
-# Last Updated: December 30th, 2021
+# Last Updated: April 8th, 2021
 #
 # MIT License
 #
@@ -24,6 +24,8 @@
 # Then, install Nativifier by running the following command in a Terminal window: sudo npm install -g nativefier
 # Finally, run this script by drag-and-dropping it into a Terminal window.
 
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin' # PATH must include "/usr/local/bin" for npm (and node) and nativefier.
+
 PROJECT_PATH="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
 readonly PROJECT_PATH
 readonly BUILD_DIR="${PROJECT_PATH}/.."
@@ -32,8 +34,7 @@ readonly ZIPS_FOR_AUTO_UPDATE_PATH="${BUILD_DIR}/../../ZIPs for Auto-Update"
 readonly KEYBOARD_TESTER_URL='https://www.keyboardtester.com/tester.html'
 
 readonly APP_BUILD='1' # REMEMBER TO RESET THIS TO "1" IF CHANGED FROM PREVIOUS BUILD!
-APP_VERSION="$(date '+%F' | tr '-' '.')-${APP_BUILD}"
-APP_VERSION="${APP_VERSION//.0/.}" # Get rid of leading zeros in month and day.
+APP_VERSION="$(date '+%Y.%-m.%-d')-${APP_BUILD}" # https://strftime.org
 readonly APP_VERSION
 
 

@@ -16,16 +16,18 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
+
 PROJECT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)/../Prepare OS Package"
 readonly PROJECT_DIR
 
-if ! ADMIN_PASSWORD="$(/usr/libexec/PlistBuddy -c 'Print :admin_password' "${PROJECT_DIR}/../../Build Tools/Free Geek Passwords.plist")" || [[ -z "${ADMIN_PASSWORD}" ]]; then
+if ! ADMIN_PASSWORD="$(PlistBuddy -c 'Print :admin_password' "${PROJECT_DIR}/../../Build Tools/Free Geek Passwords.plist")" || [[ -z "${ADMIN_PASSWORD}" ]]; then
 	echo 'FAILED TO GET ADMIN PASSWORD'
 	exit 1
 fi
 readonly ADMIN_PASSWORD
 
-if ! WIFI_PASSWORD="$(/usr/libexec/PlistBuddy -c 'Print :wifi_password' "${PROJECT_DIR}/../../Build Tools/Free Geek Passwords.plist")" || [[ -z "${WIFI_PASSWORD}" ]]; then
+if ! WIFI_PASSWORD="$(PlistBuddy -c 'Print :wifi_password' "${PROJECT_DIR}/../../Build Tools/Free Geek Passwords.plist")" || [[ -z "${WIFI_PASSWORD}" ]]; then
 	echo 'FAILED TO GET WI-FI PASSWORD'
 	exit 1
 fi
@@ -50,7 +52,7 @@ rm -rf "${PROJECT_DIR}/Package Scripts"
 mkdir -p "${PROJECT_DIR}/Package Scripts"
 
 # DO NOT JUST COPY "fg-prepare-os" SCRIPT SINCE ADMIN AND WI-FI PASSWORD PLACEHOLDERS NEED TO BE REPLACED WITH THE ACTUAL OBFUSCATED ADMIN AND WI-FI PASSWORDS.
-sed "s/'\[BUILD PACKAGE SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD\]'/\"\$(base64 -D <<< '$(echo -n "${ADMIN_PASSWORD}" | base64)')\"/; s/'\[BUILD PACKAGE SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD\]'/\"\$(base64 -D <<< '$(echo -n "${WIFI_PASSWORD}" | base64)')\"/" "${PROJECT_DIR}/fg-prepare-os.sh" > "${PROJECT_DIR}/Package Scripts/postinstall"
+sed "s/'\[BUILD PACKAGE SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD\]'/\"\$(echo '$(echo -n "${ADMIN_PASSWORD}" | base64)' | base64 -D)\"/; s/'\[BUILD PACKAGE SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD\]'/\"\$(echo '$(echo -n "${WIFI_PASSWORD}" | base64)' | base64 -D)\"/" "${PROJECT_DIR}/fg-prepare-os.sh" > "${PROJECT_DIR}/Package Scripts/postinstall"
 
 chmod +x "${PROJECT_DIR}/Package Scripts/postinstall"
 rm -f "${PROJECT_DIR}/Package Scripts/.DS_Store"
@@ -58,12 +60,14 @@ rm -f "${PROJECT_DIR}/Package Scripts/.DS_Store"
 rm -f "${TMPDIR}${package_name}.pkg"
 rm -f "${PROJECT_DIR}/${package_name}.pkg"
 
+pkg_version="$(date '+%Y.%-m.%-d')" # https://strftime.org
+
 pkgbuild \
 	--install-location "/private/tmp/${package_id}" \
 	--root "${PROJECT_DIR}/Package Resources" \
 	--scripts "${PROJECT_DIR}/Package Scripts" \
 	--identifier "${package_id}" \
-	--version "$(date '+%F' | tr '-' '.')" \
+	--version "${pkg_version}" \
 	"${TMPDIR}${package_name}.pkg"
 
 rm -rf "${PROJECT_DIR}/Package Scripts"
@@ -72,7 +76,7 @@ productbuild \
 	--sign 'Developer ID Installer' \
 	--package "${TMPDIR}${package_name}.pkg" \
 	--identifier "${package_id}" \
-	--version "$(date '+%F' | tr '-' '.')" \
+	--version "${pkg_version}" \
 	"${PROJECT_DIR}/${package_name}.pkg"
 
 rm -f "${TMPDIR}${package_name}.pkg"

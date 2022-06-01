@@ -10,7 +10,7 @@ cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && read "?'Mac Test B
 # VOLUMES ARE SUFFIXED WITH RANDOM NUMBER FOR LATER IDENTIFICATION
 # SO MULTIPLE DRIVES CAN GET STARTED AND RUN AT ONCE WITHOUT CONFLICTING
 
-MTB_IMAGE_DATE=20211028; MTB_SOURCE_IMAGE=FreeGeek-MacTestBoot-HighSierra-$MTB_IMAGE_DATE.dmg; RANDOM_SUFFIX=$RANDOM; diskutil rename MTB MTB-$RANDOM_SUFFIX; cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && echo "RESTORING '$MTB_SOURCE_IMAGE' TO 'MTB-$RANDOM_SUFFIX'" && sudo asr restore --source $MTB_SOURCE_IMAGE --target /Volumes/MTB-$RANDOM_SUFFIX --erase --noprompt
+MTB_IMAGE_DATE=20220412; MTB_SOURCE_IMAGE=FreeGeek-MacTestBoot-HighSierra-$MTB_IMAGE_DATE.dmg; RANDOM_SUFFIX=$RANDOM; diskutil rename MTB MTB-$RANDOM_SUFFIX; cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && echo "RESTORING '$MTB_SOURCE_IMAGE' TO 'MTB-$RANDOM_SUFFIX'" && sudo asr restore --source $MTB_SOURCE_IMAGE --target /Volumes/MTB-$RANDOM_SUFFIX --erase --noprompt
 
 # Command to Restore Mac Test Boot with High Sierra, Catalina, and Big Sur Installers
 

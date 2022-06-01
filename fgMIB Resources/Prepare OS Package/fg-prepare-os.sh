@@ -29,7 +29,7 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2022.4.8-1'
+readonly SCRIPT_VERSION='2022.5.13-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -39,7 +39,7 @@ readonly DARWIN_MAJOR_VERSION
 critical_error_occurred=false
 
 if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone' || -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]] && \
-   [[ "$3" == '/' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant.
+   [[ "$3" == '/' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant.
 	
 	log_path='/Users/Shared/Build Info/Prepare OS Log.txt'
 	if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]]; then # The log file will have already been started when run on boot via LaunchDaemon, so we do not want to delete it.
@@ -515,7 +515,7 @@ Save
 
 		network_interfaces="$(networksetup -listallhardwareports 2> /dev/null | awk -F ': ' '($1 == "Device") { print $NF }')"
 		IFS=$'\n'
-		for this_network_interface in $network_interfaces; do
+		for this_network_interface in ${network_interfaces}; do
 			if getairportnetwork_output="$(networksetup -getairportnetwork "${this_network_interface}" 2> /dev/null)" && [[ "${getairportnetwork_output}" != *'disabled.' ]]; then
 				write_to_log "Connecting \"${this_network_interface}\" to \"${wifi_ssid}\" Wi-Fi"
 
@@ -570,7 +570,7 @@ Save
 
 			write_to_log "Creating Hidden Admin User \"${hidden_admin_user_full_name}\" (${hidden_admin_user_account_name})"
 			
-			create_hidden_admin_user_options=( '--account-name' "${hidden_admin_user_account_name}" )
+			declare -a create_hidden_admin_user_options=( '--account-name' "${hidden_admin_user_account_name}" )
 			create_hidden_admin_user_options+=( '--full-name' "${hidden_admin_user_full_name}" )
 			create_hidden_admin_user_options+=( '--generated-uid' '0CAA0000-0A00-0000-BA00-0B000C00B00A' ) # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT208050
 			create_hidden_admin_user_options+=( '--stdin-password' )
@@ -598,7 +598,7 @@ Save
 
 			if (( create_hidden_admin_user_exit_code != 0 )) || [[ "$(id -u "${hidden_admin_user_account_name}" 2> /dev/null)" != '501' ]]; then # Confirm hidden_admin_user_account_name was assigned UID 501 to be sure all is as expected.
 				if [[ -z "${create_hidden_admin_user_error}" ]]; then create_hidden_admin_user_error="$(id -u "${hidden_admin_user_account_name}" 2>&1)"; fi
-				write_to_log "ERROR: \"${hidden_admin_user_account_name}\" User Not Created (${create_hidden_admin_user_error})"
+				write_to_log "ERROR: \"${hidden_admin_user_account_name}\" User Creation Failed (${create_hidden_admin_user_error})"
 				critical_error_occurred=true
 			fi
 		fi
@@ -610,7 +610,7 @@ Save
 
 			write_to_log "Creating Standard Auto-Login User \"${standard_autologin_user_full_name}\" (${standard_autologin_user_account_name})"
 			
-			create_standard_autologin_user_options=( '--account-name' "${standard_autologin_user_account_name}" )
+			declare -a create_standard_autologin_user_options=( '--account-name' "${standard_autologin_user_account_name}" )
 			create_standard_autologin_user_options+=( '--full-name' "${standard_autologin_user_full_name}" )
 			create_standard_autologin_user_options+=( '--generated-uid' 'B0ABCAB0-D000-00C0-A0D0-00000CA000C0' ) # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT201548 (which is different from the one above)
 			create_standard_autologin_user_options+=( '--stdin-password' )
@@ -630,7 +630,7 @@ Save
 
 			if (( create_standard_autologin_user_exit_code != 0 )) || [[ "$(id -u "${standard_autologin_user_account_name}" 2> /dev/null)" != '502' ]]; then # Confirm standard_autologin_user_account_name was assigned UID 502 to be sure all is as expected.
 				if [[ -z "${create_standard_autologin_user_error}" ]]; then create_standard_autologin_user_error="$(id -u "${standard_autologin_user_account_name}" 2>&1)"; fi
-				write_to_log "ERROR: \"${standard_autologin_user_account_name}\" User Not Created (${create_standard_autologin_user_error})"
+				write_to_log "ERROR: \"${standard_autologin_user_account_name}\" User Creation Failed (${create_standard_autologin_user_error})"
 				critical_error_occurred=true
 			fi
 		fi
@@ -930,7 +930,7 @@ Save
 									fi
 								}
 
-								custom_dock_persistent_apps=()
+								declare -a custom_dock_persistent_apps=()
 
 								if [[ -d "${this_user_apps_folder}/QA Helper.app" ]]; then
 									custom_dock_persistent_apps+=( "$(dock_app_dict_for_path "${this_user_apps_folder}/QA Helper.app")" )
@@ -941,7 +941,7 @@ Save
 								IFS=$'\n'
 								this_dock_persistent_app=''
 								this_dock_persistent_app_exists=false
-								for this_dock_persistent_apps_line in $default_dock_persistent_apps; do
+								for this_dock_persistent_apps_line in ${default_dock_persistent_apps}; do
 									if [[ "${this_dock_persistent_apps_line}" == $'\t'* ]]; then
 										this_dock_persistent_app+="${this_dock_persistent_apps_line}"
 

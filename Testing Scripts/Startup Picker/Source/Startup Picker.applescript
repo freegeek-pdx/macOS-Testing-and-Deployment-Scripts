@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.11-1
+-- Version: 2022.4.27-1
 
 -- App Icon is “Green Apple” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -393,7 +393,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		set startupDiskOptions to {}
 		if ((count of hdStartupDiskOptions) > 0) then
 			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set hdStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (hdStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set hdStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (hdStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
 			
 			set defaultStartupDiskSelection to (first item of hdStartupDiskOptions)
 			
@@ -404,7 +404,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		if ((count of otherStartupDiskOptions) > 0) then
 			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set otherStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (otherStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set otherStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (otherStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
 			
 			if ((count of startupDiskOptions) > 0) then
 				set startupDiskOptions to startupDiskOptions & {separatorLine} & otherStartupDiskOptions
@@ -415,7 +415,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		if ((count of installerStartupDiskOptions) > 0) then
 			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set installerStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (installerStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set installerStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (installerStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
 			
 			if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of installerStartupDiskOptions)
 			
@@ -428,7 +428,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		if ((count of testBootStartupDiskOptions) > 0) then
 			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set testBootStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (testBootStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set testBootStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (testBootStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
 			
 			if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of testBootStartupDiskOptions)
 			
@@ -442,7 +442,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		set incompatibleStartupDisksNote to ""
 		if ((incompatibleStartupDiskOptions count) > 0) then
 			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set incompatibleStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (incompatibleStartupDiskOptions as string)) & " | sort -urn | cut -d ':' -f 2")))
+			set incompatibleStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (incompatibleStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
 			
 			set pluralizeDisks to ""
 			if ((incompatibleStartupDiskOptions count) > 1) then set pluralizeDisks to "s"

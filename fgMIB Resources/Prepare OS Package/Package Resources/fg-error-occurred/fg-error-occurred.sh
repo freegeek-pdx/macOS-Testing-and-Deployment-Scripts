@@ -3,7 +3,7 @@
 #
 # Created by Pico Mitchell on 4/19/21.
 # For MacLand @ Free Geek
-# Version: 2022.4.8-1
+# Version: 2022.4.27-1
 #
 # MIT License
 #
@@ -68,7 +68,7 @@ launch_login_progress_app() {
 }
 
 if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-error-occurred' && -f "${launch_daemon_path}" && -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && \
-	  ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && -f '/Users/Shared/Build Info/Prepare OS Log.txt' && "$(tail -1 '/Users/Shared/Build Info/Prepare OS Log.txt')" == *'ERROR:'* ]]; then
+	  ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && -f '/Users/Shared/Build Info/Prepare OS Log.txt' ]] && grep -qF $'\tERROR:' '/Users/Shared/Build Info/Prepare OS Log.txt'; then
 	# Do not run if fg-install-packages LaunchDaemon exists since that will do since it same error display on its own when rebooting after an error occurred.
 	# The fg-install-packages LaunchDaemon needs to do its own identical error handling like this in case an error occurrs before or after this was created or deleted by fg-prepare-os package.
 

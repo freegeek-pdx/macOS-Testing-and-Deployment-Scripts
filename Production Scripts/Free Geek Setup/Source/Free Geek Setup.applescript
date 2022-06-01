@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.11-2
+-- Version: 2022.5.19-1
 
 -- Build Flag: LSUIElement
 
@@ -103,13 +103,13 @@ on error checkReadOnlyErrorMessage
 end try
 
 
-global adminUsername, adminPassword, tmpPath -- Needs to be accessible in checkEFIfirmwareIsNotInAllowList function and later in code.
+global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate, tmpPath -- Needs to be accessible in checkEFIfirmwareIsNotInAllowList function and later in code and in the doShellScriptAsAdmin function.
+set lastDoShellScriptAsAdminAuthDate to 0
 
 set adminUsername to "fg-admin"
 set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
 
 set demoUsername to "fg-demo"
-set demoPassword to "freegeek"
 
 set AppleScript's text item delimiters to ""
 set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
@@ -157,7 +157,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			end try
 			
 			try
-				do shell script ("echo " & hasAccessibilityPermissions & " > " & (quoted form of (buildInfoPath & ".fgAutomationGuideAccessibilityStatus-" & currentBundleIdentifier))) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("echo " & hasAccessibilityPermissions & " > " & (quoted form of (buildInfoPath & ".fgAutomationGuideAccessibilityStatus-" & currentBundleIdentifier)))
 			end try
 		else
 			-- If Automation Guide hasn't been run yet, launch it.
@@ -179,7 +179,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	if (demoUsernameIsAdmin) then
 		try
-			do shell script "dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin")
 		end try
 	end if
 	
@@ -189,7 +189,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	if (not demoUsernameIsCorrect) then
 		try
-			do shell script "dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'")
 		end try
 	end if
 	
@@ -364,7 +364,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		(((buildInfoPath & ".fgAutomationGuideRunning") as POSIX file) as alias)
 		
 		try
-			do shell script ("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideDid-" & currentBundleIdentifier))) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideDid-" & currentBundleIdentifier)))
 		end try
 		
 		try
@@ -374,7 +374,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 				(((buildInfoPath & ".fgAutomationGuideDid-org.freegeek.Free-Geek-Demo-Helper") as POSIX file) as alias)
 				
 				try -- If did all apps, delete all Automation Guide flags and continue setup
-					do shell script ("rm -f " & (quoted form of (buildInfoPath & ".fgAutomationGuide")) & "*") user name adminUsername password adminPassword with administrator privileges
+					doShellScriptAsAdmin("rm -f " & (quoted form of (buildInfoPath & ".fgAutomationGuide")) & "*")
 				end try
 			on error
 				try
@@ -500,7 +500,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	
 	
 	try
-		do shell script ("rm -f /Users/" & adminUsername & "/Library/Preferences/ByHost/*") user name adminUsername password adminPassword with administrator privileges
+		doShellScriptAsAdmin("rm -f /Users/" & adminUsername & "/Library/Preferences/ByHost/*")
 	end try
 	try
 		do shell script ("rm -f /Users/" & demoUsername & "/Library/Preferences/ByHost/*")
@@ -516,7 +516,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	if (shouldRunDemoHelper) then
 		try
 			-- Let Demo Helper know that it was launched by Setup so that it will always open QA Helper even if idle time is too short or time since boot is too long (which can happen on Big Sur because of Automation Guide).
-			do shell script ("touch " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper"))) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper")))
 		end try
 		
 		try
@@ -728,7 +728,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 							try
 								-- Run fg-snapshot-preserver after Snapshot Helper has been granted Full Disk Access to the get the reset Snapshot mounted as soon as possible,
 								-- so that the date can be set correctly before running Free Geek Updater or eficheck which can fail if the date is not correct.
-								do shell script "/Users/Shared/.fg-snapshot-preserver/fg-snapshot-preserver.sh" user name adminUsername password adminPassword with administrator privileges
+								doShellScriptAsAdmin("/Users/Shared/.fg-snapshot-preserver/fg-snapshot-preserver.sh")
 							end try
 							exit repeat
 						end if
@@ -743,7 +743,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			end if
 		on error
 			-- Delete "Free Geek Snapshot Helper" if ".fg-snapshot-preserver" doesn't exist, which means we're on High Sierra or Mojave.
-			do shell script "rm -rf " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app")) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("rm -rf " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app")))
 		end try
 	end try
 	
@@ -759,7 +759,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			(((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias) -- If just ran updater, then continue with setup. If not, we will launch updater.
 			
 			try
-				do shell script ("rm -f " & (quoted form of (buildInfoPath & ".fgUpdater")) & "*") user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("rm -f " & (quoted form of (buildInfoPath & ".fgUpdater")) & "*")
 			end try
 		end if
 		
@@ -779,7 +779,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			if (((do shell script "sysctl -in hw.optional.arm64") is equal to "1") and ((do shell script "file '/Users/" & demoUsername & "/Applications/QA Helper.app/Contents/MacOS/QA Helper'") does not contain ("[arm64:Mach-O 64-bit executable arm64]"))) then
 				try -- Install Rosetta 2 if on Apple Silicon if QA Helper IS NOT Universal since it will need it to be able to run.
 					-- Starting with Java 17 (which has seperate downloads for Intel and Apple Silicon and normally makes seperate native apps when jpackage is used on each platform), I figured out how to make QA Helper a Univeral Binary, but doesn't hurt to keep this check in place.
-					do shell script "softwareupdate --install-rosetta --agree-to-license" user name adminUsername password adminPassword with administrator privileges
+					doShellScriptAsAdmin("softwareupdate --install-rosetta --agree-to-license")
 				end try
 			end if
 		end try
@@ -791,14 +791,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		try
 			-- DO NOT clear NVRAM if TRIM has been enabled on Catalina with "trimforce enable" because clearing NVRAM will undo it. (The TRIM flag is not stored in NVRAM before Catalina.)
-			do shell script "nvram EnableTRIM" user name adminUsername password adminPassword with administrator privileges -- This will error if the flag does not exist.
+			doShellScriptAsAdmin("nvram EnableTRIM") -- This will error if the flag does not exist.
 		on error
 			try -- Clear NVRAM if we're not on the source drive (just for house cleaning purposes, this doesn't clear SIP).
 				if (isBigSurElevenDotThreeOrNewer or (do shell script "sysctl -in hw.optional.arm64" is not equal to "1")) then
 					-- ALSO, do not clear NVRAM on Apple Silicon IF OLDER THAN 11.3 since it will cause an error saying that macOS needs to be reinstalled (but can boot properly after re-selecting the internal drive in Startup Disk),
 					-- since it deletes important NVRAM keys (such as "boot-volume") which are now protected and cannot be deleted on 11.3 and newer.
 					try
-						do shell script "nvram -c" user name adminUsername password adminPassword with administrator privileges
+						doShellScriptAsAdmin("nvram -c")
 					end try
 				end if
 			end try
@@ -806,7 +806,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		set serialNumber to ""
 		try
-			set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print 0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
+			set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
 		end try
 		
 		if (serialNumber is not equal to "") then
@@ -818,7 +818,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 				set remoteManagementOutput to ""
 				try
 					try
-						set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" user name adminUsername password adminPassword with administrator privileges)
+						set remoteManagementOutput to doShellScriptAsAdmin("profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0")
 					on error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
 						if (profilesShowDefaultUserErrorNumber is not equal to -60007) then error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
 						try
@@ -841,7 +841,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 						do shell script ("mkdir " & (quoted form of buildInfoPath))
 					end try
 					try
-						do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within a short time of the last valid admin permissions run though.
+						do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
 					end try
 				end if
 				
@@ -1239,8 +1239,8 @@ The EFI Firmware or the EFI AllowList MUST be updated before this Mac can be sol
 			delay 0.2 -- Delay to make sure progress gets updated.
 			
 			try
-				do shell script "echo 'y
-y' | trimforce enable" user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("echo 'y
+y' | trimforce enable")
 			end try
 		else
 			if (modelIdentifier starts with "iMac12,") then
@@ -1353,7 +1353,7 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 			
 			try
 				-- Let Demo Helper know that it was launched by Setup so that it will always open QA Helper even if idle time is too short or time since boot is too long (which can happen on Big Sur because of Automation Guide).
-				do shell script ("touch " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper"))) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper")))
 			end try
 			
 			if (needsToWriteDemoHelperPlistFile) then
@@ -1401,7 +1401,7 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 				set pathToMe to (POSIX path of (path to me))
 				if ((offset of ".app" in pathToMe) > 0) then
 					try
-						do shell script "tccutil reset All org.freegeek.Free-Geek-Setup; rm -rf " & (quoted form of pathToMe) user name adminUsername password adminPassword with administrator privileges
+						doShellScriptAsAdmin("tccutil reset All org.freegeek.Free-Geek-Setup; rm -rf " & (quoted form of pathToMe))
 					end try
 				end if
 			end try
@@ -1440,7 +1440,7 @@ on checkEFIfirmwareIsNotInAllowList()
 	set efiCheckOutputPath to (tmpPath & "efiCheckOutput.txt")
 	do shell script "defaults delete eficheck; rm -f " & (quoted form of efiCheckOutputPath)
 	try
-		set efiCheckPID to (do shell script "/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check > " & (quoted form of efiCheckOutputPath) & " 2>&1 & echo $!" user name adminUsername password adminPassword with administrator privileges)
+		set efiCheckPID to doShellScriptAsAdmin("/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check > " & (quoted form of efiCheckOutputPath) & " 2>&1 & echo $!")
 		delay 1
 		set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " > /dev/null 2>&1; echo $?")) as number)
 		if (efiCheckIsRunning is equal to 0) then
@@ -1485,3 +1485,23 @@ on checkEFIfirmwareIsNotInAllowList()
 	
 	return efiFirmwareIsNotInAllowList
 end checkEFIfirmwareIsNotInAllowList
+
+on doShellScriptAsAdmin(command)
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
+	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
+	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.
+	-- Also, from testing, this 5 minute credential caching DOES NOT seem to be affected by any custom "sudo" timeout set in the sudoers file.
+	-- And, from testing, unlike "sudo" the timeout DOES NOT keep extending from the last "do shell script with administrator privileges" without credentials but only from the last time credentials were passed.
+	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
+	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
+	
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
+		set lastDoShellScriptAsAdminAuthDate to (current date)
+	else
+		set commandOutput to (do shell script command with administrator privileges)
+	end if
+	
+	return commandOutput
+end doShellScriptAsAdmin

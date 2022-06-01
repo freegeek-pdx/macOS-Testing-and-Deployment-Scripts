@@ -3,7 +3,7 @@
 #
 # Created by Pico Mitchell on 4/30/17.
 # For MacLand @ Free Geek
-# Version: 2022.4.8-1
+# Version: 2022.5.25-1
 #
 # MIT License
 #
@@ -156,7 +156,7 @@ prevent_scrolling_past_progress_display() {
 remove_user_from_all_groups() {
     if [[ -n "$1" ]]; then
         this_user_groups="$(id -Gn "$1" 2> /dev/null)"
-        for this_user_group in $this_user_groups; do
+        for this_user_group in ${this_user_groups}; do
             if [[ -n "${this_user_group}" && "$(dsmemberutil checkmembership -U "$1" -G "${this_user_group}")" == 'user is a member of the group' ]]; then
                 prevent_scrolling_past_progress_display
                 dseditgroup_delete_user_from_some_group_output="$(dseditgroup -o edit -d "$1" -t user "${this_user_group}" 2>&1)"
@@ -262,7 +262,12 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             else
                 debug_log_and_step 'launchctl_load_opendirectoryd_output' "${launchctl_load_opendirectoryd_output}"
 
-                dscl_list_users_before_output="$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
+                dscl_list_users_before_output="$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
+                # I tried using "dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }'" but found that users with passwords set (which should show as "********")
+                # do not show in the list at all on macOS 10.13 High Sierra when in Single-User Mode and the Password attribute also doesn't show at all in the user record such as "dscl . -read /Users/fg-demo",
+                # but the Password does show in the list as well as user record on macOS 10.14 Mojave when in Single-User Mode and the Password also shows in the list and user record when in full macOS on either version.
+                # So, checking for any "dscl . -list /Users ShadowHashData" is more precise and reliable even though that only shows any output when run as root since this code will always be running as root when in Single-User Mode.
+
                 # Remove "Guest" user from list because we will attempt to delete it no matter what and don't want its existence to complicate checking for actual allowed users.
                 dscl_list_users_before_output="${dscl_list_users_before_output//Guest/}"
                 dscl_list_users_before_output="$(echo "${dscl_list_users_before_output}" | sort | xargs)"
@@ -386,9 +391,23 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             fi
         fi
 
-        dscl_list_users_after_output="$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
+        dscl_list_users_after_output="$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
         debug_log_and_step 'dscl_list_users_after_output' "${dscl_list_users_after_output}"
         prevent_scrolling_past_progress_display
+
+        if [[ "$(dsmemberutil checkmembership -U '_mbsetupuser' -G 'admin')" == 'user is a member of the group' ]]; then
+            # REMOVE _mbsetupuser FROM ADMIN GROUP
+            # If any of the Setup Assistant screens were clicked through at any point, the "_mbsetupuser" may have been added to the admin group.
+            # After Setup Assistant is normally completed, macOS would have removed "_mbsetupuser" from the admin group, but since Setup Assistant was not "_mbsetupuser" would be left in the admin group.
+            # This removal of "_mbsetupuser" from the admin group should have already in previous scripts, but doesn't hurt to check again just in case.
+
+            declare -a admin_groups=( 'admin' '_appserverusr' '_appserveradm' )
+            for this_admin_group in "${admin_groups[@]}"; do
+                prevent_scrolling_past_progress_display
+                dseditgroup_delete_mbsetupuser_from_admin_group_output="$(dseditgroup -o edit -d '_mbsetupuser' -t user "${this_admin_group}" 2>&1)"
+                debug_log_and_step "dseditgroup_delete_mbsetupuser_from_admin_group_output (_mbsetupuser - ${this_admin_group})" "${dseditgroup_delete_mbsetupuser_from_admin_group_output}"
+            done
+        fi
 
         dscl_read_admin_members_after_output="$(PlistBuddy -c 'Print :dsAttrTypeStandard\:GroupMembers' /dev/stdin <<< "$(dscl -plist . -read '/Groups/admin' GroupMembers 2> /dev/null)" 2> /dev/null | awk '(($NF != "{") && ($NF != "}")) { print $NF }' | sort | xargs)"
         debug_log_and_step 'dscl_read_admin_members_after_output' "${dscl_read_admin_members_after_output}"
@@ -425,18 +444,16 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             all_share_names="$(sharing -l 2> /dev/null | grep $'name:\t\t' | cut -c 8-)"
             prevent_scrolling_past_progress_display
             IFS=$'\n' # Since names can have spaces, we only want to loop on line breaks
-            for this_share_name in $all_share_names
-            do
+            for this_share_name in ${all_share_names}; do
                 remove_some_shared_folder_output="$(sharing -r "${this_share_name}" 2>&1)"
                 debug_log_and_step "remove_some_shared_folder_output (${this_share_name})" "${remove_some_shared_folder_output}"
                 prevent_scrolling_past_progress_display
             done
             unset IFS
             
-            all_sharepoint_groups="$(dscl . -list '/Groups' 2> /dev/null | grep 'com.apple.sharepoint.group')"
+            all_sharepoint_groups="$(dscl . -list '/Groups' 2> /dev/null | grep '^com\.apple\.sharepoint\.group\.')"
             prevent_scrolling_past_progress_display
-            for this_sharepoint_group in $all_sharepoint_groups
-            do
+            for this_sharepoint_group in ${all_sharepoint_groups}; do
                 delete_some_sharepoint_group_output="$(dseditgroup -o delete "${this_sharepoint_group}" 2>&1)"
                 debug_log_and_step "delete_some_sharepoint_group_output (${this_sharepoint_group})" "${delete_some_sharepoint_group_output}"
                 prevent_scrolling_past_progress_display
@@ -478,11 +495,6 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             fi
 
             rm -f '/Users/Shared/'{,.[^.],..?}* 2> /dev/null # Delete any FILES (not folders) in the Shared folder (and ignore errors about not deleting directories).
-
-            rm -f '/usr/local/bin/memtest'
-            rm -f '/Applications/memtest'
-            
-            rm -f '/Applications/memtest_osx'
 
             if ! nvram 'EnableTRIM' &> /dev/null # DO NOT clear NVRAM if TRIM has been enabled on Catalina with "trimforce enable" because clearing NVRAM will undo it. (The TRIM flag is not stored in NVRAM before Catalina.)
             then
@@ -543,7 +555,7 @@ ${ANSI_GREEN}
                     read -r completed
                     
                     if  [[ "${completed}" != 'continue' ]]; then
-                        rm -rf '/usr/local/bin' # This folder was only made for memtest and fgreset symlinks
+                        rm -rf '/usr/local/bin' # This folder was only made for fgreset symlink.
                         rm -f '/Applications/fgreset'
 
                         clear

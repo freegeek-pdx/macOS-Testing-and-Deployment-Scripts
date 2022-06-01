@@ -19,7 +19,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-readonly SCRIPT_VERSION='2022.4.11-1'
+readonly SCRIPT_VERSION='2022.5.19-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -118,7 +118,7 @@ if [[ "${SHORT_MODEL_NAME}" == 'Mac' ]]; then
 	# TODO: Will need to keep an eye on this when future Apple Silicon Macs are released to see if all models will only get a "MacXX,Y" Model ID,
 	# in which case we'll likely need to check the local Marketing Model Name here to extract the Short Model Name when "system_profiler" isn't available.
 else
-	short_model_name_end_components=( 'Pro' 'Air' 'mini' )
+	declare -a short_model_name_end_components=( 'Pro' 'Air' 'mini' )
 	for this_short_model_name_end_component in "${short_model_name_end_components[@]}"; do
 		if [[ "${SHORT_MODEL_NAME}" == *"${this_short_model_name_end_component}" ]]; then
 			SHORT_MODEL_NAME="${SHORT_MODEL_NAME/${this_short_model_name_end_component}/ ${this_short_model_name_end_component}}"
@@ -132,13 +132,13 @@ readonly MODEL_ID_NUMBER="${MODEL_ID//[^0-9,]/}"
 
 model_name="${SHORT_MODEL_NAME} ${MODEL_ID_NUMBER}"
 
-SERIAL="$(trim_like_xargs "$(PlistBuddy -c 'Print 0:IOPlatformSerialNumber' /dev/stdin <<< "$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)" 2> /dev/null)")"
+SERIAL="$(trim_like_xargs "$(PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< "$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)" 2> /dev/null)")"
 readonly SERIAL
 readonly SPECS_SERIAL="${ANSI_BOLD}Serial:${CLEAR_ANSI} ${SERIAL}"
 
 cpu_model="$(sysctl -n machdep.cpu.brand_string 2> /dev/null)"
 
-cpu_model_removal_components=( 'Genuine' 'Intel' '(R)' '(TM)' 'CPU' 'processor' )
+declare -a cpu_model_removal_components=( 'Genuine' 'Intel' '(R)' '(TM)' 'CPU' 'processor' )
 for this_cpu_model_removal_components in "${cpu_model_removal_components[@]}"; do
 	cpu_model="${cpu_model//${this_cpu_model_removal_components}/ }"
 done
@@ -178,7 +178,7 @@ load_specs_overview() {
 
 		if $IS_APPLE_SILICON; then
 			# This local Marketing Model Name within "ioreg" only exists on Apple Silicon Macs.
-			marketing_model_name="$(PlistBuddy -c 'Print 0:product-name' /dev/stdin <<< "$(ioreg -arc IOPlatformDevice -k product-name)" 2> /dev/null)"
+			marketing_model_name="$(PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< "$(ioreg -arc IOPlatformDevice -k product-name)" 2> /dev/null | tr -dc '[:print:]')" # Remove non-printable characters because this decoded value could end with a null char.
 		elif (( ${#SERIAL} >= 11 )); then
 			# The model part of the Serial Number is the last 4 characters for 12 character serials and the last 3 characters for 11 character serials (which are very old and shouldn't actually be encountered: https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/).
 			# Starting with the 2021 MacBook Pro models, randomized 10 character Serial Numbers are now used which do not have any model specific characters, but those Macs will never get here or need to load the Marketing Model Name over the internet since they are Apple Silicon and the local Marketing Model Name will have been retrieved above.
@@ -192,8 +192,8 @@ load_specs_overview() {
 					local current_user_id
 					current_user_id="$(echo 'show State:/Users/ConsoleUser' | scutil | awk '($1 == "UID") { print $NF; exit }')"
 					local current_user_name
-					if [[ "${current_user_id}" && "${current_user_id}" != '0' ]]; then
-						current_user_name="$(dscl /Search -search /Users UniqueID "${current_user_id}" | awk '{ print $1; exit }')"
+					if [[ -n "${current_user_id}" ]] && (( current_user_id != 0 )); then
+						current_user_name="$(dscl /Search -search /Users UniqueID "${current_user_id}" 2> /dev/null | awk '{ print $1; exit }')"
 					fi
 
 					if [[ -n "${current_user_name}" ]]; then # Always check cached preferences for current user first so that we know whether or not it needs to be cached for the current user if it is already cached for another user.
@@ -478,7 +478,7 @@ clear_nvram_and_reset_sip() {
 			csrutil_output="${csrutil_output/$'\n'Please restart the machine for the changes to take effect./}" # This one is for macOS 10.15 Catalina and older.
 			csrutil_output="${csrutil_output/$'\n'Restart the machine for the changes to take effect./}" # This one is for macOS 11 Big Sur and newer.
 
-			echo -e "${csrutil_output}"
+			echo "${csrutil_output}"
 		fi
 	fi
 }
@@ -547,7 +547,7 @@ wifi_password='[COPY RESOURCES SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCA
 
 network_interfaces="$(networksetup -listallhardwareports 2> /dev/null | awk -F ': ' '($1 == "Device") { print $NF }')"
 IFS=$'\n'
-for this_network_interface in $network_interfaces; do
+for this_network_interface in ${network_interfaces}; do
 	if getairportnetwork_output="$(networksetup -getairportnetwork "${this_network_interface}" 2> /dev/null)" && [[ "${getairportnetwork_output}" != *'disabled.' ]]; then
 		if networksetup -getairportpower "${this_network_interface}" 2> /dev/null | grep -q '): Off$'; then
 			networksetup -setairportpower "${this_network_interface}" on &> /dev/null
@@ -562,7 +562,7 @@ set_date_time_from_internet # Try to set correct date before doing anything else
 
 # DETECT INSTALL PACKAGES
 
-install_packages=()
+declare -a install_packages=()
 if $CLEAN_INSTALL_REQUESTED; then
 	if [[ -z "${global_install_notes}" ]]; then global_install_notes="${GLOBAL_INSTALL_NOTES_HEADER}"; fi
 	global_install_notes+="\n    - Clean installation will be peformed since \"$1\" argument has been used."
@@ -632,13 +632,13 @@ else # If is OS X 10.10 Yosemite or older.
 	possible_disk_ids="$(PlistBuddy -c 'Print :WholeDisks' /dev/stdin <<< "$(diskutil list -plist)" 2> /dev/null | awk '/disk/ { print $1 }')"
 fi
 
-install_drive_choices=()
+declare -a install_drive_choices=()
 install_drive_choices_display=''
 
-install_drive_device_tree_paths=()
+declare -a install_drive_device_tree_paths=()
 
 IFS=$'\n'
-for this_disk_id in $possible_disk_ids; do
+for this_disk_id in ${possible_disk_ids}; do
 	this_disk_info_plist_path="$(mktemp -t 'fg_install_os-this_disk_info')"
 	diskutil info -plist "${this_disk_id}" > "${this_disk_info_plist_path}"
 
@@ -756,13 +756,13 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 					# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID, so they must be removed from the disk IDs for them to be usable.
 					# When using gsub(/[^[:print:]]/, "", $4), I was seeing an extraneous "?" get outputted after the disk ID on one computer but not another (which is odd), but removing all non-digits and then adding "disk" back solved that for all computers.
 					
-					for this_apfs_container_disk_id in $apfs_container_disk_ids; do
+					for this_apfs_container_disk_id in ${apfs_container_disk_ids}; do
 						diskutil mountDisk "${this_apfs_container_disk_id}" &> /dev/null
 					done
 				fi
 			done
 			
-			clean_install_choices=()
+			declare -a clean_install_choices=()
 			clean_install_choices_display=''
 
 			for this_volume in '/Volumes/'*; do
@@ -866,7 +866,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 							else
 								existing_user_names_display=''
 								IFS=' '
-								for this_existing_username in $existing_user_names; do
+								for this_existing_username in ${existing_user_names}; do
 									if [[ "${this_existing_username}" != 'daemon' && "${this_existing_username}" != 'nobody' && "${this_existing_username}" != 'root' ]]; then
 										if [[ -n "${existing_user_names_display}" ]]; then existing_user_names_display+=', '; fi
 										existing_user_names_display+="${this_existing_username}"
@@ -1027,20 +1027,20 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 	SUPPORTS_MONTEREY="$([[ ( "${SHORT_MODEL_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '16' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID}" == 'MacBookPro11,4' ) || ( "${MODEL_ID}" == 'MacBookPro11,5' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook Pro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '12' ) || ( "${SHORT_MODEL_NAME}" == 'MacBook Air' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${SHORT_MODEL_NAME}" == 'Mac mini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${SHORT_MODEL_NAME}" == 'Mac Pro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${SHORT_MODEL_NAME}" == 'iMac Pro' ) || ( "${SHORT_MODEL_NAME}" == 'Mac Studio' ) ]] && echo 'true' || echo 'false')"
 	readonly SUPPORTS_MONTEREY
 
-	os_installer_search_group_prefixes=(
+	declare -a os_installer_search_group_prefixes=(
 		'/Volumes/Image ' # Always want installers in "Image Volume" to come before any other installers (which is for the booted installer in recoveryOS).
 		'/Volumes/Install ' # Check any other available "Install macOS..." volumes.
 		'/' # A stub installer will always be in the root filesystem in recoveryOS.
 		'/Applications/' # Check "/Applications" folder in case we are in full OS, this could contain full or stub installers. In our use case, these should not exist and does not need to be higher in the list.
 	)
 
-	os_installer_choices=()
+	declare -a os_installer_choices=()
 	os_installer_choices_display=''
 
-	stub_os_installers_info=()
+	declare -a stub_os_installers_info=()
 
 	for this_os_installer_search_group_prefixes in "${os_installer_search_group_prefixes[@]}"; do
-		this_os_installer_search_group_paths=()
+		declare -a this_os_installer_search_group_paths=()
 		if [[ "${this_os_installer_search_group_prefixes}" != *'/' ]]; then
 			this_os_installer_search_group_paths=( "${this_os_installer_search_group_prefixes}"*'/Install '*'.app/Contents/Resources/startosinstall' )
 		else
@@ -1069,12 +1069,12 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 			fi
 		done
 
-		these_sorted_os_installer_paths="$(echo -e "${these_sorted_os_installer_paths}" | sort -rn)" # Sort by OS versions in reverse order (newest to oldest).
+		these_sorted_os_installer_paths="$(echo "${these_sorted_os_installer_paths}" | sort -rV)" # Sort by OS versions in reverse order (newest to oldest).
 		
 		is_first_os_installer_of_search_group=true
 
 		IFS=$'\n'
-		for this_os_installer_path in $these_sorted_os_installer_paths; do
+		for this_os_installer_path in ${these_sorted_os_installer_paths}; do
 			this_os_installer_darwin_major_version="$(echo "${this_os_installer_path}" | cut -d ':' -f 1)"
 			this_os_installer_path="$(echo "${this_os_installer_path}" | cut -d ':' -f 2)"
 
@@ -1122,10 +1122,10 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 				if [[ -f "${this_os_installer_app_path}/Contents/SharedSupport/SharedSupport.dmg" || -f "${this_os_installer_app_path}/Contents/SharedSupport/InstallESD.dmg" ]]; then
 					# Full installer apps will contain "SharedSupport.dmg" (on macOS 11 Big Sur and newer) or "InstallESD.dmg" (on Catalina or older).
 
-					if ( ! $SUPPORTS_HIGH_SIERRA && [[ "${this_os_installer_name}" == *' High Sierra'* ]] ) || \
-						( ! $SUPPORTS_CATALINA && [[ "${this_os_installer_name}" == *' Mojave'* || "${this_os_installer_name}" == *' Catalina'* ]] ) || \
-						( ! $SUPPORTS_BIG_SUR && [[ "${this_os_installer_name}" == *' Big Sur'* ]] ) || \
-						( ! $SUPPORTS_MONTEREY && [[ "${this_os_installer_name}" == *' Monterey'* ]] ); then # Catalina supports same as Mojave
+					if { ! $SUPPORTS_HIGH_SIERRA && [[ "${this_os_installer_name}" == *' High Sierra'* ]]; } || \
+						{ ! $SUPPORTS_CATALINA && [[ "${this_os_installer_name}" == *' Mojave'* || "${this_os_installer_name}" == *' Catalina'* ]]; } || \
+						{ ! $SUPPORTS_BIG_SUR && [[ "${this_os_installer_name}" == *' Big Sur'* ]]; } || \
+						{ ! $SUPPORTS_MONTEREY && [[ "${this_os_installer_name}" == *' Monterey'* ]]; }; then # Catalina supports same as Mojave
 						echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Model Does Not Support ${this_os_installer_name}${CLEAR_ANSI}"
 					elif [[ "$(strip_ansi_styles "${os_installer_choices_display}")" == *": ${this_os_installer_name}"* ]]; then
 						echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"
@@ -1252,7 +1252,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 		if [[ -n "${os_installer_usage_notes}" ]]; then
 			if [[ -z "${global_install_notes}" ]]; then global_install_notes="${GLOBAL_INSTALL_NOTES_HEADER}"; fi
 			IFS='&'
-			for this_os_installer_usage_note in $os_installer_usage_notes; do
+			for this_os_installer_usage_note in ${os_installer_usage_notes}; do
 				this_os_installer_usage_note="$(trim_like_xargs "${this_os_installer_usage_note}")"
 				if [[ "${this_os_installer_usage_note}" == 'Internet Required' ]]; then
 					this_os_installer_usage_note="Selected installer ${ANSI_BOLD}is a stub${CLEAR_ANSI}, full installer will be downloaded."
@@ -1404,7 +1404,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 					# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID, so they must be removed from the disk IDs for them to be usable.
 					# When using gsub(/[^[:print:]]/, "", $4), I was seeing an extraneous "?" get outputted after the disk ID on one computer but not another (which is odd), but removing all non-digits and then adding "disk" back solved that for all computers.
 					
-					for this_apfs_container_disk_id in $apfs_container_disk_ids; do
+					for this_apfs_container_disk_id in ${apfs_container_disk_ids}; do
 						diskutil mountDisk "${this_apfs_container_disk_id}" &> /dev/null
 
 						this_apfs_container_info_plist="$(diskutil list -plist "${this_apfs_container_disk_id}")"
@@ -1771,7 +1771,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 												# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID, so they must be removed from the disk IDs for them to be usable.
 												# When using gsub(/[^[:print:]]/, "", $4), I was seeing an extraneous "?" get outputted after the disk ID on one computer but not another (which is odd), but removing all non-digits and then adding "disk" back solved that for all computers.
 												
-												for this_apfs_container_disk_id in $apfs_container_disk_ids; do
+												for this_apfs_container_disk_id in ${apfs_container_disk_ids}; do
 													if diskutil apfs deleteContainer "${this_apfs_container_disk_id}"; then
 														did_delete_apfs_container=true
 													fi
@@ -1816,7 +1816,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 										# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID, so they must be removed from the disk IDs for them to be usable.
 										# When using gsub(/[^[:print:]]/, "", $4), I was seeing an extraneous "?" get outputted after the disk ID on one computer but not another (which is odd), but removing all non-digits and then adding "disk" back solved that for all computers.
 										
-										for this_apfs_container_disk_id in $apfs_container_disk_ids; do
+										for this_apfs_container_disk_id in ${apfs_container_disk_ids}; do
 											if diskutil apfs deleteContainer "${this_apfs_container_disk_id}"; then
 												did_delete_apfs_container=true
 											fi
@@ -1901,7 +1901,7 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 					echo -e "\n\n  ${ANSI_GREEN}${ANSI_BOLD}Installing ${ANSI_UNDERLINE}${os_installer_name}${ANSI_GREEN}${ANSI_BOLD}\n  Onto ${ANSI_UNDERLINE}${install_drive_name}${ANSI_GREEN}${ANSI_BOLD}...${CLEAR_ANSI}\n"
 					if [[ -n "${global_install_notes}" ]]; then echo -e "${global_install_notes}\n"; fi
 					
-					os_installer_options=( '--nointeraction' ) # The "nointeraction" argument is undocumented, but is supported on ALL versions of "startosinstall" (which is OS X 10.11 El Capitan and newer).
+					declare -a os_installer_options=( '--nointeraction' ) # The "nointeraction" argument is undocumented, but is supported on ALL versions of "startosinstall" (which is OS X 10.11 El Capitan and newer).
 
 					# NOTE: Instead of using version checks to determine supported "startosinstall" arguments, I wanted to use the output of "startosinstall --usage" instead.
 					# But, I found that "startosinstall --usage" can take a VERY long time. Grepping the binary contents to check for supported arguments is unconventional but effective and MUCH faster!
@@ -1978,11 +1978,11 @@ if [[ -n "${install_drive_choices[*]}" && -n "${install_drive_choices_display}" 
 								admin_username="$(id -un)" # We will use the current username as authorizing admin user if it is and admin and has a Secure Token (and is also a Volume Owner on Apple Silicon).
 								diskutil_apfs_users_output="$($IS_APPLE_SILICON && diskutil apfs listUsers /)" # Only need this output to check for Volume Owners on Apple Silicon.
 								all_admin_usernames="$(PlistBuddy -c 'Print :dsAttrTypeStandard\:GroupMembership' /dev/stdin <<< "$(dscl -plist /Search -read '/Groups/admin' GroupMembership 2> /dev/null)" 2> /dev/null | awk '(($NF != "{") && ($NF != "root") && ($NF != "}")) { print $NF }')"
-								if [[ $'\n'"${all_admin_usernames}"$'\n' != *$'\n'"${admin_username}"$'\n'* || "$(sysadminctl -secureTokenStatus "${admin_username}" 2>&1)" != *'is ENABLED for'* ]] || ( $IS_APPLE_SILICON && ! echo "${diskutil_apfs_users_output}" | grep -A 2 "$(dscl -plist /Search -read "/Users/${admin_username}" GeneratedUID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)$" | grep -q 'Volume Owner: Yes$' ); then
+								if [[ $'\n'"${all_admin_usernames}"$'\n' != *$'\n'"${admin_username}"$'\n'* || "$(sysadminctl -secureTokenStatus "${admin_username}" 2>&1)" != *'is ENABLED for'* ]] || { $IS_APPLE_SILICON && ! echo "${diskutil_apfs_users_output}" | grep -A 2 "$(dscl -plist /Search -read "/Users/${admin_username}" GeneratedUID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)$" | grep -q 'Volume Owner: Yes$'; }; then
 									IFS=$'\n'
-									for this_admin_username in $all_admin_usernames; do
+									for this_admin_username in ${all_admin_usernames}; do
 										if [[ "${this_admin_username}" != '_'* ]]; then
-											if [[ "$(sysadminctl -secureTokenStatus "${this_admin_username}" 2>&1)" == *'is ENABLED for'* ]] && ( ! $IS_APPLE_SILICON || echo "${diskutil_apfs_users_output}" | grep -A 2 "$(dscl -plist /Search -read "/Users/${this_admin_username}" GeneratedUID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)$" | grep -q 'Volume Owner: Yes$' ); then
+											if [[ "$(sysadminctl -secureTokenStatus "${this_admin_username}" 2>&1)" == *'is ENABLED for'* ]] && { ! $IS_APPLE_SILICON || echo "${diskutil_apfs_users_output}" | grep -A 2 "$(dscl -plist /Search -read "/Users/${this_admin_username}" GeneratedUID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)$" | grep -q 'Volume Owner: Yes$'; }; then
 												# If current user was not admin or did not have a Secure Token,
 												# check all admin users for Secure Tokens and use the first admin with a Secure Token.
 												admin_username="${this_admin_username}"

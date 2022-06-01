@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.11-1
+-- Version: 2022.5.19-1
 
 -- App Icon is “Microscope” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -697,7 +697,7 @@ repeat
 		if (chipType is not equal to "UNKNOWN Chip") then
 			try
 				-- This local marketing model name only exists on Apple Silicon Macs.
-				set marketingModelName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print 0:product-name' /dev/stdin <<< \"$(ioreg -arc IOPlatformDevice -k product-name)\"")))
+				set marketingModelName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< \"$(ioreg -arc IOPlatformDevice -k product-name)\" | tr -dc '[:print:]'"))) -- Remove non-printable characters because this decoded value could end with a null char.
 				
 				if (marketingModelName is not equal to "") then
 					set didGetLocalMarketingModelName to true
@@ -1622,7 +1622,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 					do shell script ("mkdir " & (quoted form of buildInfoPath))
 				end try
 				try
-					do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within a short time of the last valid admin permissions run though.
+					do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
 				end try
 			end if
 			

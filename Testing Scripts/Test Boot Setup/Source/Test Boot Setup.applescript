@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.7-1
+-- Version: 2022.5.9-1
 
 -- Build Flag: LSUIElement
 
@@ -100,6 +100,12 @@ on error checkReadOnlyErrorMessage
 	end if
 end try
 
+
+global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs to be accessible in doShellScriptAsAdmin function.
+set lastDoShellScriptAsAdminAuthDate to 0
+
+set adminUsername to "Staff"
+set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
 
 set currentUsername to (short user name of (system info))
 
@@ -218,9 +224,6 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	set thisDriveName to "Mac Test Boot"
 	
 	
-	set adminUsername to "Staff"
-	set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
-	
 	set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
 	
 	
@@ -243,7 +246,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		do shell script "mkdir " & (quoted form of buildInfoPath)
 	end try
 	try
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgSetupSkipped"))) user name adminUsername password adminPassword with administrator privileges
+		doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgSetupSkipped")))
 	end try
 	
 	-- Check if this is an old Mac Test Boot or Catalina Restore Boot drive an alert if so.
@@ -264,7 +267,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		set firmwareCheckerAppExists to true
 		
 		try -- Delete old OS Updates if they exist.
-			do shell script "rm -rf '/Users/Shared/OS Updates'" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("rm -rf '/Users/Shared/OS Updates'")
 		end try
 	end try
 	
@@ -284,7 +287,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		set restoreOSappExists to true
 		
 		try -- Delete old Restore OS Images if they exist.
-			do shell script "rm -rf '/Users/Shared/Restore OS Images'" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("rm -rf '/Users/Shared/Restore OS Images'")
 		end try
 	end try
 	
@@ -467,7 +470,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 			do shell script "defaults delete eficheck"
 		end try
 		try
-			set efiCheckPID to (do shell script "/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check > /dev/null 2>&1 & echo $!" user name adminUsername password adminPassword with administrator privileges)
+			set efiCheckPID to doShellScriptAsAdmin("/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check > /dev/null 2>&1 & echo $!")
 			delay 1
 			set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " > /dev/null 2>&1; echo $?")) as number)
 			if (efiCheckIsRunning is equal to 0) then
@@ -504,10 +507,10 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	else
 		try
 			-- DO NOT clear NVRAM if TRIM has been enabled on Catalina with "trimforce enable" because clearing NVRAM will undo it. (The TRIM flag is not stored in NVRAM before Catalina.)
-			do shell script "nvram EnableTRIM" user name adminUsername password adminPassword with administrator privileges -- This will error if the flag does not exist.
+			doShellScriptAsAdmin("nvram EnableTRIM") -- This will error if the flag does not exist.
 		on error
 			try -- Clear NVRAM if we're not on the source drive (just for house cleaning purposes, this doesn't clear SIP).
-				do shell script "nvram -c" user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("nvram -c")
 			end try
 		end try
 	end if
@@ -515,12 +518,12 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	-- HIDE ADMIN USER
 	try
 		if ((do shell script ("dscl -plist . -read /Users/" & adminUsername & " IsHidden | xmllint --xpath '//string[1]/text()' -; exit 0")) is not equal to "1") then
-			do shell script ("dscl . -create /Users/" & adminUsername & " IsHidden 1") user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("dscl . -create /Users/" & adminUsername & " IsHidden 1")
 		end if
 	end try
 	
 	try
-		do shell script "
+		doShellScriptAsAdmin("
 # DISABLE SLEEP
 pmset -a sleep 0 displaysleep 0
 
@@ -531,7 +534,7 @@ defaults write '/Library/Preferences/.GlobalPreferences' AppleMeasurementUnits -
 defaults write '/Library/Preferences/.GlobalPreferences' AppleMetricUnits -bool false
 defaults write '/Library/Preferences/.GlobalPreferences' AppleTemperatureUnit -string 'Fahrenheit'
 defaults write '/Library/Preferences/.GlobalPreferences' AppleTextDirection -bool false
-" user name adminUsername password adminPassword with administrator privileges
+")
 	end try
 	
 	-- SET USER LANGUAGE AND LOCALE
@@ -563,7 +566,7 @@ defaults write NSGlobalDomain AppleTextDirection -bool false
 	
 	-- ENABLE NETWORK TIME AND SET MENUBAR CLOCK FORMAT
 	try
-		do shell script "systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
+		doShellScriptAsAdmin("systemsetup -setusingnetworktime on")
 	end try
 	do shell script "defaults write com.apple.menuextra.clock FlashDateSeparators -bool false; defaults write com.apple.menuextra.clock IsAnalog -bool false"
 	set currentClockFormat to "UNKNOWN CLOCK FORMAT"
@@ -604,17 +607,17 @@ defaults export com.apple.menuextra.clock -") -- Seems that restarting SystemUIS
 	-- DISABLE AUTOMATIC OS & APP STORE  UPDATES
 	-- Keeping AutomaticCheckEnabled and AutomaticDownload enabled is required for EFIAllowListAll to be able to be updated when EFIcheck is run by our scripts, the rest should be disabled.
 	try
-		do shell script "
+		doShellScriptAsAdmin("
 defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticCheckEnabled -bool true
 defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticDownload -bool true
 defaults write '/Library/Preferences/com.apple.SoftwareUpdate' ConfigDataInstall -bool false
 defaults write '/Library/Preferences/com.apple.SoftwareUpdate' CriticalUpdateInstall -bool false
 defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false
-" user name adminUsername password adminPassword with administrator privileges
+")
 		if (isMojaveOrNewer) then
-			do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticallyInstallMacOSUpdates -bool false" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticallyInstallMacOSUpdates -bool false")
 		else
-			do shell script "defaults write '/Library/Preferences/com.apple.commerce' AutoUpdateRestartRequired -bool false" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("defaults write '/Library/Preferences/com.apple.commerce' AutoUpdateRestartRequired -bool false")
 		end if
 	end try
 	
@@ -700,7 +703,7 @@ killall ControlStrip
 		set sharedFolderNames to (do shell script "sharing -l | grep 'name:		' | cut -c 8-")
 		repeat with thisSharedFolderName in (paragraphs of sharedFolderNames)
 			try
-				do shell script ("sharing -r " & (quoted form of thisSharedFolderName)) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("sharing -r " & (quoted form of thisSharedFolderName))
 			end try
 		end repeat
 	end try
@@ -708,7 +711,7 @@ killall ControlStrip
 		set sharePointGroups to (do shell script "dscl . -list /Groups | grep com.apple.sharepoint.group")
 		repeat with thisSharePointGroupName in (paragraphs of sharePointGroups)
 			try
-				do shell script ("dseditgroup -o delete " & (quoted form of thisSharePointGroupName)) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("dseditgroup -o delete " & (quoted form of thisSharePointGroupName))
 			end try
 		end repeat
 	end try
@@ -722,9 +725,9 @@ killall ControlStrip
 		try
 			set AppleScript's text item delimiters to ""
 			set intendedLocalHostName to "FreeGeek-" & ((words of thisDriveName) as string) & "-" & serialNumber
-			do shell script ("
+			doShellScriptAsAdmin("
 scutil --set ComputerName " & (quoted form of intendedComputerName) & "
-scutil --set LocalHostName " & (quoted form of intendedLocalHostName)) user name adminUsername password adminPassword with administrator privileges
+scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 		end try
 	end if
 	
@@ -741,8 +744,8 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName)) user name
 		try
 			set currentDriveName to (name of startup disk)
 			if (currentDriveName is not equal to thisDriveName) then
-				do shell script "/usr/sbin/diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of thisDriveName) user name adminUsername password adminPassword with administrator privileges
-				if (isCatalinaOrNewer) then do shell script "/usr/sbin/diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (thisDriveName & " - Data")) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("/usr/sbin/diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of thisDriveName))
+				if (isCatalinaOrNewer) then doShellScriptAsAdmin("/usr/sbin/diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (thisDriveName & " - Data")))
 			end if
 		end try
 		
@@ -793,7 +796,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName)) user name
 											do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
 										end try
 										try
-											do shell script ("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork)) user name adminUsername password adminPassword with administrator privileges
+											doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
 										end try
 										set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 									end if
@@ -805,7 +808,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName)) user name
 						end try
 						try
 							-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-							do shell script "networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]") user name adminUsername password adminPassword with administrator privileges
+							doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
 						end try
 					end if
 				end repeat
@@ -823,18 +826,18 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName)) user name
 			do shell script "security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete)
 		end try
 		try -- Run WITH Admin to delete from System keychain
-			do shell script "security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete))
 		end try
 	end repeat
 	
-	do shell script "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO" user name adminUsername password adminPassword with administrator privileges
+	doShellScriptAsAdmin("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO")
 	
 	try
 		do shell script "defaults delete eficheck; tccutil reset SystemPolicyAllFiles"
 	end try
 	
 	try
-		do shell script ("rm -rf /private/var/db/softwareupdate/journal.plist " & ¬
+		doShellScriptAsAdmin("rm -rf /private/var/db/softwareupdate/journal.plist " & ¬
 			"'/Users/Shared/Relocated Items' " & ¬
 			"'/Users/" & adminUsername & "/Library/Application Support/App Store/updatejournal.plist' " & ¬
 			"/Users/" & adminUsername & "/Library/Preferences/ByHost/* " & ¬
@@ -845,7 +848,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName)) user name
 			"/Users/" & adminUsername & "/_geeks3d_gputest_log.txt " & ¬
 			"'/Users/" & adminUsername & "/Library/Application Support/keyboard-test'* " & ¬
 			"'/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt' " & ¬
-			"'/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
+			"'/Users/" & adminUsername & "/Desktop/Relocated Items'")
 	end try
 	
 	try
@@ -881,10 +884,6 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName)) user name
 			end try
 			set warns before emptying of trash to true
 		end tell
-	end try
-	
-	try
-		do shell script "chflags hidden /Applications/memtest" user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	-- DISABLE NOTIFICATIONS
@@ -1041,7 +1040,7 @@ killall usernoted
 	
 	if ((year of the (current date)) < 2022) then
 		try
-			do shell script "systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on")
 		end try
 	end if
 	
@@ -1208,7 +1207,7 @@ killall usernoted
 						
 						if (thisLauncherFlagContents is equal to "") then -- If flag file is empty, delete it. If not, leave if for the specified app to read and then delete itself.
 							try
-								do shell script ("rm -f " & (quoted form of thisBuildInfoFGflag)) user name adminUsername password adminPassword with administrator privileges
+								doShellScriptAsAdmin("rm -f " & (quoted form of thisBuildInfoFGflag))
 							end try
 						end if
 						
@@ -1223,7 +1222,7 @@ killall usernoted
 						end try
 					else -- Delete any other flag files (THIS IS WHERE ".fgSetupSkipped" WILL GET DELETED)
 						try
-							do shell script ("rm -f " & (quoted form of thisBuildInfoFGflag)) user name adminUsername password adminPassword with administrator privileges
+							doShellScriptAsAdmin("rm -f " & (quoted form of thisBuildInfoFGflag))
 						end try
 					end if
 				end repeat
@@ -1233,7 +1232,7 @@ killall usernoted
 				do shell script (do shell script ("ls " & (quoted form of (buildInfoPath & ".fg")) & "*"))
 			on error -- Only delete "Build Info" if no more .fg flag files are left.
 				try
-					do shell script ("rm -rf " & (quoted form of buildInfoPath)) user name adminUsername password adminPassword with administrator privileges
+					doShellScriptAsAdmin("rm -rf " & (quoted form of buildInfoPath))
 				end try
 			end try
 		end try
@@ -1275,3 +1274,23 @@ else
 	display alert "Cannot Run “" & (name of me) & "”" message "“" & (name of me) & "” must be installed at
 “/Applications/” and run from the “Tester” or “restorer” user accounts." buttons {"Quit"} default button 1 as critical
 end if
+
+on doShellScriptAsAdmin(command)
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
+	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
+	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.
+	-- Also, from testing, this 5 minute credential caching DOES NOT seem to be affected by any custom "sudo" timeout set in the sudoers file.
+	-- And, from testing, unlike "sudo" the timeout DOES NOT keep extending from the last "do shell script with administrator privileges" without credentials but only from the last time credentials were passed.
+	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
+	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
+	
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
+		set lastDoShellScriptAsAdminAuthDate to (current date)
+	else
+		set commandOutput to (do shell script command with administrator privileges)
+	end if
+	
+	return commandOutput
+end doShellScriptAsAdmin

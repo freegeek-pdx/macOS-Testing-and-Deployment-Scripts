@@ -47,7 +47,7 @@
 	# It seems that somehow the "deleted" daemon is maybe marking the reset Snapshot as unusable and preventing it from being able to show up in "Restore from Time Machine Backup" in Recovery. This seems to not be an issue on macOS 11 Big Sur though.
 	# So, ALWAYS manipulate the system date (Solution 1) to keep set to the Snapshot date on macOS 10.15 Catalina and do not bother mounting the Snapshot (since knowing the Snapshot got purged is better user feedback than it just not showing in Recovery).
 
-readonly SCRIPT_VERSION='2022.4.8-1'
+readonly SCRIPT_VERSION='2022.4.27-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
@@ -325,7 +325,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 				afplay '/System/Library/Sounds/Purr.aiff' & # Continue to display dialog before this is done playing.
 				reset_date_dialog_icon_path="${SCRIPT_DIR}/Resources/DateAndTime.icns" # Had to extract images from Assets.car in DateAndTime.prefPane and re-create icns file to include and use here.
 				if [[ ! -f "${reset_date_dialog_icon_path}" ]]; then reset_date_dialog_icon_path='/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/Clock.icns'; fi # This icon doesn't have the calendar in the corner, but use it as a fallback.
-				launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" osascript -e "display dialog \"\nRebooting in 5 Seconds After Setting Date\nBack to Reset Snapshot Date (${reset_snapshot_date})…\" buttons {\"OK\"} with title \"Free Geek Snapshot Preserver\"$([[ -f "${reset_date_dialog_icon_path}" ]] && echo " with icon ((\"${reset_date_dialog_icon_path}\" as POSIX file) as alias)")" &> /dev/null & disown
+				launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" osascript -e "display dialog \"\nRebooting in 5 Seconds After Setting Date\nBack to Reset Snapshot Date (${reset_snapshot_date})…\" buttons {\"OK\"} with title \"Free Geek Snapshot Preserver\"$([[ -f "${reset_date_dialog_icon_path}" ]] && echo " with icon (\"${reset_date_dialog_icon_path}\" as POSIX file)")" &> /dev/null & disown
 				sleep 5 # Give the technician some time to see this alert to know the computer didn't reboot because of a hardware issue.
 
 				launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" launchctl reboot apps # Kill all running DEMO_USERNAME apps AGAIN in case any were launched in the 5 seconds since the dialog was shown (so that the dialog will be visible just before reboot).

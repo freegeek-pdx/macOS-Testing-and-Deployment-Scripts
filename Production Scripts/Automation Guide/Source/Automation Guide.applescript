@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.11-1
+-- Version: 2022.5.9-1
 
 -- App Icon is “Guide Dog” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -103,9 +103,14 @@ on error checkReadOnlyErrorMessage
 end try
 
 
+global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs to be accessible in doShellScriptAsAdmin function.
+set lastDoShellScriptAsAdminAuthDate to 0
+
+set adminUsername to "fg-admin"
+set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
+
 set demoUsername to "fg-demo"
 set demoPassword to "freegeek"
-
 
 if (((short user name of (system info)) is equal to demoUsername) and ((POSIX path of (path to me)) is equal to ("/Users/" & demoUsername & "/Applications/" & (name of me) & ".app/"))) then
 	set systemVersion to (system version of (system info))
@@ -160,16 +165,11 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
 	
 	
-	set adminUsername to "fg-admin"
-	set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
-	
-	
-	-- Verify admin can do admin things since there is a bug (which has been worked around) when customizing via LaunchDaemon and using "sysadminctl -addUser".
-	-- For more information about this bug, see comments in create_user function within fg-prepare-os.
+	-- Verify adminUsername can do admin things.
 	
 	set adminCanDoAdminThings to false
 	try
-		set adminCanDoAdminThings to ("CAN DO ADMIN THINGS" is equal to (do shell script "echo 'CAN DO ADMIN THINGS'" user name adminUsername password adminPassword with administrator privileges))
+		set adminCanDoAdminThings to ("CAN DO ADMIN THINGS" is equal to doShellScriptAsAdmin("echo 'CAN DO ADMIN THINGS'"))
 	end try
 	
 	if (not adminCanDoAdminThings) then
@@ -190,7 +190,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	if (demoUsernameIsAdmin) then
 		try
-			do shell script "dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin")
 		end try
 	end if
 	
@@ -200,7 +200,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	if (not demoUsernameIsCorrect) then
 		try
-			do shell script "dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'")
 		end try
 	end if
 	
@@ -344,7 +344,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		if (freeGeekUpdaterExists) then
 			(((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias) -- If just ran updater, then continue with Automation Guide. If not, we will launch updater.
 			try
-				do shell script ("rm -f " & (quoted form of (buildInfoPath & ".fgUpdater")) & "*") user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("rm -f " & (quoted form of (buildInfoPath & ".fgUpdater")) & "*")
 			end try
 		end if
 		
@@ -406,7 +406,7 @@ NOTE: The currently logged in “" & demoUsername & "” user will be made an Ad
 				end try
 				if (not demoUsernameIsAdmin) then
 					try
-						do shell script "dseditgroup -o edit -a " & (quoted form of demoUsername) & " -t user admin" user name adminUsername password adminPassword with administrator privileges
+						doShellScriptAsAdmin("dseditgroup -o edit -a " & (quoted form of demoUsername) & " -t user admin")
 					end try
 				end if
 				
@@ -416,7 +416,7 @@ NOTE: The currently logged in “" & demoUsername & "” user will be made an Ad
 				end try
 				if (not demoUsernameIsChanged) then
 					try
-						do shell script "dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek TEMPORARY Administrator'" user name adminUsername password adminPassword with administrator privileges
+						doShellScriptAsAdmin("dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek TEMPORARY Administrator'")
 					end try
 				end if
 				
@@ -488,7 +488,7 @@ After you've performed the manual steps described in the previous dialog, click 
 							end try
 							
 							try
-								do shell script ("rm -f '" & buildInfoPath & ".fgAutomationGuideAccessibilityStatus-org.freegeek." & ((words of thisAppName) as string) & "'") user name adminUsername password adminPassword with administrator privileges
+								doShellScriptAsAdmin("rm -f '" & buildInfoPath & ".fgAutomationGuideAccessibilityStatus-org.freegeek." & ((words of thisAppName) as string) & "'")
 							end try
 						end repeat
 						
@@ -528,7 +528,7 @@ After you've performed the manual steps described in the previous dialog, click 
 		end try
 		if (demoUsernameIsAdmin) then
 			try
-				do shell script "dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin" user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin")
 			end try
 		end if
 		
@@ -538,7 +538,7 @@ After you've performed the manual steps described in the previous dialog, click 
 		end try
 		if (not demoUsernameIsCorrect) then
 			try
-				do shell script "dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'" user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'")
 			end try
 		end if
 		
@@ -574,7 +574,7 @@ After you've performed the manual steps described in the previous dialog, click 
 				do shell script "mkdir " & (quoted form of buildInfoPath)
 			end try
 			try
-				do shell script ("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideRunning"))) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideRunning")))
 			end try
 			
 			-- Launch Cleanup After QA Complete AFTER Automation Guide is quit so we know it has been deleted.
@@ -627,3 +627,23 @@ else
 	display alert "Cannot Run “" & (name of me) & "”" message "“" & (name of me) & "” must be installed at
 “/Users/" & demoUsername & "/Applications/” and run from the “" & demoUsername & "” user account." buttons {"Quit"} default button 1 as critical
 end if
+
+on doShellScriptAsAdmin(command)
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
+	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
+	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.
+	-- Also, from testing, this 5 minute credential caching DOES NOT seem to be affected by any custom "sudo" timeout set in the sudoers file.
+	-- And, from testing, unlike "sudo" the timeout DOES NOT keep extending from the last "do shell script with administrator privileges" without credentials but only from the last time credentials were passed.
+	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
+	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
+	
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
+		set lastDoShellScriptAsAdminAuthDate to (current date)
+	else
+		set commandOutput to (do shell script command with administrator privileges)
+	end if
+	
+	return commandOutput
+end doShellScriptAsAdmin

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.3.1-1
+-- Version: 2022.5.9-1
 
 -- Build Flag: LSUIElement
 
@@ -83,6 +83,10 @@ on error checkReadOnlyErrorMessage
 	end if
 end try
 
+
+global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs to be accessible in doShellScriptAsAdmin function.
+set lastDoShellScriptAsAdminAuthDate to 0
+
 set adminUsername to "fg-admin"
 set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
 
@@ -106,7 +110,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 					-- Do not bother try re-mounting if it's already mounted.
 					(("/Users/Shared/.fg-snapshot-preserver/mount/Users/Shared/fg-snapshot-reset" as POSIX file) as alias)
 					try
-						do shell script "echo \"$(date '+%D %T')	Snapshot Helper: Reset Snapshot Already Mounted\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'" user name adminUsername password adminPassword with administrator privileges
+						doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: Reset Snapshot Already Mounted\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 					end try
 				on error
 					set resetSnapshotName to (do shell script "head -1 /Users/Shared/.fgResetSnapshotCreated")
@@ -117,20 +121,20 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 						on error
 							try
 								-- Needs admin privileges since root owns ".fg-snapshot-preserver" folder.
-								do shell script "mkdir '/Users/Shared/.fg-snapshot-preserver/mount'" user name adminUsername password adminPassword with administrator privileges
+								doShellScriptAsAdmin("mkdir '/Users/Shared/.fg-snapshot-preserver/mount'")
 							end try
 						end try
 						
 						try
 							-- But the mount folder needs to be writeable by demoUsername or mounting the snapshot will fail (even when using administrator privileges).
-							do shell script "chown " & demoUsername & " '/Users/Shared/.fg-snapshot-preserver/mount'" user name adminUsername password adminPassword with administrator privileges
+							doShellScriptAsAdmin("chown " & demoUsername & " '/Users/Shared/.fg-snapshot-preserver/mount'")
 						end try
 						
 						try
 							-- Mounting the reset Snapshot will prevent macOS from deleting it after 24 hours: https://eclecticlight.co/2021/03/28/last-week-on-my-mac-macos-at-20-apfs-at-4/#comment-59001
 							do shell script ("bash -c " & (quoted form of ("mount_apfs -o rdonly,nobrowse -s " & (quoted form of resetSnapshotName) & " \"$(/usr/libexec/PlistBuddy -c 'Print :DeviceNode' /dev/stdin <<< \"$(diskutil info -plist '/System/Volumes/Data')\")\" '/Users/Shared/.fg-snapshot-preserver/mount'")))
 							try
-								do shell script "echo \"$(date '+%D %T')	Snapshot Helper: Successfully Mounted Reset Snapshot\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'" user name adminUsername password adminPassword with administrator privileges
+								doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: Successfully Mounted Reset Snapshot\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 							end try
 							
 							if (isMontereyOrNewer) then
@@ -161,18 +165,18 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 							end if
 						on error mountErrorMessage number mountErrorNumber
 							try
-								do shell script "echo \"$(date '+%D %T')	Snapshot Helper: FAILED to Mount Reset Snapshot (Error Code " & (mountErrorNumber as string) & ": " & mountErrorMessage & ")\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'" user name adminUsername password adminPassword with administrator privileges
+								doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: FAILED to Mount Reset Snapshot (Error Code " & (mountErrorNumber as string) & ": " & mountErrorMessage & ")\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 							end try
 						end try
 					else
 						try
-							do shell script "echo \"$(date '+%D %T')	Snapshot Helper: Invalid Reset Snapshot Name\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'" user name adminUsername password adminPassword with administrator privileges
+							doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: Invalid Reset Snapshot Name\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 						end try
 					end if
 				end try
 			else
 				try
-					do shell script "echo \"$(date '+%D %T')	Snapshot Helper: Not Mounting Reset Snapshot on Catalina\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'" user name adminUsername password adminPassword with administrator privileges
+					doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: Not Mounting Reset Snapshot on Catalina\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 				end try
 			end if
 		on error
@@ -222,7 +226,7 @@ Please inform and deliver this Mac to Free Geek I.T." as critical
 		end try
 		
 		try
-			do shell script "rm -rf '/Users/Shared/.fg-snapshot-preserver/.launchedSnapshotHelper'" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("rm -rf '/Users/Shared/.fg-snapshot-preserver/.launchedSnapshotHelper'")
 		end try
 	end try
 else
@@ -230,7 +234,7 @@ else
 		(("/Users/Shared/.fg-snapshot-preserver" as POSIX file) as alias)
 		
 		try
-			do shell script "echo \"$(date '+%D %T')	Snapshot Helper: NOT RUNNING Because Not Logged In or Not Installed in Correct Location\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: NOT RUNNING Because Not Logged In or Not Installed in Correct Location\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 		end try
 	on error
 		try
@@ -240,3 +244,23 @@ else
 “/Users/" & demoUsername & "/Applications/” and run from the “" & demoUsername & "” user account." buttons {"Quit"} default button 1 as critical
 	end try
 end if
+
+on doShellScriptAsAdmin(command)
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
+	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
+	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.
+	-- Also, from testing, this 5 minute credential caching DOES NOT seem to be affected by any custom "sudo" timeout set in the sudoers file.
+	-- And, from testing, unlike "sudo" the timeout DOES NOT keep extending from the last "do shell script with administrator privileges" without credentials but only from the last time credentials were passed.
+	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
+	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
+	
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
+		set lastDoShellScriptAsAdminAuthDate to (current date)
+	else
+		set commandOutput to (do shell script command with administrator privileges)
+	end if
+	
+	return commandOutput
+end doShellScriptAsAdmin

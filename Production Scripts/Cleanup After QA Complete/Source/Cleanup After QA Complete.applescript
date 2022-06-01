@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.8-2
+-- Version: 2022.5.19-1
 
 -- App Icon is “Broom” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -103,6 +103,9 @@ on error checkReadOnlyErrorMessage
 end try
 
 
+global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs to be accessible in doShellScriptAsAdmin function.
+set lastDoShellScriptAsAdminAuthDate to 0
+
 set adminUsername to "fg-admin"
 set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
 
@@ -151,7 +154,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			end try
 			
 			try
-				do shell script ("echo " & hasAccessibilityPermissions & " > " & (quoted form of (buildInfoPath & ".fgAutomationGuideAccessibilityStatus-" & currentBundleIdentifier))) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("echo " & hasAccessibilityPermissions & " > " & (quoted form of (buildInfoPath & ".fgAutomationGuideAccessibilityStatus-" & currentBundleIdentifier)))
 			end try
 		else
 			-- If Automation Guide hasn't been run yet, launch it.
@@ -329,7 +332,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		(((buildInfoPath & ".fgAutomationGuideRunning") as POSIX file) as alias)
 		
 		try
-			do shell script ("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideDid-" & currentBundleIdentifier))) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideDid-" & currentBundleIdentifier)))
 		end try
 		
 		try
@@ -462,7 +465,6 @@ The following actions will be peformed:
 	⁃ Remove all printers.
 	⁃ Remove all shared folders.
 	⁃ Delete all Touch ID fingerprints.
-	⁃ Move RAM Stress Test Logs to the “Build Info” folder.
 	⁃ Empty the trash.
 	⁃ Rename internal drive to “Macintosh HD”.
 	⁃ Remove “FG Reuse” from preferred Wi-Fi networks.
@@ -484,7 +486,7 @@ THIS MAC WILL BE SHUT DOWN AFTER THE PROCESS IS COMPLETE." buttons {"Don't Clean
 	
 	set serialNumber to ""
 	try
-		set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print 0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
+		set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
 	end try
 	
 	if (serialNumber is not equal to "") then
@@ -522,7 +524,7 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 			set remoteManagementOutput to ""
 			try
 				try
-					set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" user name adminUsername password adminPassword with administrator privileges)
+					set remoteManagementOutput to doShellScriptAsAdmin("profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0")
 				on error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
 					if (profilesShowDefaultUserErrorNumber is not equal to -60007) then error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
 					try
@@ -545,7 +547,7 @@ to check for Remote Management (DEP/MDM)." with administrator privileges)
 					do shell script ("mkdir " & (quoted form of buildInfoPath))
 				end try
 				try
-					do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within a short time of the last valid admin permissions run though.
+					do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
 				end try
 			end if
 			
@@ -697,7 +699,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	
 	-- RESET SAFARI & TERMINAL
 	try
-		do shell script ("rm -rf /Users/" & adminUsername & "/Library/Safari " & ¬
+		doShellScriptAsAdmin("rm -rf /Users/" & adminUsername & "/Library/Safari " & ¬
 			"'/Users/" & adminUsername & "/Library/Caches/Apple - Safari - Safari Extensions Gallery' " & ¬
 			"/Users/" & adminUsername & "/Library/Caches/Metadata/Safari " & ¬
 			"/Users/" & adminUsername & "/Library/Caches/com.apple.Safari " & ¬
@@ -721,7 +723,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 			"/Users/" & adminUsername & "/.zsh_history " & ¬
 			"/Users/" & adminUsername & "/.zsh_sessions " & ¬
 			"'/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt' " & ¬
-			"'/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
+			"'/Users/" & adminUsername & "/Desktop/Relocated Items'")
 	end try
 	
 	try -- Put this in a "try" block since deleting Safari stuff may results in "Operation not permitted", but the rest will work and don't want to cause a script error.
@@ -765,7 +767,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		set sharedFolderNames to (do shell script "sharing -l | grep 'name:		' | cut -c 8-")
 		repeat with thisSharedFolderName in (paragraphs of sharedFolderNames)
 			try
-				do shell script ("sharing -r " & (quoted form of thisSharedFolderName)) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("sharing -r " & (quoted form of thisSharedFolderName))
 			end try
 		end repeat
 	end try
@@ -773,14 +775,14 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		set sharePointGroups to (do shell script "dscl . -list /Groups | grep com.apple.sharepoint.group")
 		repeat with thisSharePointGroupName in (paragraphs of sharePointGroups)
 			try
-				do shell script ("dseditgroup -o delete " & (quoted form of thisSharePointGroupName)) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("dseditgroup -o delete " & (quoted form of thisSharePointGroupName))
 			end try
 		end repeat
 	end try
 	
 	-- DELETING ALL TOUCH ID FINGERPRINTS
 	try
-		do shell script "echo 'Y' | bioutil -p -s" user name adminUsername password adminPassword with administrator privileges
+		doShellScriptAsAdmin("echo 'Y' | bioutil -p -s")
 	end try
 	
 	-- MUTE VOLUME WHILE FILES ARE MOVED AND TRASH IS EMPTIED
@@ -803,24 +805,6 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		end tell
 	end try
 	
-	-- MOVE MEMTEST LOG
-	try
-		tell application "Finder"
-			try
-				((buildInfoPath as POSIX file) as alias)
-			on error
-				try
-					make new folder at (path to shared documents folder) with properties {name:"Build Info"}
-				end try
-			end try
-			
-			try
-				((buildInfoPath as POSIX file) as alias)
-				move (every file of (folder (path to desktop folder from user domain)) whose name extension is "log") to (buildInfoPath as POSIX file) with replacing
-			end try
-		end tell
-	end try
-	
 	-- EMPTY THE TRASH
 	try
 		tell application "Finder"
@@ -838,8 +822,8 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		set currentDriveName to intendedDriveName
 		tell application "System Events" to set currentDriveName to (name of startup disk)
 		if (currentDriveName is not equal to intendedDriveName) then
-			do shell script "diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName) user name adminUsername password adminPassword with administrator privileges
-			if (isCatalinaOrNewer) then do shell script "diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName))
+			if (isCatalinaOrNewer) then doShellScriptAsAdmin("diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")))
 		end if
 	end try
 	
@@ -868,7 +852,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 										do shell script "networksetup -setairportpower " & thisWiFiInterfaceID & " off"
 									end try
 									try
-										do shell script ("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork)) user name adminUsername password adminPassword with administrator privileges
+										doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
 									end try
 									set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 								end if
@@ -880,7 +864,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 					end try
 					try
 						-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-						do shell script "networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'Free Geek'" user name adminUsername password adminPassword with administrator privileges
+						doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'Free Geek'")
 					end try
 				end if
 			end repeat
@@ -892,22 +876,22 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 			do shell script "security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete)
 		end try
 		try -- Run WITH Admin to delete from System keychain
-			do shell script "security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete))
 		end try
 	end repeat
 	try
-		do shell script "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO" user name adminUsername password adminPassword with administrator privileges
+		doShellScriptAsAdmin("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO")
 	end try
 	
 	-- SET POWER ON AND SHUTDOWN SCHEDULE
 	try
-		do shell script "pmset repeat poweron TWRFSU 9:45:00 shutdown TWRFSU 18:10:00" user name adminUsername password adminPassword with administrator privileges
+		doShellScriptAsAdmin("pmset repeat poweron TWRFSU 9:45:00 shutdown TWRFSU 18:10:00")
 	end try
 	
 	-- IF ON MOJAVE, CATALINA UPDATE WAS HIDDEN. UN-HIDE IT SO CUSTOMER CAN UPDATE
 	if (isMojaveOrNewer) then
 		try
-			do shell script "softwareupdate --reset-ignored" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("softwareupdate --reset-ignored")
 		end try
 	end if
 	
@@ -1170,10 +1154,6 @@ Error Number: " & deleteFilesWithFinderErrorNumber) as critical
 		end try
 	end try
 	
-	try
-		do shell script ("rm -f /memtest.log /Users/Shared/memtest.log") user name adminUsername password adminPassword with administrator privileges -- Just in case memtest was canceled.
-	end try
-	
 	-- EMPTY THE TRASH
 	try
 		tell application "Finder"
@@ -1253,3 +1233,23 @@ else
 	display alert "Cannot Run “" & (name of me) & "”" message "“" & (name of me) & "” must be installed at
 “/Users/" & demoUsername & "/Applications/” and run from the “" & demoUsername & "” user account." buttons {"Quit"} default button 1 as critical
 end if
+
+on doShellScriptAsAdmin(command)
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
+	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
+	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.
+	-- Also, from testing, this 5 minute credential caching DOES NOT seem to be affected by any custom "sudo" timeout set in the sudoers file.
+	-- And, from testing, unlike "sudo" the timeout DOES NOT keep extending from the last "do shell script with administrator privileges" without credentials but only from the last time credentials were passed.
+	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
+	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
+	
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
+		set lastDoShellScriptAsAdminAuthDate to (current date)
+	else
+		set commandOutput to (do shell script command with administrator privileges)
+	end if
+	
+	return commandOutput
+end doShellScriptAsAdmin

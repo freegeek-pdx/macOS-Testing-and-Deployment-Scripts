@@ -21,7 +21,7 @@
 
 # NOTICE: This script will only be installed and run via LaunchDaemon when customizing an existing clean install, such as on Apple Silicon Macs.
 
-readonly SCRIPT_VERSION='2022.4.8-1'
+readonly SCRIPT_VERSION='2022.5.13-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -71,7 +71,7 @@ launch_login_progress_app() {
 }
 
 if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-install-packages' && -f "${launch_daemon_path}" ]]; then
-	if [[ -f '/Users/Shared/Build Info/Prepare OS Log.txt' && "$(tail -1 '/Users/Shared/Build Info/Prepare OS Log.txt')" == *'ERROR:'* ]]; then
+	if [[ -f '/Users/Shared/Build Info/Prepare OS Log.txt' ]] && grep -qF $'\tERROR:' '/Users/Shared/Build Info/Prepare OS Log.txt'; then
 		# If rebooted after previous error, just re-display error and do not proceed.
 
 
@@ -118,7 +118,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 
 		rm -f "${launch_daemon_path}"
 		rm -rf "${SCRIPT_DIR}"
-	elif [[ -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant. 
+	elif [[ -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant. 
 		# Only run if running as root on a clean installation prepared by fg-install-os.
 		# IMPORTANT: fg-install-os will create AppleSetupDone to not show Setup Assistant while this script runs.
 
@@ -179,7 +179,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 
 			write_to_log 'Removing Setup Assistant User from Administrators'
 
-			admin_groups=( 'admin' '_appserverusr' '_appserveradm' )
+			declare -a admin_groups=( 'admin' '_appserverusr' '_appserveradm' )
 			for this_admin_group in "${admin_groups[@]}"; do
 				dseditgroup -o edit -d '_mbsetupuser' -t user "${this_admin_group}"
 			done
@@ -313,8 +313,8 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 		
 		# ANNOUNCE ERROR (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
 
-		if [[ "$(tail -1 "${log_path}")" != *'ERROR:'* ]]; then
-			# No need to add another error line if the occurred and was logged during package installation.
+		if ! grep -qF $'\tERROR:' "${log_path}"; then
+			# No need to add another error line if an error occurred and was logged during package installation.
 			write_to_log 'ERROR: Failed to Perform Previous Task'
 		fi
 

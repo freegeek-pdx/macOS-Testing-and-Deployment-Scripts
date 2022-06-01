@@ -22,7 +22,7 @@
 # NOTICE: This script will only exist on boot to be able to run via LaunchDaemon when booting after restoring from the reset Snapshot.
 # ALSO: fg-prepare-os will have created AppleSetupDone to not show Setup Assistant BEFORE creating the reset Snapshot so that Setup Assistant would also not show during Snapshot reset.
 
-readonly SCRIPT_VERSION='2022.4.8-1'
+readonly SCRIPT_VERSION='2022.5.13-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -69,10 +69,10 @@ launch_login_progress_app() {
 }
 
 if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemon_path}" && -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && \
-	  -z "$(dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }')" && "$(fdesetup isactive)" == 'false' && \
+	  -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" && "$(fdesetup isactive)" == 'false' && \
 	  -f '/Users/Shared/Build Info/Prepare OS Log.txt' && "$(tail -1 '/Users/Shared/Build Info/Prepare OS Log.txt')" == *'Creating Reset Snapshot' ]]; then # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
 	
-	if [[ -f "${SCRIPT_DIR}/log.txt" && "$(tail -1 "${SCRIPT_DIR}/log.txt")" == *'ERROR:'* ]]; then
+	if [[ -f "${SCRIPT_DIR}/log.txt" ]] && grep -qF $'\tERROR:' "${SCRIPT_DIR}/log.txt"; then
 		# If rebooted after previous error, just re-display error and do not proceed.
 
 
@@ -211,7 +211,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 			# but it seems to always return nothing when running in this LaunchDaemon.
 
 			IFS=$'\n'
-			for this_cryto_user_uuid in $crypto_user_uuids_before; do
+			for this_cryto_user_uuid in ${crypto_user_uuids_before}; do
 				if [[ -n "${this_cryto_user_uuid}" ]] && (( ${#this_cryto_user_uuid} == 36 )); then
 					# Since any and all Secure Token accounts no longer exists after restoring the reset Snapshot, their crypto user references can now be deleted using "fdesetup remove -uuid". But when the accounts still existed, macOS would not allow the last one to be removed.
 					write_to_log "Deleting Leftover Secure Token Reference (${this_cryto_user_uuid})"

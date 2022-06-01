@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.8-1
+-- Version: 2022.5.9-1
 
 -- App Icon is “Counterclockwise Arrows” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -116,12 +116,17 @@ considering numeric strings
 end considering
 
 
+global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs to be accessible in doShellScriptAsAdmin function.
+set lastDoShellScriptAsAdminAuthDate to 0
+
 set adminUsername to "Staff"
 if (isCatalinaOrNewer) then set adminUsername to "staff"
+
 set currentUsername to (short user name of (system info))
 if (currentUsername is equal to "fg-demo") then set adminUsername to "fg-admin"
 
 set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
+
 
 set testingFlagExists to false
 set baseUpdatesURL to "https://apps.freegeek.org/macland/download/"
@@ -250,7 +255,7 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 	try
 		(((buildInfoPath & ".fgUpdaterJustUpdatedItself") as POSIX file) as alias)
 		set shouldUpdateSelf to false
-		do shell script "rm -f " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdatedItself")) user name adminUsername password adminPassword with administrator privileges
+		doShellScriptAsAdmin("rm -f " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdatedItself")))
 	end try
 	
 	set shouldUpdateOtherApps to true -- Will be set to false if self update is started.
@@ -417,7 +422,7 @@ end try
 						do shell script "mkdir " & (quoted form of buildInfoPath)
 					end try
 					try
-						do shell script ("touch " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdatedItself"))) user name adminUsername password adminPassword with administrator privileges
+						doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdatedItself")))
 					end try
 				else
 					do shell script "afplay /System/Library/Sounds/Basso.aiff; rm -rf " & (quoted form of appUpdateTempFilePath)
@@ -429,23 +434,12 @@ end try
 	end if
 	
 	if (shouldUpdateOtherApps) then
-		set shouldUpdateMemtest to false -- Only update/install memtest if memtest_osx exists ("memtest_osx" WILL NOT be installed on Big Sur since since Single User Mode is no longer functional).
-		try
-			(("/Applications/memtest_osx" as POSIX file) as alias)
-			set shouldUpdateMemtest to true
-		on error
-			try
-				(("/memtest_osx" as POSIX file) as alias)
-				set shouldUpdateMemtest to true
-			end try
-		end try
-		
 		repeat with thisLatestVersionLine in latestVersionsLines
 			if (thisLatestVersionLine contains ": ") then
 				set AppleScript's text item delimiters to ": "
 				set thisAppName to ((first text item of thisLatestVersionLine) as string)
 				if (thisAppName is not equal to (name of me)) then
-					if ((currentUsername is equal to "fg-demo") and ((thisAppName is equal to "fgreset") or (shouldUpdateMemtest and (thisAppName is equal to "memtest")))) then
+					if ((currentUsername is equal to "fg-demo") and (thisAppName is equal to "fgreset")) then
 						set thisScriptInstallPath to ("/Applications/" & thisAppName)
 						
 						set thisScriptLatestVersion to ((text item 2 of thisLatestVersionLine) as string)
@@ -554,14 +548,14 @@ end try
 									end try
 									
 									try
-										do shell script "rm -f " & (quoted form of thisScriptInstallPath) user name adminUsername password adminPassword with administrator privileges
+										doShellScriptAsAdmin("rm -f " & (quoted form of thisScriptInstallPath))
 									end try
 									
 									try
 										do shell script "mv -f " & (quoted form of thisScriptUpdateTempFilePath) & " " & (quoted form of thisScriptInstallPath)
 									on error
 										try
-											do shell script "mv -f " & (quoted form of thisScriptUpdateTempFilePath) & " " & (quoted form of thisScriptInstallPath) user name adminUsername password adminPassword with administrator privileges
+											doShellScriptAsAdmin("mv -f " & (quoted form of thisScriptUpdateTempFilePath) & " " & (quoted form of thisScriptInstallPath))
 										end try
 									end try
 									
@@ -679,7 +673,7 @@ end try
 												end try
 												
 												try
-													do shell script "rm -rf " & (quoted form of thisAppInstallPath) user name adminUsername password adminPassword with administrator privileges
+													doShellScriptAsAdmin("rm -rf " & (quoted form of thisAppInstallPath))
 												end try
 												
 												set thisAppUpdateTempFileStructure to ""
@@ -691,7 +685,7 @@ end try
 													do shell script "mv -f " & (quoted form of thisAppUpdateTempFilePath) & " " & (quoted form of thisAppInstallPath)
 												on error
 													try
-														do shell script "mv -f " & (quoted form of thisAppUpdateTempFilePath) & " " & (quoted form of thisAppInstallPath) user name adminUsername password adminPassword with administrator privileges
+														doShellScriptAsAdmin("mv -f " & (quoted form of thisAppUpdateTempFilePath) & " " & (quoted form of thisAppInstallPath))
 													end try
 												end try
 												
@@ -702,14 +696,14 @@ end try
 														-- Generating the install path file structure alone seems to delay enough to avoid the issue, but this loop makes it extra safe.
 														set thisAppInstallFileStructure to ""
 														try
-															set thisAppInstallFileStructure to (do shell script ("cd " & (quoted form of thisAppInstallPath) & "; ls -Rsk") user name adminUsername password adminPassword with administrator privileges)
+															set thisAppInstallFileStructure to doShellScriptAsAdmin("cd " & (quoted form of thisAppInstallPath) & "; ls -Rsk")
 														end try
 														if (thisAppUpdateTempFileStructure is equal to thisAppInstallFileStructure) then
 															try
 																do shell script "mkdir " & (quoted form of buildInfoPath)
 															end try
 															try
-																do shell script ("touch " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdated-" & thisUpdatedAppBundleID))) user name adminUsername password adminPassword with administrator privileges
+																doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdated-" & thisUpdatedAppBundleID)))
 															end try
 															
 															exit repeat
@@ -732,7 +726,7 @@ end try
 			do shell script "mkdir " & (quoted form of buildInfoPath)
 		end try
 		try
-			do shell script ("touch " & (quoted form of (buildInfoPath & ".fgUpdaterJustFinished"))) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgUpdaterJustFinished")))
 		end try
 		
 		try
@@ -752,3 +746,23 @@ end try
 		end try
 	end if
 end if
+
+on doShellScriptAsAdmin(command)
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
+	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
+	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.
+	-- Also, from testing, this 5 minute credential caching DOES NOT seem to be affected by any custom "sudo" timeout set in the sudoers file.
+	-- And, from testing, unlike "sudo" the timeout DOES NOT keep extending from the last "do shell script with administrator privileges" without credentials but only from the last time credentials were passed.
+	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
+	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
+	
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
+		set lastDoShellScriptAsAdminAuthDate to (current date)
+	else
+		set commandOutput to (do shell script command with administrator privileges)
+	end if
+	
+	return commandOutput
+end doShellScriptAsAdmin

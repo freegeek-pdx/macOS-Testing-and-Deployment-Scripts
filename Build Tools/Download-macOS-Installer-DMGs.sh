@@ -22,7 +22,7 @@ readonly MIST_PATH='/usr/local/bin/mist'
 
 installer_dmgs_path="${HOME}/Documents/Programming/Free Geek/MacLand Images/macOS Installers"
 
-installer_names_to_download=( 'High Sierra' 'Catalina' 'Big Sur' 'Monterey' )
+declare -a installer_names_to_download=( 'High Sierra' 'Mojave' 'Catalina' 'Big Sur' 'Monterey' )
 
 for this_installer_name_to_download in "${installer_names_to_download[@]}"; do
     if [[ "${this_installer_name_to_download}" == *' beta' ]]; then

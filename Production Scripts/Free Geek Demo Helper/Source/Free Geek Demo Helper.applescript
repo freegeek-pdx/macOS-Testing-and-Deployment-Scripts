@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.11-2
+-- Version: 2022.5.9-1
 
 -- Build Flag: LSUIElement
 
@@ -84,11 +84,13 @@ on error checkReadOnlyErrorMessage
 end try
 
 
+global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs to be accessible in doShellScriptAsAdmin function.
+set lastDoShellScriptAsAdminAuthDate to 0
+
 set adminUsername to "fg-admin"
 set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
 
 set demoUsername to "fg-demo"
-set demoPassword to "freegeek"
 
 
 if (((short user name of (system info)) is equal to demoUsername) and ((POSIX path of (path to me)) is equal to ("/Users/" & demoUsername & "/Applications/" & (name of me) & ".app/"))) then
@@ -131,7 +133,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			end try
 			
 			try
-				do shell script ("echo " & hasAccessibilityPermissions & " > " & (quoted form of (buildInfoPath & ".fgAutomationGuideAccessibilityStatus-" & currentBundleIdentifier))) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("echo " & hasAccessibilityPermissions & " > " & (quoted form of (buildInfoPath & ".fgAutomationGuideAccessibilityStatus-" & currentBundleIdentifier)))
 			end try
 		else
 			-- If Automation Guide hasn't been run yet, launch it.
@@ -153,7 +155,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	if (demoUsernameIsAdmin) then
 		try
-			do shell script "dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin")
 		end try
 	end if
 	
@@ -163,7 +165,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	if (not demoUsernameIsCorrect) then
 		try
-			do shell script "dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'")
 		end try
 	end if
 	
@@ -275,7 +277,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		(((buildInfoPath & ".fgAutomationGuideRunning") as POSIX file) as alias)
 		
 		try
-			do shell script ("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideDid-" & currentBundleIdentifier))) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideDid-" & currentBundleIdentifier)))
 		end try
 		
 		try
@@ -328,7 +330,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		(((buildInfoPath & ".fgSetupLaunchedDemoHelper") as POSIX file) as alias)
 		
 		try -- If did all apps, delete all Automation Guide flags and continue setup
-			do shell script ("rm -f " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper"))) user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("rm -f " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper")))
 		end try
 		
 		set setupLaunchedDemoHelper to true
@@ -361,7 +363,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			-- THIS IS NO LONGER REALLY NECESSARY SINCE fg-snapshot-preserver WILL NOW WAIT UNTIL LOGIN TO TRY TO RUN Free Geek Snapshot Helper AGAIN AS SOON AS POSSIBLE.
 			-- BUT DOESN'T HURT TO CONTINUE LAUNCHING fg-snapshot-preserver HERE JUST IN CASE SINCE fg-snapshot-preserver WILL JUST EXIT IF ANOTHER INSTANCE IS ALREADY RUNNING.
 			
-			do shell script "/Users/Shared/.fg-snapshot-preserver/fg-snapshot-preserver.sh" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("/Users/Shared/.fg-snapshot-preserver/fg-snapshot-preserver.sh")
 		end try
 	end if
 	
@@ -401,12 +403,12 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		-- HIDE ADMIN USER
 		try
 			if ((do shell script ("dscl -plist . -read /Users/" & adminUsername & " IsHidden 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null; exit 0")) is not equal to "1") then
-				do shell script ("dscl . -create /Users/" & adminUsername & " IsHidden 1") user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("dscl . -create /Users/" & adminUsername & " IsHidden 1")
 			end if
 		end try
 		
 		try
-			do shell script "
+			doShellScriptAsAdmin("
 # DISABLE SLEEP
 pmset -a sleep 0 displaysleep 0
 
@@ -417,7 +419,7 @@ defaults write '/Library/Preferences/.GlobalPreferences' AppleMeasurementUnits -
 defaults write '/Library/Preferences/.GlobalPreferences' AppleMetricUnits -bool false
 defaults write '/Library/Preferences/.GlobalPreferences' AppleTemperatureUnit -string 'Fahrenheit'
 defaults write '/Library/Preferences/.GlobalPreferences' AppleTextDirection -bool false
-" user name adminUsername password adminPassword with administrator privileges
+")
 		end try
 		
 		-- SET USER LANGUAGE AND LOCALE
@@ -457,7 +459,7 @@ defaults write NSGlobalDomain AppleTextDirection -bool false
 			(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
 		on error
 			try
-				do shell script "systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("systemsetup -setusingnetworktime on")
 			end try
 		end try
 		
@@ -501,17 +503,17 @@ defaults export com.apple.menuextra.clock -") -- Seems that restarting SystemUIS
 		-- DISABLE AUTOMATIC OS & APP STORE  UPDATES
 		-- Keeping AutomaticCheckEnabled and AutomaticDownload enabled is required for EFIAllowListAll to be able to be updated when EFIcheck is run by our scripts, the rest should be disabled.
 		try
-			do shell script "
+			doShellScriptAsAdmin("
 defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticCheckEnabled -bool true
 defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticDownload -bool true
 defaults write '/Library/Preferences/com.apple.SoftwareUpdate' ConfigDataInstall -bool false
 defaults write '/Library/Preferences/com.apple.SoftwareUpdate' CriticalUpdateInstall -bool false
 defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false
-" user name adminUsername password adminPassword with administrator privileges
+")
 			if (isMojaveOrNewer) then
-				do shell script "defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticallyInstallMacOSUpdates -bool false" user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("defaults write '/Library/Preferences/com.apple.SoftwareUpdate' AutomaticallyInstallMacOSUpdates -bool false")
 			else
-				do shell script "defaults write '/Library/Preferences/com.apple.commerce' AutoUpdateRestartRequired -bool false" user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("defaults write '/Library/Preferences/com.apple.commerce' AutoUpdateRestartRequired -bool false")
 			end if
 		end try
 		
@@ -597,7 +599,7 @@ killall ControlStrip
 			set sharedFolderNames to (do shell script "sharing -l | grep 'name:		' | cut -c 8-")
 			repeat with thisSharedFolderName in (paragraphs of sharedFolderNames)
 				try
-					do shell script ("sharing -r " & (quoted form of thisSharedFolderName)) user name adminUsername password adminPassword with administrator privileges
+					doShellScriptAsAdmin("sharing -r " & (quoted form of thisSharedFolderName))
 				end try
 			end repeat
 		end try
@@ -605,7 +607,7 @@ killall ControlStrip
 			set sharePointGroups to (do shell script "dscl . -list /Groups | grep com.apple.sharepoint.group")
 			repeat with thisSharePointGroupName in (paragraphs of sharePointGroups)
 				try
-					do shell script ("dseditgroup -o delete " & (quoted form of thisSharePointGroupName)) user name adminUsername password adminPassword with administrator privileges
+					doShellScriptAsAdmin("dseditgroup -o delete " & (quoted form of thisSharePointGroupName))
 				end try
 			end repeat
 		end try
@@ -622,9 +624,9 @@ killall ControlStrip
 				set newLocalHostNameParts to (every text item of newLocalHostName)
 				set AppleScript's text item delimiters to ""
 				set newLocalHostName to (newLocalHostNameParts as string)
-				do shell script ("
+				doShellScriptAsAdmin("
 scutil --set ComputerName " & (quoted form of intendedComputerName) & "
-scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name adminUsername password adminPassword with administrator privileges
+scutil --set LocalHostName " & (quoted form of newLocalHostName))
 			end try
 		end if
 		
@@ -657,8 +659,8 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name admi
 				set intendedDriveName to "Macintosh HD"
 				set currentDriveName to (name of startup disk)
 				if (currentDriveName is not equal to intendedDriveName) then
-					do shell script "/usr/sbin/diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName) user name adminUsername password adminPassword with administrator privileges
-					if (isCatalinaOrNewer) then do shell script "/usr/sbin/diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")) user name adminUsername password adminPassword with administrator privileges
+					doShellScriptAsAdmin("/usr/sbin/diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName))
+					if (isCatalinaOrNewer) then doShellScriptAsAdmin("/usr/sbin/diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")))
 				end if
 			end try
 			
@@ -717,7 +719,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name admi
 												do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
 											end try
 											try
-												do shell script ("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork)) user name adminUsername password adminPassword with administrator privileges
+												doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
 											end try
 											set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 										end if
@@ -730,10 +732,10 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name admi
 							try
 								if (qaCompleteHasRun) then
 									-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-									do shell script "networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'Free Geek'" user name adminUsername password adminPassword with administrator privileges
+									doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'Free Geek'")
 								else
 									-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-									do shell script "networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]") user name adminUsername password adminPassword with administrator privileges
+									doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
 								end if
 							end try
 						end if
@@ -752,12 +754,12 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name admi
 				do shell script "security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete)
 			end try
 			try -- Run WITH Admin to delete from System keychain
-				do shell script "security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete) user name adminUsername password adminPassword with administrator privileges
+				doShellScriptAsAdmin("security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete))
 			end try
 		end repeat
 		
 		try
-			do shell script "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO")
 		end try
 		
 		try
@@ -779,7 +781,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name admi
 		end try
 		
 		try
-			do shell script ("rm -rf /private/var/db/softwareupdate/journal.plist " & ¬
+			doShellScriptAsAdmin("rm -rf /private/var/db/softwareupdate/journal.plist " & ¬
 				"'/Users/Shared/Relocated Items' " & ¬
 				"'/Users/" & adminUsername & "/Library/Application Support/App Store/updatejournal.plist' " & ¬
 				"/Users/" & adminUsername & "/.bash_history " & ¬
@@ -787,7 +789,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name admi
 				"/Users/" & adminUsername & "/.zsh_history " & ¬
 				"/Users/" & adminUsername & "/.zsh_sessions " & ¬
 				"'/Users/" & adminUsername & "/Desktop/QA Helper - Computer Specs.txt' " & ¬
-				"'/Users/" & adminUsername & "/Desktop/Relocated Items'") user name adminUsername password adminPassword with administrator privileges
+				"'/Users/" & adminUsername & "/Desktop/Relocated Items'")
 		end try
 		
 		do shell script ("rm -rf '/Users/" & demoUsername & "/Library/Application Support/App Store/updatejournal.plist' " & ¬
@@ -821,7 +823,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName)) user name admi
 		end try
 		
 		try
-			do shell script "chflags hidden /Applications/fgreset /Applications/memtest /Applications/memtest_osx" user name adminUsername password adminPassword with administrator privileges
+			doShellScriptAsAdmin("chflags hidden /Applications/fgreset")
 		end try
 		
 		-- DISABLE NOTIFICATIONS
@@ -1031,7 +1033,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		on error
 			if ((year of the (current date)) < 2022) then
 				try
-					do shell script "systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
+					doShellScriptAsAdmin("systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on")
 				end try
 			end if
 		end try
@@ -1570,3 +1572,23 @@ else
 	display alert "Cannot Run “" & (name of me) & "”" message "“" & (name of me) & "” must be installed at
 “/Users/" & demoUsername & "/Applications/” and run from the “" & demoUsername & "” user account." buttons {"Quit"} default button 1 as critical
 end if
+
+on doShellScriptAsAdmin(command)
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
+	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
+	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.
+	-- Also, from testing, this 5 minute credential caching DOES NOT seem to be affected by any custom "sudo" timeout set in the sudoers file.
+	-- And, from testing, unlike "sudo" the timeout DOES NOT keep extending from the last "do shell script with administrator privileges" without credentials but only from the last time credentials were passed.
+	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
+	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
+	
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
+		set lastDoShellScriptAsAdminAuthDate to (current date)
+	else
+		set commandOutput to (do shell script command with administrator privileges)
+	end if
+	
+	return commandOutput
+end doShellScriptAsAdmin

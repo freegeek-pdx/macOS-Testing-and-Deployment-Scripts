@@ -97,10 +97,7 @@ try -- CLEAN MAC TEST BOOT
 	-- Delete a few things from: https://bombich.com/kb/ccc5/some-files-and-folders-are-automatically-excluded-from-backup-task
 	-- Delete vm and temporary files
 	-- "com.bombich.ccc" get's created if drive was selected with Carbon Copy Cloner
-	do shell script ("rm -rf '/Volumes/Mac Test Boot/Applications/memtest-test.sh' " & ¬
-		"'/Volumes/Mac Test Boot/Applications/memtest' " & ¬
-		"'/Volumes/Mac Test Boot/memtest' " & ¬
-		"'/Volumes/Mac Test Boot/usr/local/bin/' " & ¬
+	do shell script ("rm -rf '/Volumes/Mac Test Boot/usr/local/bin/' " & ¬
 		"'/Volumes/Mac Test Boot/Users/Shared/Build Info/' " & ¬
 		"'/Volumes/Mac Test Boot/private/var/db/softwareupdate/journal.plist' " & ¬
 		"'/Volumes/Mac Test Boot/.fseventsd' " & ¬
@@ -138,6 +135,7 @@ try -- CLEAN MAC TEST BOOT
 		"'/Volumes/Mac Test Boot/Users/'*'/Library/Preferences/com.apple.WebFoundation.plist' " & ¬
 		"'/Volumes/Mac Test Boot/Users/'*'/Library/Preferences/com.apple.WebKit.PluginHost.plist' " & ¬
 		"'/Volumes/Mac Test Boot/Users/'*'/Library/Preferences/com.apple.WebKit.PluginProcess.plist' " & ¬
+		"'/Volumes/Mac Test Boot/Users/'*'/Library/Preferences/com.apple.SystemProfiler.plist' " & ¬
 		"'/Volumes/Mac Test Boot/Users/'*'/Library/PubSub/Database' " & ¬
 		"'/Volumes/Mac Test Boot/Users/'*'/Library/Saved Application State/com.apple.Safari.savedState' " & ¬
 		"'/Volumes/Mac Test Boot/Users/'*'/Pictures/GPU Stress Test/' " & ¬

@@ -78,15 +78,14 @@ Designed and Developed by Pico Mitchell")) & " " & (quoted form of infoPlistPath
 			do shell script "plutil -remove CFBundleVersion " & (quoted form of infoPlistPath) & "; plutil -replace CFBundleShortVersionString -string " & (quoted form of correctVersion) & " " & (quoted form of infoPlistPath)
 		end try
 		
-		do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'try' -e 'do shell script \"chmod a-w \\\"" & ((POSIX path of (path to me)) & "Contents/Resources/Scripts/main.scpt") & "\\\"\"' -e 'do shell script \"codesign -s \\\"Developer ID Application\\\" --deep --force \\\"" & (POSIX path of (path to me)) & "\\\"\"' -e 'on error codeSignError' -e 'activate' -e 'display alert \"Code Sign Error\" message codeSignError' -e 'end try' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+		do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'try' -e 'do shell script \"chmod a-w \\\"" & ((POSIX path of (path to me)) & "Contents/Resources/Scripts/main.scpt") & "\\\"\"' -e 'do shell script \"codesign -fs \\\"Developer ID Application\\\" --strict \\\"" & (POSIX path of (path to me)) & "\\\"\"' -e 'on error codeSignError' -e 'activate' -e 'display alert \"Code Sign Error\" message codeSignError' -e 'end try' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 		quit
 		delay 10
 	end try
 end try
 
-global passwordCharacterShiftCount
+global obfuscateCharactersShiftCount
 
-set bundleIdentifierPrefix to "org.freegeek."
 set currentYear to ((year of (current date)) as string)
 set shortCurrentDateString to (short date string of (current date))
 
@@ -129,24 +128,24 @@ repeat
 					set zipFilesForAutoUpdate to (every file of thisScriptTypeFolder whose name extension is "zip")
 					repeat with thisScriptZip in zipFilesForAutoUpdate
 						if (((name of thisScriptZip) as string) is equal to "fgreset.zip") then
-							do shell script ("ditto -x -k --noqtn " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " ${TMPDIR}MacLand-Script-Builder-Versions/")
+							do shell script ("ditto -x -k --noqtn " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/")
 							
-							set thisScriptVersionLine to (do shell script "grep -m 1 '# Version: ' ${TMPDIR}MacLand-Script-Builder-Versions/*.sh")
+							set thisScriptVersionLine to (do shell script "grep -m 1 '# Version: ' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/*.sh")
 							
 							if (thisScriptVersionLine contains "# Version: ") then
 								do shell script "echo '" & (text 1 thru -5 of ((name of thisScriptZip) as string)) & ": " & ((text 12 thru -1 of thisScriptVersionLine) as string) & "' >> " & (quoted form of latestVersionsFilePath)
 							end if
 							
-							do shell script "rm -f ${TMPDIR}MacLand-Script-Builder-Versions/*.sh"
+							do shell script "rm -f ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/*.sh"
 						else
-							do shell script "unzip -jo " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " */Contents/Info.plist -d ${TMPDIR}MacLand-Script-Builder-Versions/"
-							set thisAppName to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleName' ${TMPDIR}MacLand-Script-Builder-Versions/Info.plist")
-							set thisAppVersion to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ${TMPDIR}MacLand-Script-Builder-Versions/Info.plist")
+							do shell script "unzip -jo " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " */Contents/Info.plist -d ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
+							set thisAppName to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleName' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
+							set thisAppVersion to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
 							do shell script "echo '" & thisAppName & ": " & thisAppVersion & "' >> " & (quoted form of latestVersionsFilePath)
 						end if
 					end repeat
-					do shell script "rm -rf ${TMPDIR}MacLand-Script-Builder-Versions/"
-				else if ((((name of thisScriptTypeFolder) as string) is not equal to "Build Tools") and (((name of thisScriptTypeFolder) as string) is not equal to "fgMIB Resources")) then
+					do shell script "rm -rf ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
+				else if ((((name of thisScriptTypeFolder) as string) is not equal to "Build Tools") and (((name of thisScriptTypeFolder) as string) is not equal to "fgMIB Resources") and (((name of thisScriptTypeFolder) as string) is not equal to "Other Scripts")) then
 					set scriptFoldersForThisScriptType to (get folders of thisScriptTypeFolder)
 					repeat with thisScriptFolder in scriptFoldersForThisScriptType
 						set thisScriptName to ((name of thisScriptFolder) as string)
@@ -178,7 +177,7 @@ repeat
 									set addBuildRunOnlyArg to " -x"
 									
 									if ((thisScriptSource contains obfuscatedAdminPasswordPlaceholder) or (thisScriptSource contains obfuscatedWiFiPasswordPlaceholder)) then
-										set passwordCharacterShiftCount to (random number from 100000 to 999999)
+										set obfuscateCharactersShiftCount to (random number from 100000 to 999999)
 										
 										if (thisScriptSource contains obfuscatedAdminPasswordPlaceholder) then
 											tell me to set obfuscatedAdminPassword to shiftString(adminPassword)
@@ -203,16 +202,17 @@ repeat
 										set thisScriptSource to thisScriptSource & "
 
 on x(s)
-	set y to id of s as list
+	set y to ((id of s) as list)
 	repeat with c in y
-		set contents of c to c - " & passwordCharacterShiftCount & "
+		set (contents of c) to (c - " & obfuscateCharactersShiftCount & ")
 	end repeat
-	return string id y
+	return (string id y)
 end x"
 									end if
 								end if
 								
 								set thisScriptAppBundleIdentifier to (bundleIdentifierPrefix & thisScriptHyphenatedName)
+								set thisScriptAppVersion to "UNKOWN VERSION"
 								
 								try
 									do shell script "osacompile" & addBuildRunOnlyArg & " -o " & (quoted form of thisScriptAppPath) & " -e " & (quoted form of thisScriptSource)
@@ -242,14 +242,13 @@ plutil -replace CFBundleDevelopmentRegion -string 'en_US' " & (quoted form of th
 
 plutil -replace NSAppleEventsUsageDescription -string " & (quoted form of ("You MUST click the “OK” button for “" & thisScriptName & "” to be able to function.")) & " " & (quoted form of thisScriptAppInfoPlistPath))
 										
+										set thisScriptAppVersion to (currentYear & "." & (word 1 of shortCurrentDateString) & "." & (word 2 of shortCurrentDateString))
 										if (thisScriptSource contains "-- Version: ") then
 											set AppleScript's text item delimiters to "-- Version: "
 											set thisScriptAppVersionPart to ((text item 2 of thisScriptSource) as string)
 											set thisScriptAppVersion to ((first paragraph of thisScriptAppVersionPart) as string)
-											do shell script "plutil -replace CFBundleShortVersionString -string " & (quoted form of thisScriptAppVersion) & " " & (quoted form of thisScriptAppInfoPlistPath)
-										else
-											do shell script "plutil -replace CFBundleShortVersionString -string " & (quoted form of (currentYear & "." & (word 1 of shortCurrentDateString) & "." & (word 2 of shortCurrentDateString))) & " " & (quoted form of thisScriptAppInfoPlistPath)
 										end if
+										do shell script "plutil -replace CFBundleShortVersionString -string " & (quoted form of thisScriptAppVersion) & " " & (quoted form of thisScriptAppInfoPlistPath)
 										
 										do shell script ("
 mv " & (quoted form of (thisScriptAppPath & "/Contents/MacOS/applet")) & " " & (quoted form of (thisScriptAppPath & "/Contents/MacOS/" & thisScriptName)) & "
@@ -290,14 +289,32 @@ rm -f " & (quoted form of (thisScriptAppPath & "/Contents/Resources/.DS_Store"))
 										end try
 										
 										try
+											do shell script ("xattr -crs " & (quoted form of thisScriptAppPath)) -- Any xattrs MUST be cleared for 'codesign' to not error (this MUST be done BEFORE code signing the following Launcher script, if created, since signing shell scripts stores the code signature in the xattrs, and those specific xattrs do not prevent code signing of the app itself).
+										end try
+										
+										try
+											if (thisScriptSource contains "-- Build Flag: IncludeSignedLauncher") then
+												-- The following "Launch [APP NAME]" script is created and SIGNED so that it can be used for the LaunchAgents and/or LaunchDaemons, and it MUST be signed so that the "AssociatedBundleIdentifier" key can be used in macOS 13 Ventura so that the LA/LD is properly displayed as being for the specified app.
+												-- This is because the executable in the LA/LD MUST have a Code Signing Team ID that matches the Team ID of the app Bundle ID specified in the "AssociatedBundleIdentifiers" key (as described in https://developer.apple.com/documentation/servicemanagement/updating_helper_executables_from_earlier_versions_of_macos?language=objc#4065210).
+												-- We DO NOT want to have the LAs/LDs just run the app binary directly because if the app is launched that way via the LA/LD and then the LA/LD is removed during that execution the app will be terminated immediately when "launchctl bootout" is run.
+												-- That issue has always been avoided by using the "/usr/bin/open" binary to launch the app instead. But using "/usr/bin/open" directly in the LA/LD on macOS 13 Ventura makes it show as just running "open" from an unidentified developer in the new Login Items list, which may seem suspicious or confusing.
+												-- Making this simple SIGNED script that just runs "/usr/bin/open" and then using the "AssociatedBundleIdentifiers" allows the LA/LD to be properly displayed as being for the specified app.
+												-- When on macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the "Launch [APP NAME]" will function the same as if we directly specified "/usr/bin/open" with the path to the app in the LA/LD.
+												-- Search for "AssociatedBundleIdentifiers" throughout other scripts to see the LA/LD creation code.
+												do shell script ("echo '#!/bin/sh
+/usr/bin/open -na \"${0%/Contents/*}\"' > " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Launch " & thisScriptName)) & "
+chmod +x " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Launch " & thisScriptName)) & "
+codesign -s 'Developer ID Application' --identifier " & (quoted form of (bundleIdentifierPrefix & "Launch-" & thisScriptHyphenatedName)) & " --strict " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Launch " & thisScriptName)))
+											end if
+										end try
+										
+										try
 											do shell script ("
-# Required to make sure codesign works
-xattr -crs " & (quoted form of thisScriptAppPath) & "
+codesign -fs 'Developer ID Application' --strict " & (quoted form of thisScriptAppPath) & " || exit 1
 
-codesign -s 'Developer ID Application' --deep --force " & (quoted form of thisScriptAppPath) & " || exit 1
-
-ditto -c -k --keepParent --sequesterRsrc --zlibCompressionLevel 9 " & (quoted form of thisScriptAppPath) & " " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")) & "
-touch " & (quoted form of thisScriptAppPath))
+touch " & (quoted form of thisScriptAppPath) & "
+	
+ditto -c -k --keepParent --sequesterRsrc --zlibCompressionLevel 9 " & (quoted form of thisScriptAppPath) & " " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")))
 										on error codeSignError
 											do shell script "rm -rf " & (quoted form of thisScriptAppPath)
 											tell me
@@ -335,9 +352,9 @@ tccutil reset All " & (quoted form of ("com.randomapplications." & thisScriptHyp
 									(((zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip") as POSIX file) as alias)
 									
 									if (addBuildRunOnlyArg is not equal to "") then
-										set (end of buildResultsOutput) to "✅🔒	" & (name of thisScriptTypeFolder) & " > BUILT " & thisScriptName & " (AS RUN-ONLY)"
+										set (end of buildResultsOutput) to "✅🔒	" & (name of thisScriptTypeFolder) & " > BUILT (AS RUN-ONLY) " & thisScriptName & " " & thisScriptAppVersion
 									else
-										set (end of buildResultsOutput) to "✅🛠	" & (name of thisScriptTypeFolder) & " > BUILT " & thisScriptName
+										set (end of buildResultsOutput) to "✅🛠	" & (name of thisScriptTypeFolder) & " > BUILT " & thisScriptName & " " & thisScriptAppVersion
 									end if
 								on error
 									set (end of buildResultsOutput) to "⚠️		" & (name of thisScriptTypeFolder) & " > FAILED TO BUILD " & thisScriptName
@@ -347,21 +364,27 @@ tccutil reset All " & (quoted form of ("com.randomapplications." & thisScriptHyp
 									set thisFGresetSourcePath to (thisScriptFolderPath & "fgreset.sh")
 									((thisFGresetSourcePath as POSIX file) as alias)
 									
+									set thisScriptVersion to "UNKNOWN VERSION"
+									try
+										set thisScriptVersionLine to (do shell script ("grep -m 1 '# Version: ' " & (quoted form of thisFGresetSourcePath)))
+										if (thisScriptVersionLine contains "# Version: ") then set thisScriptVersion to ((text 12 thru -1 of thisScriptVersionLine) as string)
+									end try
+									
 									do shell script ("
 xattr -c " & (quoted form of thisFGresetSourcePath) & "
 									
-rm -rf ${TMPDIR}MacLand-Script-Builder-fgreset
-mkdir -p ${TMPDIR}MacLand-Script-Builder-fgreset
+rm -rf ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset
+mkdir -p ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset
 									
 # CANNOT directly edit shell script source strings in AppleScript (like we do with AppleScript source) since it messes up escaped characters for ANSI styles. So, we'll use 'sed' instead.
 # DO NOT pass the base64 string to 'base64 -D' using a here-string since that requires writing a temp file to the filesystem which will NOT be writable when the password is decoded. Use echo and pipe instead since piping does not write to the filesystem.
-sed \"s/'\\[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD\\]'/\\\"\\$(echo '$(/bin/echo -n " & (quoted form of adminPassword) & " | base64)' | base64 -D)\\\"/\" " & (quoted form of thisFGresetSourcePath) & " > ${TMPDIR}MacLand-Script-Builder-fgreset/fgreset.sh
-chmod +x ${TMPDIR}MacLand-Script-Builder-fgreset/fgreset.sh
+sed \"s/'\\[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD\\]'/\\\"\\$(echo '$(/bin/echo -n " & (quoted form of adminPassword) & " | base64)' | base64 -D)\\\"/\" " & (quoted form of thisFGresetSourcePath) & " > ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh
+chmod +x ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh
 									
 # DO NOT '--keepParent' WHEN DITTO ZIPPING A SINGLE FILE!
-ditto -c -k --sequesterRsrc --zlibCompressionLevel 9 ${TMPDIR}MacLand-Script-Builder-fgreset/fgreset.sh " & (quoted form of (zipsForAutoUpdateFolderPath & "fgreset.zip")) & "
+ditto -c -k --sequesterRsrc --zlibCompressionLevel 9 ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh " & (quoted form of (zipsForAutoUpdateFolderPath & "fgreset.zip")) & "
 									
-rm -rf ${TMPDIR}MacLand-Script-Builder-fgreset
+rm -rf ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset
 									
 mkdir -p " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/Global/Scripts/")) & "
 rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/Global/Scripts/fgreset.zip")) & "
@@ -369,9 +392,9 @@ ditto " & (quoted form of (zipsForAutoUpdateFolderPath & "fgreset.zip")) & " " &
 									
 									try
 										(((zipsForAutoUpdateFolderPath & "fgreset.zip") as POSIX file) as alias)
-										set (end of buildResultsOutput) to "📄		" & (name of thisScriptTypeFolder) & " > ZIPPED " & thisScriptName
+										set (end of buildResultsOutput) to "📄		" & (name of thisScriptTypeFolder) & " > ZIPPED " & thisScriptName & " " & thisScriptVersion
 									on error
-										set (end of buildResultsOutput) to "⚠️		" & (name of thisScriptTypeFolder) & " > FAILED TO ZIP " & thisScriptName
+										set (end of buildResultsOutput) to "⚠️		" & (name of thisScriptTypeFolder) & " > FAILED TO ZIP " & thisScriptName & " " & thisScriptVersion
 									end try
 								on error
 									set (end of buildResultsOutput) to "❌		" & (name of thisScriptTypeFolder) & " > " & thisScriptName & " NOT APPLESCRIPT APP"
@@ -423,9 +446,9 @@ end repeat
 
 -- From: https://stackoverflow.com/questions/14612235/protecting-an-applescript-script/14616010#14616010
 on shiftString(sourceString)
-	set stringID to id of sourceString as list
-	repeat with thisCharacter in stringID
-		set contents of thisCharacter to thisCharacter + passwordCharacterShiftCount
+	set stringIDs to ((id of sourceString) as list)
+	repeat with thisCharacterID in stringIDs
+		set (contents of thisCharacterID) to (thisCharacterID + obfuscateCharactersShiftCount)
 	end repeat
-	return string id stringID
+	return (string id stringIDs)
 end shiftString

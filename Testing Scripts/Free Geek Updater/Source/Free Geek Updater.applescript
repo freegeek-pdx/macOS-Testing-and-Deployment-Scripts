@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.5.9-1
+-- Version: 2022.10.24-1
 
 -- App Icon is “Counterclockwise Arrows” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -25,12 +25,12 @@
 
 use AppleScript version "2.7"
 use scripting additions
-use framework "Cocoa"
+use framework "AppKit"
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -104,12 +104,6 @@ on error checkReadOnlyErrorMessage
 end try
 
 
-set dialogIconName to "applet"
-try
-	((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-	set dialogIconName to (name of me)
-end try
-
 set systemVersion to (system version of (system info))
 considering numeric strings
 	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
@@ -120,7 +114,6 @@ global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs t
 set lastDoShellScriptAsAdminAuthDate to 0
 
 set adminUsername to "Staff"
-if (isCatalinaOrNewer) then set adminUsername to "staff"
 
 set currentUsername to (short user name of (system info))
 if (currentUsername is equal to "fg-demo") then set adminUsername to "fg-admin"
@@ -213,7 +206,7 @@ If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet
 
 Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
 
-If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Continue Without Updating", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName giving up after 30
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Continue Without Updating", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
 				delay 0.5
 			on error
 				exit repeat
@@ -398,19 +391,18 @@ try
 end try
 
 try
-	do shell script \"open -n -a \" & (quoted form of updaterAppFilePath)
+	do shell script \"open -na \" & (quoted form of updaterAppFilePath)
 on error
 	try
-		do shell script \"open -n -a \\\"/Applications/Test Boot Setup.app\\\"\"
+		do shell script \"open -na \\\"/Applications/Test Boot Setup.app\\\"\"
 	on error
 		try
-			((\"/Users/fg-demo/Applications/Automation Guide.app\" as POSIX file) as alias)
-			do shell script \"open -n -a \\\"/Users/fg-demo/Applications/Automation Guide.app\\\"\"
+			do shell script \"open -na \\\"/Users/fg-demo/Applications/Free Geek Setup.app\\\"\"
 		on error
 			try
-				do shell script \"open -n -a \\\"/Users/fg-demo/Applications/Free Geek Setup.app\\\"\"
+				do shell script \"open -na \\\"/Applications/Mac Scope.app\\\"\"
 			end try
-		end
+		end try
 	end try
 end try
 
@@ -731,16 +723,13 @@ end try
 		
 		try
 			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-			do shell script "open -n -a '/Applications/Test Boot Setup.app'"
+			do shell script "open -na '/Applications/Test Boot Setup.app'"
 		on error
 			try
-				(("/Users/fg-demo/Applications/Automation Guide.app" as POSIX file) as alias)
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script "open -n -a '/Users/fg-demo/Applications/Automation Guide.app'"
+				do shell script "open -na '/Users/fg-demo/Applications/Free Geek Setup.app'"
 			on error
 				try
-					-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-					do shell script "open -n -a '/Users/fg-demo/Applications/Free Geek Setup.app'"
+					do shell script "open -na '/Applications/Mac Scope.app'" -- Also check and launch Mac Scope if neither Setup exists for some other customized test boot environments used in Hardware Test.
 				end try
 			end try
 		end try

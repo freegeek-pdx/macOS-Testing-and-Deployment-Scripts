@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.8-1
+-- Version: 2022.10.24-1
 
 -- App Icon is “Loudspeaker” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -27,7 +27,7 @@ use scripting additions
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -99,11 +99,45 @@ on error checkReadOnlyErrorMessage
 end try
 
 
-set dialogIconName to "applet"
+set freeGeekUpdaterAppPath to "/Applications/Free Geek Updater.app"
+set freeGeekUpdaterIsRunning to false
 try
-	((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-	set dialogIconName to (name of me)
+	((freeGeekUpdaterAppPath as POSIX file) as alias)
+	set freeGeekUpdaterIsRunning to (application freeGeekUpdaterAppPath is running)
 end try
+
+set adminUsername to "Staff"
+set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
+
+set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
+
+try
+	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
+	
+	try
+		do shell script ("mkdir " & (quoted form of buildInfoPath))
+	end try
+	try
+		set AppleScript's text item delimiters to "-"
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+	end try
+	
+	if (not freeGeekUpdaterIsRunning) then
+		try
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			do shell script "open -na '/Applications/Test Boot Setup.app'"
+		end try
+	end if
+	
+	quit
+	delay 10
+end try
+
+if (freeGeekUpdaterIsRunning) then -- Quit if Updater is running so that this app can be updated if needed.
+	quit
+	delay 10
+end if
+
 
 set systemVersion to (system version of (system info))
 considering numeric strings
@@ -116,12 +150,12 @@ if (isMojaveOrNewer) then
 		tell application "System Events" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
-			tell application "System Preferences"
-				try
-					activate
-				end try
-				reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-			end tell
+			try
+				tell application "System Preferences" to activate
+			end try
+			try
+				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
+			end try
 			try
 				activate
 			end try
@@ -141,9 +175,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the “System Events” checkbox underneath it.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -188,40 +222,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the checkbox next to it. If “" & (name of me) & "” IS NOT in the list, drag-and-drop the app icon from Finder into the list.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 			try
-				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		end try
 		quit
 		delay 10
 	end if
-end try
-
-
-set adminUsername to "Staff"
-if (isCatalinaOrNewer) then set adminUsername to "staff"
-set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
-
-set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
-try
-	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
-	
-	try
-		do shell script ("mkdir " & (quoted form of buildInfoPath))
-	end try
-	try
-		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
-	end try
-	
-	try
-		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-		do shell script "open -n -a '/Applications/Test Boot Setup.app'"
-	end try
-	
-	quit
-	delay 10
 end try
 
 
@@ -273,13 +281,27 @@ You do not hear each phrase out of the correct speakers or they don't sound cris
 		
 		if (shouldTestAudio) then
 			repeat with thisAudioTest in {{0, "Left speaker"}, {1, "Right speaker"}, {0.5, "Both speakers"}}
-				tell application "System Preferences"
+				repeat 60 times -- Wait for Sound pane to load
+					tell application "System Preferences"
+						try
+							activate
+						end try
+						reveal ((anchor "output") of (pane id "com.apple.preference.sound"))
+					end tell
+					
 					try
-						activate
+						tell application "System Events" to tell application process "System Preferences"
+							if ((title of window 1) is equal to "Sound") then
+								exit repeat
+							else
+								delay 0.5
+							end if
+						end tell
+					on error
+						delay 0.5
 					end try
-					reveal anchor "output" of pane id "com.apple.preference.sound"
-				end tell
-				delay 0.5
+				end repeat
+				
 				set isTestingHeadphones to false
 				try
 					tell application "System Events" to tell application process "System Preferences"
@@ -312,7 +334,7 @@ You do not hear each phrase out of the correct speakers or they don't sound cris
 				end try
 				try
 					tell application "System Events" to tell application process "System Preferences"
-						tell (slider 1 of group 1 of tab group 1 of window 1) to set value to ((first item of thisAudioTest) as number)
+						set value of (slider 1 of group 1 of tab group 1 of window 1) to ((first item of thisAudioTest) as number)
 					end tell
 					delay 0.25
 					say ((last item of thisAudioTest) as string)
@@ -365,7 +387,7 @@ if ((testInternalSpeakersCount > 0) and (testHeadphonesCount > 0)) then
 				display alert "
 Would you like to launch
 “Microphone Test”?" buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 15
-				do shell script "open -n -a '/Applications/Microphone Test.app'"
+				do shell script "open -na '/Applications/Microphone Test.app'"
 			end if
 		end try
 	else

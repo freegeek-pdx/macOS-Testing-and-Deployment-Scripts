@@ -18,7 +18,7 @@
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
-PROJECT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)/.."
+PROJECT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)/.."
 readonly PROJECT_DIR
 
 if ! WIFI_PASSWORD="$(PlistBuddy -c 'Print :wifi_password' "${PROJECT_DIR}/../Build Tools/Free Geek Passwords.plist")" || [[ -z "${WIFI_PASSWORD}" ]]; then
@@ -45,49 +45,54 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 			
 			chmod +x "${this_fgMIB_volume}/fg-install-os"
 			
-			if ! cmp -s "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" "${this_fgMIB_volume}/install-packages/fg-prepare-os.pkg"; then
-				if [[ -d "${this_fgMIB_volume}/install-packages" ]]; then
-					rm -f "${this_fgMIB_volume}/install-packages/fg-prepare-os.pkg"
+			if [[ -d "${this_fgMIB_volume}/install-packages" && ! -e "${this_fgMIB_volume}/customization-resources" ]]; then # Rename old packages folder name to new folder name if needed.
+				echo 'RENAMING install-packages TO customization-resources...'
+				mv "${this_fgMIB_volume}/install-packages" "${this_fgMIB_volume}/customization-resources"
+			fi
+
+			if ! cmp -s "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg"; then
+				if [[ -d "${this_fgMIB_volume}/customization-resources" ]]; then
+					rm -f "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg"
 				fi
 
-				echo 'COPYING install-packages/fg-prepare-os.pkg...'
-				ditto "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" "${this_fgMIB_volume}/install-packages/fg-prepare-os.pkg"
+				echo 'COPYING customization-resources/fg-prepare-os.pkg...'
+				ditto "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg"
 			else
-				echo "EXACT COPY EXISTS: install-packages/fg-prepare-os.pkg"
+				echo "EXACT COPY EXISTS: customization-resources/fg-prepare-os.pkg"
 			fi
 
 			for this_install_packages_script_file_or_folder in "${PROJECT_DIR}/Install Packages Script/"*; do
-				this_install_packages_script_file_or_folder_name="$(basename "${this_install_packages_script_file_or_folder}")"
+				this_install_packages_script_file_or_folder_name="${this_install_packages_script_file_or_folder##*/}"
 				
 				if [[ -f "${this_install_packages_script_file_or_folder}" ]]; then
-					if ! cmp -s "${this_install_packages_script_file_or_folder}" "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}"; then
-						rm -f "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}"
-						echo "COPYING install-packages/${this_install_packages_script_file_or_folder_name}..."
-						ditto "${this_install_packages_script_file_or_folder}" "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}"
+					if ! cmp -s "${this_install_packages_script_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"; then
+						rm -f "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"
+						echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}..."
+						ditto "${this_install_packages_script_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"
 					else
-						echo "EXACT COPY EXISTS: install-packages/${this_install_packages_script_file_or_folder_name}"
+						echo "EXACT COPY EXISTS: customization-resources/${this_install_packages_script_file_or_folder_name}"
 					fi
 				elif [[ -d "${this_install_packages_script_file_or_folder}" ]]; then
-					if [[ ! -d "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}" ]]; then
-						mkdir -p "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}"
+					if [[ ! -d "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}" ]]; then
+						mkdir -p "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"
 					fi
 
 					for this_install_packages_script_subfolder_file_or_folder in "${this_install_packages_script_file_or_folder}/"*; do
-						this_install_packages_script_subfolder_file_or_folder_name="$(basename "${this_install_packages_script_subfolder_file_or_folder}")"
+						this_install_packages_script_subfolder_file_or_folder_name="${this_install_packages_script_subfolder_file_or_folder##*/}"
 
 						if [[ -f "${this_install_packages_script_subfolder_file_or_folder}" ]]; then
-							if ! cmp -s "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"; then
-								rm -f "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
-								echo "COPYING install-packages/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}..."
-								ditto "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+							if ! cmp -s "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"; then
+								rm -f "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+								echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}..."
+								ditto "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
 							else
-								echo "EXACT COPY EXISTS: install-packages/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+								echo "EXACT COPY EXISTS: customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
 							fi
 						elif [[ -d "${this_install_packages_script_subfolder_file_or_folder}" ]]; then
 							# TODO: Check if exact copy exists instead of always re-copying whole dir (which will be an app). THIS IS NO LONGER CURRENTLY IMPORTANT SINCE NO LONGER INCLUDING APPS IN HERE (INCLUDING ZIP INSTEAD).
-							rm -rf "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
-							echo "COPYING install-packages/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}..."
-							ditto "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/install-packages/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+							rm -rf "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+							echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}..."
+							ditto "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
 						fi
 					done
 				fi
@@ -95,7 +100,7 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 			
 			for this_extra_bins_folder in "${PROJECT_DIR}/extra-bins/"*; do
 				if [[ -d "${this_extra_bins_folder}" ]]; then
-					this_extra_bins_folder_name="$(basename "${this_extra_bins_folder}")"
+					this_extra_bins_folder_name="${this_extra_bins_folder##*/}"
 					
 					if [[ ! -d "${this_fgMIB_volume}/extra-bins/${this_extra_bins_folder_name}" ]]; then
 						mkdir -p "${this_fgMIB_volume}/extra-bins/${this_extra_bins_folder_name}"
@@ -103,7 +108,7 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 
 					for this_extra_bins_versioned_file in "${this_extra_bins_folder}/"*; do
 						if [[ -f "${this_extra_bins_versioned_file}" ]]; then
-							this_extra_bins_versioned_file_name="$(basename "${this_extra_bins_versioned_file}")"
+							this_extra_bins_versioned_file_name="${this_extra_bins_versioned_file##*/}"
 
 							if ! cmp -s "${this_extra_bins_versioned_file}" "${this_fgMIB_volume}/extra-bins/${this_extra_bins_folder_name}/${this_extra_bins_versioned_file_name}"; then
 								rm -f "${this_fgMIB_volume}/extra-bins/${this_extra_bins_folder_name}/${this_extra_bins_versioned_file_name}"

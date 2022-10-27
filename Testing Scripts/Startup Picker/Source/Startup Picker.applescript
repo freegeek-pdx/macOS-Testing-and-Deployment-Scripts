@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.4.27-1
+-- Version: 2022.10.25-1
 
 -- App Icon is “Green Apple” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -27,7 +27,7 @@ use scripting additions
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -101,44 +101,79 @@ on error checkReadOnlyErrorMessage
 end try
 
 
-set currentUsername to (short user name of (system info))
 
-if (((currentUsername is equal to "Tester") or (currentUsername is equal to "restorer")) and ((POSIX path of (path to me)) is equal to ("/Applications/" & (name of me) & ".app/"))) then
-	set dialogIconName to "applet"
+set freeGeekUpdaterAppPath to "/Applications/Free Geek Updater.app"
+set freeGeekUpdaterIsRunning to false
+try
+	((freeGeekUpdaterAppPath as POSIX file) as alias)
+	set freeGeekUpdaterIsRunning to (application freeGeekUpdaterAppPath is running)
+end try
+
+set adminUsername to "Staff"
+set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
+
+set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
+
+try
+	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
+	
 	try
-		((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-		set dialogIconName to (name of me)
+		do shell script ("mkdir " & (quoted form of buildInfoPath))
+	end try
+	try
+		set AppleScript's text item delimiters to "-"
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
-	set systemVersion to (system version of (system info))
-	considering numeric strings
-		set isMojaveOrNewer to (systemVersion ≥ "10.14")
-		set isCatalinaOrNewer to (systemVersion ≥ "10.15")
-		set isBigSurOrNewer to (systemVersion ≥ "11.0")
-	end considering
-	
-	if (isMojaveOrNewer) then
-		set needsAutomationAccess to false
+	if (not freeGeekUpdaterIsRunning) then
 		try
-			tell application "System Events" to every window -- To prompt for Automation access on Mojave
-		on error automationAccessErrorMessage number automationAccessErrorNumber
-			if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			do shell script "open -na '/Applications/Test Boot Setup.app'"
 		end try
-		
-		if (needsAutomationAccess) then
-			try
-				tell application "System Preferences"
-					try
-						activate
-					end try
-					reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-				end tell
-			end try
-			try
-				activate
-			end try
-			try
-				display dialog "“" & (name of me) & "” must be allowed to control and perform actions in “System Events” to be able to function.
+	end if
+	
+	quit
+	delay 10
+end try
+
+if (freeGeekUpdaterIsRunning) then -- Quit if Updater is running so that this app can be updated if needed.
+	quit
+	delay 10
+end if
+
+
+set systemVersion to (system version of (system info))
+considering numeric strings
+	set isMojaveOrNewer to (systemVersion ≥ "10.14")
+	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
+	set isBigSurOrNewer to (systemVersion ≥ "11.0")
+	set isMontereyOrNewer to (systemVersion ≥ "12.0")
+	set isVenturaOrNewer to (systemVersion ≥ "13.0")
+end considering
+
+set systemPreferencesOrSettings to "System Preferences"
+if (isVenturaOrNewer) then set systemPreferencesOrSettings to "System Settings"
+
+if (isMojaveOrNewer) then
+	set needsAutomationAccess to false
+	try
+		tell application "System Events" to every window -- To prompt for Automation access on Mojave
+	on error automationAccessErrorMessage number automationAccessErrorNumber
+		if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
+	end try
+	
+	if (needsAutomationAccess) then
+		try
+			tell application "System Preferences" to activate
+		end try
+		try
+			do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
+		end try
+		try
+			activate
+		end try
+		try
+			display dialog "“" & (name of me) & "” must be allowed to control and perform actions in “System Events” to be able to function.
 
 
 USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
@@ -153,38 +188,36 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the “System Events” checkbox underneath it.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
-				end try
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
+			try
+				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
-			quit
-			delay 10
-		end if
+		end try
+		quit
+		delay 10
 	end if
-	
-	try
-		tell application "System Events" to tell application process "Finder" to (get windows)
-	on error (assistiveAccessTestErrorMessage)
-		if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
-			if (isMojaveOrNewer) then
-				try
-					tell application "System Preferences" to every window -- To prompt for Automation access on Mojave
-				on error automationAccessErrorMessage number automationAccessErrorNumber
-					if (automationAccessErrorNumber is equal to -1743) then
-						try
-							tell application "System Preferences"
-								try
-									activate
-								end try
-								reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-							end tell
-						end try
-						try
-							activate
-						end try
-						try
-							display dialog "“" & (name of me) & "” must be allowed to control and perform actions in “System Preferences” to be able to function.
+end if
+
+try
+	tell application "System Events" to tell application process "Finder" to (get windows)
+on error (assistiveAccessTestErrorMessage)
+	if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
+		if (isMojaveOrNewer) then
+			try
+				tell application "System Preferences" to every window -- To prompt for Automation access on Mojave
+			on error automationAccessErrorMessage number automationAccessErrorNumber
+				if (automationAccessErrorNumber is equal to -1743) then
+					try
+						tell application "System Preferences" to activate
+					end try
+					try
+						do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
+					end try
+					try
+						activate
+					end try
+					try
+						display dialog "“" & (name of me) & "” must be allowed to control and perform actions in “System Preferences” to be able to function.
 
 
 USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
@@ -199,38 +232,38 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the “System Preferences” checkbox underneath it.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-							try
-								do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
-							end try
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
+						try
+							do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 						end try
-						quit
-						delay 10
-					end if
-				end try
-				try
-					with timeout of 1 second
-						tell application "System Preferences" to quit
-					end timeout
-				end try
-			end if
-			
-			try
-				tell application "Finder" to reveal (path to me)
-			end try
-			try
-				tell application "System Preferences"
-					try
-						activate
 					end try
-					reveal ((anchor "Privacy_Accessibility") of (pane id "com.apple.preference.security"))
-				end tell
+					quit
+					delay 10
+				end if
 			end try
 			try
-				activate
+				with timeout of 1 second
+					tell application "System Preferences" to quit
+				end timeout
 			end try
-			try
-				display dialog "“" & (name of me) & "” must be allowed to control this computer using Accessibility Features to be able to function.
+		end if
+		
+		try
+			tell application "Finder" to reveal (path to me)
+		end try
+		try
+			tell application "System Preferences"
+				try
+					activate
+				end try
+				reveal ((anchor "Privacy_Accessibility") of (pane id "com.apple.preference.security"))
+			end tell
+		end try
+		try
+			activate
+		end try
+		try
+			display dialog "“" & (name of me) & "” must be allowed to control this computer using Accessibility Features to be able to function.
 
 
 USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
@@ -247,529 +280,725 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the checkbox next to it. If “" & (name of me) & "” IS NOT in the list, drag-and-drop the app icon from Finder into the list.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
-				end try
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
+			try
+				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
-			quit
-			delay 10
-		end if
-	end try
+		end try
+		quit
+		delay 10
+	end if
+end try
+
+
+set AppleScript's text item delimiters to ""
+set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+
+set supportsHighSierra to false
+set supportsCatalina to false
+set supportsBigSur to false
+set supportsMonterey to false
+set supportsVentura to false
+
+set modelInfoPath to tmpPath & "modelInfo.plist"
+try
+	do shell script "system_profiler -xml SPHardwareDataType > " & (quoted form of modelInfoPath)
+	tell application "System Events" to tell property list file modelInfoPath
+		set hardwareItems to (first property list item of property list item "_items" of first property list item)
+		set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
+		set modelIdentifierName to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -d '[:digit:],'") -- Need use this whenever comparing along with Model ID numbers since there could be false matches for the newer "MacXX,Y" style Model IDs if I used shortModelName in those conditions instead (which I used to do).
+		set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
+		set AppleScript's text item delimiters to ","
+		set modelNumberParts to (every text item of modelIdentifierNumber)
+		set modelIdentifierMajorNumber to ((item 1 of modelNumberParts) as number)
+		
+		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 6)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 6)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 3)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 4)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 5)) or (modelIdentifierName is equal to "iMacPro")) then set supportsHighSierra to true
+		
+		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 13)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 9)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 5)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 6)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 6)) or (modelIdentifierName is equal to "iMacPro")) then set supportsCatalina to true
+		
+		if (((modelIdentifierName is equal to "iMac") and ((modelIdentifierNumber is equal to "14,4") or (modelIdentifierMajorNumber ≥ 15))) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 11)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 6)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 7)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 6)) or (modelIdentifierName is equal to "iMacPro")) then set supportsBigSur to true
+		
+		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((modelIdentifierName is equal to "MacBookPro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 7)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 7)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 6)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsMonterey to true
+		
+		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 18)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 14)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 7)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsVentura to true
+	end tell
+on error (modelInfoErrorMessage)
+	log "Model Info Error: " & modelInfoErrorMessage
+end try
+do shell script "rm -f " & (quoted form of modelInfoPath)
+
+set supportedOS to "OS X 10.11 El Capitan"
+if (supportsVentura) then
+	set supportedOS to "macOS 13 Ventura"
+else if (supportsMonterey) then
+	set supportedOS to "macOS 12 Monterey"
+else if (supportsBigSur) then
+	set supportedOS to "macOS 11 Big Sur"
+else if (supportsCatalina) then
+	set supportedOS to "macOS 10.15 Catalina"
+else if (supportsHighSierra) then
+	set supportedOS to "macOS 10.13 High Sierra"
+end if
+
+set nameOfBootedDisk to ""
+try
+	tell application "System Events" to set nameOfBootedDisk to (name of startup disk)
+end try
+
+set shouldSetStartupDisk to false
+set chosenStartupDiskName to ""
+set chosenStartupDiskVersion to "0"
+
+repeat
+	set shouldSetStartupDisk to false
+	set chosenStartupDiskName to ""
+	set chosenStartupDiskVersion to "0"
 	
+	set systemVersionPlists to (paragraphs of (do shell script "ls /Volumes/*/System/Library/CoreServices/SystemVersion.plist | sort"))
 	
-	set adminUsername to "Staff"
-	if (isCatalinaOrNewer) then set adminUsername to "staff"
-	set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
+	set hdStartupDiskOptions to {}
+	set testBootStartupDiskOptions to {}
+	set installerStartupDiskOptions to {}
+	set otherStartupDiskOptions to {}
+	set incompatibleStartupDiskOptions to {}
 	
-	
-	set AppleScript's text item delimiters to ""
-	set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
-	
-	set supportsHighSierra to false
-	set supportsCatalina to false
-	set supportsBigSur to false
-	set supportsMonterey to false
-	
-	set modelInfoPath to tmpPath & "modelInfo.plist"
-	try
-		do shell script "system_profiler -xml SPHardwareDataType > " & (quoted form of modelInfoPath)
-		tell application "System Events" to tell property list file modelInfoPath
-			set hardwareItems to (first property list item of property list item "_items" of first property list item)
-			set shortModelName to ((value of property list item "machine_name" of hardwareItems) as string)
-			set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
-			set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
-			set AppleScript's text item delimiters to ","
-			set modelNumberParts to (every text item of modelIdentifierNumber)
-			set modelIdentifierMajorNumber to ((item 1 of modelNumberParts) as number)
+	repeat with thisSystemVersionPlist in systemVersionPlists
+		try
+			set osVersion to "UNKNOWN"
+			set osDarwinMajorVersion to "00"
 			
-			if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 10)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 3)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 4)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 5)) or (shortModelName is equal to "iMac Pro")) then set supportsHighSierra to true
+			try
+				tell application "System Events" to tell property list file thisSystemVersionPlist
+					try
+						set osVersion to ((value of property list item "ProductUserVisibleVersion") as string)
+					on error
+						try
+							set osVersion to ((value of property list item "ProductVersion") as string)
+						end try
+					end try
+					try
+						set osDarwinMajorVersion to (text 1 thru 2 of ((value of property list item "ProductBuildVersion") as string))
+					end try
+				end tell
+			end try
 			
-			if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 13)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 9)) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 5)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then set supportsCatalina to true
+			set startupDiskIsCompatibleWithMac to true
 			
-			if (((shortModelName is equal to "iMac") and ((modelIdentifierNumber is equal to "14,4") or (modelIdentifierMajorNumber ≥ 15))) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 11)) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then set supportsBigSur to true
+			set macOSname to "Mac OS X"
+			considering numeric strings
+				if (osVersion ≥ "10.12") then
+					set macOSname to "macOS"
+					if ((osVersion ≥ "13.0") and (not supportsVentura)) then
+						set startupDiskIsCompatibleWithMac to false
+					else if ((osVersion ≥ "12.0") and (not supportsMonterey)) then
+						set startupDiskIsCompatibleWithMac to false
+					else if ((osVersion ≥ "11.0") and (not supportsBigSur)) then
+						set startupDiskIsCompatibleWithMac to false
+					else if ((osVersion ≥ "10.14") and (not supportsCatalina)) then -- Catalina supports same as Mojave
+						set startupDiskIsCompatibleWithMac to false
+					else if ((osVersion ≥ "10.13") and (not supportsHighSierra)) then
+						set startupDiskIsCompatibleWithMac to false
+					end if
+				else if (osVersion ≥ "10.8") then
+					set macOSname to "OS X"
+				end if
+			end considering
 			
-			if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((shortModelName is equal to "MacBook Pro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro") or (shortModelName is equal to "Mac Studio")) then set supportsMonterey to true
-		end tell
-	on error (modelInfoErrorMessage)
-		log "Model Info Error: " & modelInfoErrorMessage
-	end try
-	do shell script "rm -f " & (quoted form of modelInfoPath)
+			set thisDriveName to (name of (info for (text 1 thru -48 of thisSystemVersionPlist)))
+			if (nameOfBootedDisk is not equal to thisDriveName) then
+				set thisStartupDiskDisplay to (osDarwinMajorVersion & ":" & thisDriveName & " (" & macOSname & " " & osVersion & ")")
+				
+				if (startupDiskIsCompatibleWithMac) then
+					if (thisDriveName contains " HD") then
+						set (end of hdStartupDiskOptions) to thisStartupDiskDisplay
+					else if ((thisDriveName starts with "Install ")) then
+						set (end of installerStartupDiskOptions) to thisStartupDiskDisplay
+					else if (thisDriveName contains " Test Boot") then
+						set (end of testBootStartupDiskOptions) to thisStartupDiskDisplay
+					else
+						set (end of otherStartupDiskOptions) to thisStartupDiskDisplay
+					end if
+				else
+					set (end of incompatibleStartupDiskOptions) to thisStartupDiskDisplay
+				end if
+			end if
+		end try
+	end repeat
 	
-	set supportedOS to "OS X 10.11 “El Capitan”"
-	if (supportsMonterey) then
-		set supportedOS to "macOS 12 “Monterey”"
-	else if (supportsBigSur) then
-		set supportedOS to "macOS 11 “Big Sur”"
-	else if (supportsCatalina) then
-		set supportedOS to "macOS 10.15 “Catalina”"
-	else if (supportsHighSierra) then
-		set supportedOS to "macOS 10.13 “High Sierra”"
+	set defaultStartupDiskSelection to ""
+	
+	set startupDiskOptions to {}
+	if ((count of hdStartupDiskOptions) > 0) then
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+		set hdStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (hdStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		
+		set defaultStartupDiskSelection to (first item of hdStartupDiskOptions)
+		
+		set startupDiskOptions to hdStartupDiskOptions
 	end if
 	
-	set nameOfCurrentStartupDisk to "UNKNOWN"
-	tell application "System Events" to set nameOfCurrentStartupDisk to (name of startup disk)
+	set separatorLine to "———————————————————————"
 	
-	set shouldSetStartupDisk to false
-	set selectedStartupDiskName to "UNKNOWN"
-	set selectedStartupDiskVersion to "0"
-	
-	repeat
-		set shouldSetStartupDisk to false
-		set selectedStartupDiskName to "UNKNOWN"
-		set selectedStartupDiskVersion to "0"
+	if ((count of otherStartupDiskOptions) > 0) then
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+		set otherStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (otherStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
 		
-		set systemVersionPlists to (paragraphs of (do shell script "ls /Volumes/*/System/Library/CoreServices/SystemVersion.plist | sort"))
-		
-		set hdStartupDiskOptions to {}
-		set testBootStartupDiskOptions to {}
-		set installerStartupDiskOptions to {}
-		set otherStartupDiskOptions to {}
-		set incompatibleStartupDiskOptions to {}
-		
-		repeat with thisSystemVersionPlist in systemVersionPlists
-			try
-				set osVersion to "UNKNOWN"
-				set osDarwinMajorVersion to "00"
-				
-				try
-					tell application "System Events" to tell property list file thisSystemVersionPlist
-						try
-							set osVersion to ((value of property list item "ProductUserVisibleVersion") as string)
-						on error
-							try
-								set osVersion to ((value of property list item "ProductVersion") as string)
-							end try
-						end try
-						try
-							set osDarwinMajorVersion to (text 1 thru 2 of ((value of property list item "ProductBuildVersion") as string))
-						end try
-					end tell
-				end try
-				
-				set startupDiskIsCompatibleWithMac to true
-				
-				set macOSname to "Mac OS X"
-				considering numeric strings
-					if (osVersion ≥ "10.12") then
-						set macOSname to "macOS"
-						if ((osVersion ≥ "12.0") and (not supportsMonterey)) then
-							set startupDiskIsCompatibleWithMac to false
-						else if ((osVersion ≥ "11.0") and (not supportsBigSur)) then
-							set startupDiskIsCompatibleWithMac to false
-						else if ((osVersion ≥ "10.14") and (not supportsCatalina)) then -- Catalina supports same as Mojave
-							set startupDiskIsCompatibleWithMac to false
-						else if ((osVersion ≥ "10.13") and (not supportsHighSierra)) then
-							set startupDiskIsCompatibleWithMac to false
-						end if
-					else if (osVersion ≥ "10.8") then
-						set macOSname to "OS X"
-					end if
-				end considering
-				
-				set thisDriveName to (name of (info for (text 1 thru -48 of thisSystemVersionPlist)))
-				if (nameOfCurrentStartupDisk is not equal to thisDriveName) then
-					set thisStartupDiskDisplay to (osDarwinMajorVersion & ":" & thisDriveName & " (" & macOSname & " " & osVersion & ")")
-					
-					if (startupDiskIsCompatibleWithMac) then
-						if (thisDriveName contains " HD") then
-							set (end of hdStartupDiskOptions) to thisStartupDiskDisplay
-						else if ((thisDriveName starts with "Install ")) then
-							set (end of installerStartupDiskOptions) to thisStartupDiskDisplay
-						else if (thisDriveName contains " Test Boot") then
-							set (end of testBootStartupDiskOptions) to thisStartupDiskDisplay
-						else
-							set (end of otherStartupDiskOptions) to thisStartupDiskDisplay
-						end if
-					else
-						set (end of incompatibleStartupDiskOptions) to thisStartupDiskDisplay
-					end if
-				end if
-			end try
-		end repeat
-		
-		set defaultStartupDiskSelection to ""
-		
-		set startupDiskOptions to {}
-		if ((count of hdStartupDiskOptions) > 0) then
-			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set hdStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (hdStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
-			
-			set defaultStartupDiskSelection to (first item of hdStartupDiskOptions)
-			
-			set startupDiskOptions to hdStartupDiskOptions
-		end if
-		
-		set separatorLine to "———————————————————————"
-		
-		if ((count of otherStartupDiskOptions) > 0) then
-			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set otherStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (otherStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
-			
-			if ((count of startupDiskOptions) > 0) then
-				set startupDiskOptions to startupDiskOptions & {separatorLine} & otherStartupDiskOptions
-			else
-				set startupDiskOptions to otherStartupDiskOptions
-			end if
-		end if
-		
-		if ((count of installerStartupDiskOptions) > 0) then
-			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set installerStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (installerStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
-			
-			if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of installerStartupDiskOptions)
-			
-			if ((count of startupDiskOptions) > 0) then
-				set startupDiskOptions to startupDiskOptions & {separatorLine} & installerStartupDiskOptions
-			else
-				set startupDiskOptions to installerStartupDiskOptions
-			end if
-		end if
-		
-		if ((count of testBootStartupDiskOptions) > 0) then
-			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set testBootStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (testBootStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
-			
-			if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of testBootStartupDiskOptions)
-			
-			if ((count of startupDiskOptions) > 0) then
-				set startupDiskOptions to startupDiskOptions & {separatorLine} & testBootStartupDiskOptions
-			else
-				set startupDiskOptions to testBootStartupDiskOptions
-			end if
-		end if
-		
-		set incompatibleStartupDisksNote to ""
-		if ((incompatibleStartupDiskOptions count) > 0) then
-			set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-			set incompatibleStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (incompatibleStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
-			
-			set pluralizeDisks to ""
-			if ((incompatibleStartupDiskOptions count) > 1) then set pluralizeDisks to "s"
-			set AppleScript's text item delimiters to (linefeed & tab)
-			set incompatibleStartupDisksNote to "Excluded Incompatible Startup Disk" & pluralizeDisks & ":
-	" & (incompatibleStartupDiskOptions as string)
-		end if
-		
-		if ((count of startupDiskOptions) is equal to 0) then
-			try
-				activate
-			end try
-			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
-			end try
-			try
-				set noStartupDisksTitle to "
-No Startup Disks Detected"
-				if (incompatibleStartupDisksNote is not equal to "") then set noStartupDisksTitle to "No Compatible Startup Disks Detected"
-				
-				display alert noStartupDisksTitle message incompatibleStartupDisksNote buttons {"Quit", "Try Again"} cancel button 1 default button 2 as critical
-			on error
-				exit repeat
-			end try
+		if ((count of startupDiskOptions) > 0) then
+			set startupDiskOptions to startupDiskOptions & {separatorLine} & otherStartupDiskOptions
 		else
-			if (incompatibleStartupDisksNote is not equal to "") then set incompatibleStartupDisksNote to (incompatibleStartupDisksNote & "
+			set startupDiskOptions to otherStartupDiskOptions
+		end if
+	end if
+	
+	if ((count of installerStartupDiskOptions) > 0) then
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+		set installerStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (installerStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		
+		if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of installerStartupDiskOptions)
+		
+		if ((count of startupDiskOptions) > 0) then
+			set startupDiskOptions to startupDiskOptions & {separatorLine} & installerStartupDiskOptions
+		else
+			set startupDiskOptions to installerStartupDiskOptions
+		end if
+	end if
+	
+	if ((count of testBootStartupDiskOptions) > 0) then
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+		set testBootStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (testBootStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		
+		if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of testBootStartupDiskOptions)
+		
+		if ((count of startupDiskOptions) > 0) then
+			set startupDiskOptions to startupDiskOptions & {separatorLine} & testBootStartupDiskOptions
+		else
+			set startupDiskOptions to testBootStartupDiskOptions
+		end if
+	end if
+	
+	set incompatibleStartupDisksNote to ""
+	if ((incompatibleStartupDiskOptions count) > 0) then
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
+		set incompatibleStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (incompatibleStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		
+		set pluralizeDisks to ""
+		if ((incompatibleStartupDiskOptions count) > 1) then set pluralizeDisks to "s"
+		set AppleScript's text item delimiters to (linefeed & tab)
+		set incompatibleStartupDisksNote to "Excluded Incompatible Startup Disk" & pluralizeDisks & ":
+	" & (incompatibleStartupDiskOptions as string)
+	end if
+	
+	if ((count of startupDiskOptions) is equal to 0) then
+		try
+			activate
+		end try
+		try
+			do shell script "afplay /System/Library/Sounds/Basso.aiff"
+		end try
+		try
+			set noStartupDisksTitle to "
+No Startup Disks Detected"
+			if (incompatibleStartupDisksNote is not equal to "") then set noStartupDisksTitle to "No Compatible Startup Disks Detected"
+			
+			display alert noStartupDisksTitle message incompatibleStartupDisksNote buttons {"Quit", "Try Again"} cancel button 1 default button 2 as critical
+		on error
+			exit repeat
+		end try
+	else
+		if (incompatibleStartupDisksNote is not equal to "") then set incompatibleStartupDisksNote to (incompatibleStartupDisksNote & "
 
 ")
-			try
-				activate
-			end try
-			set selectedStartupDisk to (choose from list startupDiskOptions default items defaultStartupDiskSelection with prompt "This Mac Supports " & supportedOS & "
+		try
+			activate
+		end try
+		set chosenStartupDisk to (choose from list startupDiskOptions default items defaultStartupDiskSelection with prompt "This Mac Supports " & supportedOS & "
 
 " & incompatibleStartupDisksNote & "Select Drive to Set as Startup Disk:" OK button name "Select Startup Disk" cancel button name "Quit" with title "Startup Picker")
-			if (selectedStartupDisk is not equal to false) then
-				if ((selectedStartupDisk as string) is equal to separatorLine) then
-					-- Just display list again since user selected separator line.
-				else if ((last word of (selectedStartupDisk as string)) starts with "1") then
-					set AppleScript's text item delimiters to " ("
-					set selectedStartupDiskParts to (every text item of (selectedStartupDisk as string))
-					set selectedStartupDiskName to ((text items 1 thru -2 of selectedStartupDiskParts) as string)
-					set selectedStartupDiskVersion to (do shell script "echo " & (quoted form of ((last text item of selectedStartupDiskParts) as string)) & " | tr -dc '[:digit:].'")
-					try
-						try
-							activate
-						end try
-						display alert "
-Are you sure you want to set “" & selectedStartupDiskName & "” as the startup disk?" buttons {"Quit", "Change Selection", "Set “" & selectedStartupDiskName & "” as Startup Disk"} cancel button 2 default button 3
-						if ((button returned of result) is not equal to "Quit") then
-							set shouldSetStartupDisk to true
-						end if
-						
-						exit repeat
-					end try
-				else
+		if (chosenStartupDisk is not equal to false) then
+			if ((chosenStartupDisk as string) is equal to separatorLine) then
+				-- Just display list again since user selected separator line.
+			else if ((last word of (chosenStartupDisk as string)) starts with "1") then
+				set AppleScript's text item delimiters to " ("
+				set chosenStartupDiskParts to (every text item of (chosenStartupDisk as string))
+				set chosenStartupDiskName to ((text items 1 thru -2 of chosenStartupDiskParts) as string)
+				set chosenStartupDiskVersion to (do shell script "echo " & (quoted form of ((last text item of chosenStartupDiskParts) as string)) & " | tr -dc '[:digit:].'")
+				try
 					try
 						activate
 					end try
-					try
-						do shell script "afplay /System/Library/Sounds/Basso.aiff"
-					end try
-					try
-						display alert "
-Error Selecting Drive to Set as Startup Disk" buttons {"Quit", "Start Over"} cancel button 1 default button 2 as critical
-					on error
-						exit repeat
-					end try
-				end if
+					display alert "
+Are you sure you want to set “" & chosenStartupDiskName & "” as the startup disk?" buttons {"Quit", "Change Selection", "Set “" & chosenStartupDiskName & "” as Startup Disk"} cancel button 2 default button 3
+					if ((button returned of result) is not equal to "Quit") then
+						set shouldSetStartupDisk to true
+					end if
+					
+					exit repeat
+				end try
 			else
-				exit repeat
-			end if
-		end if
-	end repeat
-	
-	if (shouldSetStartupDisk and (selectedStartupDiskName is not equal to "UNKNOWN")) then
-		set didSetStartUpDisk to false
-		set didNotTryToSetStartupDisk to false
-		
-		considering numeric strings
-			if (selectedStartupDiskVersion ≥ "11.0") then
-				-- macOS 11 Big Sur and newer installers do not show up in Startup Disk, so do not waste time trying to set them.
-				set didNotTryToSetStartupDisk to true
-			end if
-		end considering
-		
-		if (not didNotTryToSetStartupDisk) then
-			repeat 15 times
 				try
-					tell application "System Preferences"
-						repeat 180 times -- Wait for Security pane to load
-							try
-								activate
-							end try
-							reveal (pane id "com.apple.preference.startupdisk")
-							delay 1
-							if ((name of window 1) is "Startup Disk") then exit repeat
-						end repeat
-					end tell
-					if (isCatalinaOrNewer) then
-						-- On Catalina, a SecurityAgent alert with "System Preferences wants to make changes." will appear IF an Encrypted Disk is present.
-						-- OR if Big Sur is installed on some drive, whose Sealed System Volume is unable to be mounted (ERROR -69808) and makes System Preferences think it needs to try again with admin privileges.
-						-- In this case, we can just cancel out of that alert to continue on without displaying the Encrypted Disk or the Big Sur installation in the Startup Disk options.
-						
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				end try
+				try
+					display alert "
+Error Selecting Drive to Set as Startup Disk" buttons {"Quit", "Start Over"} cancel button 1 default button 2 as critical
+				on error
+					exit repeat
+				end try
+			end if
+		else
+			exit repeat
+		end if
+	end if
+end repeat
+
+if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
+	set nameOfCurrentlySelectedStartupDisk to ""
+	try
+		set nameOfCurrentlySelectedStartupDisk to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :VolumeName' /dev/stdin <<< \"$(diskutil info -plist \"$(bless --getBoot)\")\"")))
+	end try
+	
+	set didSetStartUpDisk to (nameOfCurrentlySelectedStartupDisk is equal to chosenStartupDiskName)
+	
+	set didNotTryToSetStartupDisk to false
+	considering numeric strings
+		if (chosenStartupDiskVersion ≥ "11.0") then
+			-- macOS 11 Big Sur and newer installers do not show up in Startup Disk, so do not waste time trying to set them.
+			set didNotTryToSetStartupDisk to true
+		end if
+	end considering
+	
+	if ((not didSetStartUpDisk) and (not didNotTryToSetStartupDisk)) then
+		repeat 15 times
+			try
+				with timeout of 1 second
+					tell application systemPreferencesOrSettings to quit
+				end timeout
+			end try
+			try
+				tell application "System Preferences"
+					repeat 180 times -- Wait for Security pane to load
 						try
-							do shell script "diskutil apfs list | grep 'Yes (Locked)\\|ERROR -69808'" -- Grep will error if not found.
-							
-							try -- Mute volume before key codes so it's silent if the window isn't open
-								set volume output volume 0 with output muted
-							end try
-							try
-								set volume alert volume 0
-							end try
-							
-							set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
-							repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch since it can take a moment, but the script will stall if we go past this before it launches. 
-								delay 1
-								try
-									if (application securityAgentPath is running) then
-										exit repeat
-									end if
-								end try
-							end repeat
-							repeat 60 times
-								delay 1
-								try
-									if (application securityAgentPath is running) then
-										with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-											tell application "System Events" to tell application process "SecurityAgent"
-												set frontmost to true
-												key code 53 -- Cannot reliably get SecurityAgent windows, so if it's running (for decryption prompts) just hit escape until it quits (or until 60 seconds passes)
-											end tell
-										end timeout
-									else
-										exit repeat
-									end if
-								end try
-							end repeat
-							
-							try
-								set volume output volume 75 without output muted
-							end try
-							try
-								set volume alert volume 100
+							activate
+						end try
+						try
+							reveal (pane id "com.apple.preference.startupdisk")
+						on error
+							try -- As of macOS 13 Ventura, all of the AppleScript capability of the new System Settings apps to reveal anchors and panes no longer works, so use this URL Scheme instead which gets us directly to the same place as before.
+								do shell script "open x-apple.systempreferences:com.apple.preference.startupdisk" -- Ventura adds a new URL Scheme for the same section (com.apple.Startup-Disk-Settings.extension), but this old one still works too (oddly, this old one doesn't seem to work in Monterey, haven't tested on older though but shouldn't matter since Monterey and older should never get here).
 							end try
 						end try
+						delay 1
+						if ((name of window 1) is "Startup Disk") then exit repeat
+					end repeat
+				end tell
+				if (isCatalinaOrNewer and (not isVenturaOrNewer)) then
+					-- On Catalina, a SecurityAgent alert with "System Preferences wants to make changes." will appear IF an Encrypted Disk is present.
+					-- OR if Big Sur is installed on some drive, whose Sealed System Volume is unable to be mounted (ERROR -69808) and makes System Preferences think it needs to try again with admin privileges.
+					-- In this case, we can just cancel out of that alert to continue on without displaying the Encrypted Disk or the Big Sur installation in the Startup Disk options.
+					-- BUT, on Ventura the disk must instead be manually unlocked before being able to choose it as a startup disk, so no prompt will appear automatically.
+					
+					try
+						do shell script "diskutil apfs list | grep 'Yes (Locked)\\|ERROR -69808'" -- Grep will error if not found.
+						
+						try -- Mute volume before key codes so it's silent if the window isn't open
+							set volume output volume 0 with output muted
+						end try
+						try
+							set volume alert volume 0
+						end try
+						
+						set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
+						repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch since it can take a moment, but the script will stall if we go past this before it launches.
+							delay 1
+							try
+								if (application securityAgentPath is running) then
+									exit repeat
+								end if
+							end try
+						end repeat
+						repeat 60 times
+							delay 1
+							try
+								if (application securityAgentPath is running) then
+									with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
+										tell application "System Events" to tell application process "SecurityAgent"
+											set frontmost to true
+											key code 53 -- Cannot reliably get SecurityAgent windows, so if it's running (for decryption prompts) just hit escape until it quits (or until 60 seconds passes)
+										end tell
+									end timeout
+								else
+									exit repeat
+								end if
+							end try
+						end repeat
+						
+						try
+							set volume output volume 75 without output muted
+						end try
+						try
+							set volume alert volume 100
+						end try
+					end try
+				end if
+				
+				set numberOfStartupDisks to 0
+				set currentlySelectedStartupDiskValue to ""
+				set leftOrRightArrowKeyCode to 124 -- RIGHT ARROW Key
+				if (isVenturaOrNewer) then
+					tell application "System Events" to tell application process systemPreferencesOrSettings
+						repeat 30 times -- Wait for startup disk list to populate
+							delay 1
+							try
+								set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
+								if (numberOfStartupDisks is not 0) then
+									delay 3 -- Wait a few more seconds for disks to load since it's possible that not all startup disks are actually loaded yet.
+									set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
+									
+									set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup) -- Check if the internal drive is already set as the Startup Disk.
+									if (currentlySelectedStartupDiskValue ends with ("“" & chosenStartupDiskName & "”.")) then
+										set didSetStartUpDisk to true
+									else
+										if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the internal disk is to the right or left of that.
+											set foundSelectedStartupDisk to false
+											repeat with thisStartupDiskGroup in (groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
+												set thisStartDiskName to (value of static text 1 of thisStartupDiskGroup)
+												if (currentlySelectedStartupDiskValue ends with ("“" & thisStartDiskName & "”.")) then
+													exit repeat -- If we found the selected startup disk and have not found the internal disk yet, they means it must be to the RIGHT, which leftOrRightArrowKeyCode is already set to.
+												else if (thisStartDiskName is equal to selectedStartupDiskName) then
+													-- If we're at the internal disk and we HAVE NOT already passed the selected disk (since we haven't exited to loop yet), we need to move LEFT from the selected disk.
+													set leftOrRightArrowKeyCode to 123 -- LEFT ARROW Key
+													exit repeat
+												end if
+											end repeat
+										end if
+									end if
+									exit repeat
+								end if
+							end try
+						end repeat
+					end tell
+					
+					if (not didSetStartUpDisk) then -- If it's already selected, no need to unlock and re-select it.
+						set didAuthenticateSecurityAgent to false
+						
+						repeat numberOfStartupDisks times -- The loop should be exited before even getting through numberOfStartupDisks, but want some limit so we don't get stuck in an infinite loop if something goes very wrong.
+							tell application "System Events" to tell application process systemPreferencesOrSettings
+								-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
+								set frontmost to true
+								set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								set focused of (scroll area 1 of startupDisksSelectionGroup) to true
+								set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
+								repeat 5 times -- Click up to 5 times until the selected startup disk changed (in case some clicks get lost)
+									set frontmost to true
+									key code leftOrRightArrowKeyCode
+									delay 0.25
+									if (currentlySelectedStartupDiskValue is not equal to (value of static text 2 of startupDisksSelectionGroup)) then exit repeat
+								end repeat
+							end tell
+							
+							if (not didAuthenticateSecurityAgent) then
+								set didTryToAuthenticateSecurityAgent to false
+								set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
+								repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
+									delay 1
+									try
+										if (application securityAgentPath is running) then
+											tell application "System Events" to tell application process "SecurityAgent"
+												if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
+													repeat with thisSecurityAgentButton in (buttons of window 1)
+														if (((title of thisSecurityAgentButton) is equal to "Unlock") or ((title of thisSecurityAgentButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
+															set value of (text field 1 of window 1) to adminUsername
+															set value of (text field 2 of window 1) to adminPassword
+															click thisSecurityAgentButton
+															set didTryToAuthenticateSecurityAgent to true
+															exit repeat
+														end if
+													end repeat
+												end if
+												exit repeat
+											end tell
+										end if
+									end try
+								end repeat
+								if (didTryToAuthenticateSecurityAgent) then
+									repeat 10 times -- Wait up to 10 seconds for SecurityAgent to exit or close the admin auth prompt to be sure the authentication was successful.
+										delay 1
+										try
+											if (application securityAgentPath is running) then
+												tell application "System Events" to tell application process "SecurityAgent"
+													if ((number of windows) is 0) then
+														set didAuthenticateSecurityAgent to true
+														exit repeat
+													end if
+												end tell
+											else
+												set didAuthenticateSecurityAgent to true
+												exit repeat
+											end if
+										end try
+									end repeat
+								end if
+							end if
+							
+							if (didAuthenticateSecurityAgent) then
+								tell application "System Events" to tell application process systemPreferencesOrSettings
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+									if ((enabled of button 1 of startupDisksSelectionGroup) and ((value of static text 2 of startupDisksSelectionGroup) ends with ("“" & chosenStartupDiskName & "”."))) then
+										set didSetStartUpDisk to true
+										exit repeat
+									end if
+								end tell
+							else
+								exit repeat -- If did not authenticate, better to exit this loop and start all over with System Settings being quit and re-launched instead of continuing to arrow through the Startup Disks.
+							end if
+						end repeat
 					end if
-					tell application "System Events" to tell application process "System Preferences"
+				else
+					tell application "System Events" to tell application process systemPreferencesOrSettings
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
 								if (isBigSurOrNewer) then
-									if ((number of groups of list 1 of scroll area 1 of window 1) is not 0) then exit repeat
+									set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of window 1)
+									if (numberOfStartupDisks is not 0) then
+										delay 3 -- Wait a few more seconds for disks to load since it's possible that not all startup disks are actually loaded yet.
+										set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of window 1)
+										
+										set currentlySelectedStartupDiskValue to (value of static text 1 of window 1)
+										if ((value of static text 1 of window 1) ends with ("“" & chosenStartupDiskName & ".”")) then -- Check if the internal drive is already set as the Startup Disk.
+											set didSetStartUpDisk to true
+										else
+											if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the internal disk is to the right or left of that.
+												set foundSelectedStartupDisk to false
+												repeat with thisStartupDiskGroup in (groups of list 1 of scroll area 1 of window 1)
+													set thisStartDiskName to (value of static text 1 of thisStartupDiskGroup)
+													if (currentlySelectedStartupDiskValue ends with ("“" & thisStartDiskName & ".”")) then
+														exit repeat -- If we found the selected startup disk and have not found the internal disk yet, they means it must be to the RIGHT, which leftOrRightArrowKeyCode is already set to.
+													else if (thisStartDiskName is equal to selectedStartupDiskName) then
+														-- If we're at the internal disk and we HAVE NOT already passed the selected disk (since we haven't exited to loop yet), we need to move LEFT from the selected disk.
+														set leftOrRightArrowKeyCode to 123 -- LEFT ARROW Key
+														exit repeat
+													end if
+												end repeat
+											end if
+										end if
+										
+										exit repeat
+									end if
 								else
-									if ((number of (radio buttons of (radio group 1 of scroll area 1 of group 1 of splitter group 1 of window 1))) is not 0) then exit repeat
+									if ((number of radio buttons of radio group 1 of scroll area 1 of group 1 of splitter group 1 of window 1) is not 0) then
+										delay 3 -- Wait a few more seconds for disks to load since it's possible that not all startup disks are actually loaded yet.
+										set didSetStartUpDisk to ((value of static text 2 of group 1 of splitter group 1 of window 1) ends with ("“" & chosenStartupDiskName & ".”")) -- Check if the internal drive is already set as the Startup Disk.
+										
+										exit repeat
+									end if
 								end if
 							end try
 						end repeat
-						repeat with thisButton in (buttons of window 1)
-							if (((name of thisButton) is equal to "Click the lock to make changes.") or ((name of thisButton) is equal to "Authenticating…")) then
-								set frontmost to true
-								click thisButton
-								
-								repeat 60 times -- Wait for password prompt
-									delay 0.5
+						
+						if (not didSetStartUpDisk) then -- If it's already selected, no need to unlock and re-select it.
+							repeat with thisButton in (buttons of window 1)
+								if (((name of thisButton) is equal to "Click the lock to make changes.") or ((name of thisButton) is equal to "Authenticating…")) then
 									set frontmost to true
-									if ((number of sheets of window (number of windows)) is equal to 1) then exit repeat
-									delay 0.5
-								end repeat
-								
-								if ((number of sheets of window (number of windows)) is equal to 1) then
-									set frontmost to true
-									set value of (text field 2 of sheet 1 of window (number of windows)) to adminUsername
+									click thisButton
 									
-									set frontmost to true
-									set focused of (text field 1 of sheet 1 of window (number of windows)) to true -- Seems to not accept the password if the field is never focused.
-									set frontmost to true
-									set value of (text field 1 of sheet 1 of window (number of windows)) to adminPassword
-									
-									repeat with thisSheetButton in (buttons of sheet 1 of window (number of windows))
-										if ((name of thisSheetButton) is equal to "Unlock") then
-											set frontmost to true
-											click thisSheetButton
-										end if
-									end repeat
-									
-									repeat 10 times -- Wait for password prompt to close
+									repeat 60 times -- Wait for password prompt
 										delay 0.5
-										if ((number of sheets of window (number of windows)) is equal to 0) then exit repeat
+										set frontmost to true
+										if ((number of sheets of window (number of windows)) is equal to 1) then exit repeat
 										delay 0.5
 									end repeat
 									
 									if ((number of sheets of window (number of windows)) is equal to 1) then
 										set frontmost to true
-										key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
-									end if
-								end if
-								
-								exit repeat
-							else if ((name of thisButton) is equal to "Click the lock to prevent further changes.") then
-								exit repeat
-							end if
-						end repeat
-						
-						repeat with thisButton in (buttons of window 1)
-							if ((name of thisButton) is equal to "Click the lock to prevent further changes.") then
-								if (isBigSurOrNewer) then
-									repeat (number of groups of list 1 of scroll area 1 of window 1) times
-										-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
-										set frontmost to true
-										set focused of (scroll area 1 of window 1) to true
-										set frontmost to true
-										key code 124 -- Press RIGHT ARROW Key
-										
-										if (value of static text 1 of window 1) ends with ("“" & selectedStartupDiskName & ".”") then
-											set didSetStartUpDisk to true
-											
-											exit repeat
-										end if
-										
-										delay 0.5
-									end repeat
-								else
-									repeat with thisStartUpDiskRadioButton in (radio buttons of (radio group 1 of scroll area 1 of group 1 of splitter group 1 of window 1))
-										if ((name of thisStartUpDiskRadioButton) is equal to selectedStartupDiskName) then
+										if (isMontereyOrNewer) then
+											-- This sheet has been redesigned on Monterey and the username is now "text field 1"
+											set value of (text field 1 of sheet 1 of window (number of windows)) to adminUsername
+											-- For some reason this sheet on Monterey will only show that it has 1 text field until the 2nd password text field has been focused, so focus it by tabbing.
 											set frontmost to true
-											click thisStartUpDiskRadioButton
+											keystroke tab
+											set value of (text field 2 of sheet 1 of window (number of windows)) to adminPassword
+										else
+											set value of (text field 2 of sheet 1 of window (number of windows)) to adminUsername
 											
-											set didSetStartUpDisk to true
-											
-											exit repeat
+											set frontmost to true
+											set focused of (text field 1 of sheet 1 of window (number of windows)) to true -- Seems to not accept the password if the field is never focused.
+											set frontmost to true
+											set value of (text field 1 of sheet 1 of window (number of windows)) to adminPassword
 										end if
-									end repeat
+										repeat with thisSheetButton in (buttons of sheet 1 of window (number of windows))
+											if ((name of thisSheetButton) is equal to "Unlock") then
+												set frontmost to true
+												click thisSheetButton
+											end if
+										end repeat
+										
+										repeat 10 times -- Wait for password prompt to close
+											delay 0.5
+											if ((number of sheets of window (number of windows)) is equal to 0) then exit repeat
+											delay 0.5
+										end repeat
+										
+										if ((number of sheets of window (number of windows)) is equal to 1) then
+											set frontmost to true
+											key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
+										end if
+									end if
+									
+									exit repeat
+								else if ((name of thisButton) is equal to "Click the lock to prevent further changes.") then
+									exit repeat
 								end if
-								
+							end repeat
+							
+							repeat with thisButton in (buttons of window 1)
+								if ((name of thisButton) is equal to "Click the lock to prevent further changes.") then
+									if (isBigSurOrNewer) then
+										repeat numberOfStartupDisks times
+											-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
+											set frontmost to true
+											set focused of (scroll area 1 of window 1) to true
+											set currentlySelectedStartupDiskValue to (value of static text 1 of window 1)
+											repeat 5 times -- Click up to 5 times until the selected startup disk changed (in case some clicks get lost)
+												set frontmost to true
+												key code leftOrRightArrowKeyCode
+												delay 0.25
+												if (currentlySelectedStartupDiskValue is not equal to (value of static text 1 of window 1)) then exit repeat
+											end repeat
+											
+											if ((value of static text 1 of window 1) ends with ("“" & chosenStartupDiskName & ".”")) then
+												set didSetStartUpDisk to true
+												exit repeat
+											end if
+										end repeat
+									else
+										repeat with thisStartUpDiskRadioButton in (radio buttons of radio group 1 of scroll area 1 of group 1 of splitter group 1 of window 1)
+											if ((name of thisStartUpDiskRadioButton) is equal to chosenStartupDiskName) then
+												set frontmost to true
+												click thisStartUpDiskRadioButton
+												delay 0.25
+												if ((value of static text 2 of group 1 of splitter group 1 of window 1) ends with ("“" & chosenStartupDiskName & ".”")) then -- If this text didn't get set, then something went wrong and we need to try again.
+													set didSetStartUpDisk to true
+													exit repeat
+												end if
+											end if
+										end repeat
+									end if
+									
+									exit repeat
+								end if
+							end repeat
+						end if
+					end tell
+				end if
+				if (didSetStartUpDisk) then
+					-- If didSetStartUpDisk, double-check by getting the name of the disk specified by "bless --getBoot" which seems to get updated shortly after System Preferences/Settings has QUIT.
+					try
+						with timeout of 1 second
+							tell application systemPreferencesOrSettings to quit
+						end timeout
+					end try
+					
+					set didVerifyStartUpDisk to false
+					repeat 15 times
+						try
+							delay 1
+							if (chosenStartupDiskName is equal to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :VolumeName' /dev/stdin <<< \"$(diskutil info -plist \"$(bless --getBoot)\")\"")))) then
+								set didVerifyStartUpDisk to true
 								exit repeat
 							end if
-						end repeat
-					end tell
+						end try
+					end repeat
 					
-					exit repeat -- Big Sur Installers are not listed for some reason, so exit if if didSetStartUpDisk is false but we checked them all without erroring. This repeat is just to try again if an error occurs.
-				end try
-			end repeat
-			
-			try
-				with timeout of 1 second
-					tell application "System Preferences" to quit
-				end timeout
-			end try
-		end if
-		
-		try
-			try
-				if (didSetStartUpDisk) then
-					do shell script "afplay /System/Library/Sounds/Glass.aiff"
-				else if (didNotTryToSetStartupDisk) then
-					do shell script "afplay /System/Library/Sounds/Pop.aiff"
-				else
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+					if (didVerifyStartUpDisk) then
+						exit repeat
+					else
+						set didSetStartUpDisk to false -- If the startup disk name was not verified by "bless --getBoot" after 15 seconds, try again.
+					end if
 				end if
 			end try
-			
+		end repeat
+		try
+			with timeout of 1 second
+				tell application systemPreferencesOrSettings to quit
+			end timeout
+		end try
+	end if
+	
+	try
+		try
+			if (didSetStartUpDisk) then
+				do shell script "afplay /System/Library/Sounds/Glass.aiff"
+			else if (didNotTryToSetStartupDisk) then
+				do shell script "afplay /System/Library/Sounds/Pop.aiff"
+			else
+				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+			end if
+		end try
+		
+		try
+			activate
+		end try
+		
+		if (didSetStartUpDisk) then
 			try
-				activate
+				-- Make sure this Mac won't just boot into Startup Manager if that has been set previously.
+				do shell script "nvram -d manufacturing-enter-picker" user name adminUsername password adminPassword with administrator privileges
 			end try
 			
-			if (didSetStartUpDisk) then
-				try
-					-- Make sure this Mac won't just boot into Startup Manager if that has been set previously.
-					do shell script "nvram -d manufacturing-enter-picker" user name adminUsername password adminPassword with administrator privileges
-				end try
-				
-				display alert "The startup disk has been set to “" & selectedStartupDiskName & "”.
+			display alert "The startup disk has been set to “" & chosenStartupDiskName & "”.
 
-Do you want to reboot into “" & selectedStartupDiskName & "” right now?" message "
-This Mac will automatically reboot into “" & selectedStartupDiskName & "” in 30 seconds…" buttons {"Don't Reboot", "Reboot Into “" & selectedStartupDiskName & "” Now"} cancel button 1 default button 2 giving up after 30
-			else
-				display alert "Unable to set the startup disk to “" & selectedStartupDiskName & "”.
+Do you want to reboot into “" & chosenStartupDiskName & "” right now?" message "
+This Mac will automatically reboot into “" & chosenStartupDiskName & "” in 30 seconds…" buttons {"Don't Reboot", "Reboot Into “" & chosenStartupDiskName & "” Now"} cancel button 1 default button 2 giving up after 30
+		else
+			display alert "Unable to set the startup disk to “" & chosenStartupDiskName & "”.
 
-Instead, this computer can be rebooted into Startup Manager for you to be able to choose to boot into “" & selectedStartupDiskName & "” from there.
+Instead, this computer can be rebooted into Startup Manager for you to be able to choose to boot into “" & chosenStartupDiskName & "” from there.
 
 Do you want to reboot into Startup Manager right now?" message "
 You will not need to hold the Option key to boot into Startup Manager, it will be done automatically if you choose to reboot into Startup Manager now.
 
 This Mac will automatically reboot into Startup Manager in 30 seconds…" buttons {"Don't Reboot", "Reboot Into Startup Manager Now"} cancel button 1 default button 2 giving up after 30
-				
-				try
-					-- https://osxdaily.com/2021/02/26/make-intel-mac-boot-startup-manager/
-					do shell script "nvram manufacturing-enter-picker=true" user name adminUsername password adminPassword with administrator privileges
-				end try
-			end if
 			
-			-- Quit all apps before rebooting
 			try
-				tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-				if ((count of listOfRunningApps) > 0) then
-					try
-						repeat with thisAppName in listOfRunningApps
+				-- https://osxdaily.com/2021/02/26/make-intel-mac-boot-startup-manager/
+				do shell script "nvram manufacturing-enter-picker=true" user name adminUsername password adminPassword with administrator privileges
+			end try
+		end if
+		
+		-- Quit all apps before rebooting
+		try
+			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
+			if ((count of listOfRunningApps) > 0) then
+				try
+					repeat with thisAppName in listOfRunningApps
+						try
+							if (application thisAppName is running) then
+								with timeout of 1 second
+									tell application thisAppName to quit
+								end timeout
+							end if
+						end try
+					end repeat
+				end try
+				delay 3
+				try
+					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
+					repeat with thisAppName in listOfRunningApps
+						repeat 2 times
 							try
-								if (application thisAppName is running) then
-									with timeout of 1 second
-										tell application thisAppName to quit
-									end timeout
-								end if
+								do shell script "pkill -f " & (quoted form of thisAppName)
 							end try
 						end repeat
-					end try
-					delay 3
-					try
-						tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-						repeat with thisAppName in listOfRunningApps
-							repeat 2 times
-								try
-									do shell script "pkill -f " & (quoted form of thisAppName)
-								end try
-							end repeat
-						end repeat
-					end try
-				end if
-			end try
-			
-			tell application "System Events" to restart with state saving preference
+					end repeat
+				end try
+			end if
 		end try
-	end if
-else
-	try
-		activate
+		
+		tell application "System Events" to restart with state saving preference
 	end try
-	display alert "Cannot Run “" & (name of me) & "”" message "“" & (name of me) & "” must be installed at
-“/Applications/” and run from the “Tester” or “restorer” user accounts." buttons {"Quit"} default button 1 as critical
 end if

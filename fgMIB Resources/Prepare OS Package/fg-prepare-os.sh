@@ -29,21 +29,22 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2022.5.13-1'
+readonly SCRIPT_VERSION='2022.10.26-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
 DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc.
 readonly DARWIN_MAJOR_VERSION
 
+TMPDIR="$([[ -d "${TMPDIR}" && -w "${TMPDIR}" ]] && echo "${TMPDIR%/}/" || echo '/private/tmp/')" # Make sure "TMPDIR" is always set and that it always has a trailing slash for consistency regardless of the current environment.
+
 critical_error_occurred=false
 
 if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone' || -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]] && \
-   [[ "$3" == '/' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant.
-	
+	[[ "$3" == '/' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant.
+
 	log_path='/Users/Shared/Build Info/Prepare OS Log.txt'
-	if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]]; then # The log file will have already been started when run on boot via LaunchDaemon, so we do not want to delete it.
-		rm -rf '/Users/Shared/Build Info' # "Build Info" folder should not exist yet, but delete it to be sure.
+	if [[ ! -d '/Users/Shared/Build Info' ]]; then # "Build Info" folder should already exist from the install log, but double-check and create it if needed.
 		mkdir -p '/Users/Shared/Build Info'
 		chown -R 502:20 '/Users/Shared/Build Info' # Want standard auto-login user to own the "Build Info" folder, but keep log owned by root.
 	fi
@@ -61,7 +62,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		# ANNOUNCE STARTING CUSTOMIZATION (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
 		# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.
 		# Do not announce if started via LaunchDaemon since that would have already announced this same thing earlier.
-		
+
 		for (( wait_to_play_seconds = 0; wait_to_play_seconds < 60; wait_to_play_seconds ++ )); do
 			osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
 			if afplay "$2/Announcements/fg-starting-customizations.aiff" &> /dev/null; then
@@ -82,7 +83,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		rm -rf "${error_occurred_resources_install_path}"
 		ditto "$2/fg-error-occurred" "${error_occurred_resources_install_path}"
 		chmod +x "${error_occurred_resources_install_path}/fg-error-occurred.sh"
-		
+
 		PlistBuddy \
 			-c 'Add :Label string org.freegeek.fg-error-occurred' \
 			-c "Add :Program string ${error_occurred_resources_install_path}/fg-error-occurred.sh" \
@@ -110,14 +111,32 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 	fi
 
 
-	if [[ -n "$1" && -f "$1" ]]; then
+	if [[ -f '/private/var/db/dslocal_orig.cpgz' || -n "$(find '/private/var/db' -type f -name 'PreviousSystem*' -maxdepth 1 -print -quit 2> /dev/null)" ]]; then
+
+		# DELETE FILES LEFTOVER FROM THE "UPGRADE/RE-INSTALL TRICK"
+		# Search for "UPGRADE/RE-INSTALL TRICK" in the "fg-install-os" script for more information about that process.
+		# Oddly, it seems on Apple Silicon that just "PreviousSystemVersion.plist" will exist while on Intel "PreviousSystemVersion.plist" WILL NOT exist
+		# and "PreviousSystemFiles.plist" and "PreviousSystemLogs.plist" will exist (both of which don't exist on Apple Silicon).
+		# I'm not sure if that difference is because of using "startosinstall" on Intel vs manually running the
+		# "InstallAssistant" app on Apple Silicon or if it is because of platform differences.
+		# Also, "dslocal_orig.cpgz" will always exist on both Apple Silicon and Intel.
+		# So, no matter which ones of these files exist, delete all of them since they are not useful and just leftovers
+		# and having them not exist makes the system closer to an actual "clean install" state like we are intending.
+
+		write_to_log 'Deleting Leftover Files From Upgrade/Re-Install Trick'
+
+		rm -f '/private/var/db/dslocal_orig.cpgz' '/private/var/db/PreviousSystem'*
+	fi
+
+
+	if [[ -f "$1" ]]; then
 
 		# DELETE PACKAGE PARENT FOLDER IF IN "startosinstall --installpackage" LOCATION
 		# Do this before creating reset Snapshot so it does not have to be dealt with in fg-snapshot-reset.
 
 		if [[ "$1" == '/System/Volumes/Data/.com.apple.templatemigration.boot-install/'* ]]; then
 			# This is where macOS 11 Big Sur will store the package when included via "installpackage". MAKE SURE TO CHECK THIS IS THE SAME LOCATION FOR FUTURE VERSIONS.
-			
+
 			write_to_log 'Deleting Package Parent Folder (com.apple.templatemigration.boot-install)'
 
 			rm -rf '/System/Volumes/Data/.com.apple.templatemigration.boot-install/'
@@ -127,7 +146,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			write_to_log 'Deleting Package Parent Folder (com.apple.installer)'
 
 			rm -rf '/Library/Application Support/com.apple.installer/'
-		elif [[ "$1" != '/Users/Shared/fg-install-packages/'* ]]; then
+		elif [[ "$1" != '/Users/Shared/fg-customization-resources/'* ]]; then
 			# Log a note if installed via "startosinstall --installpackage" and package is in a different location.
 
 			write_to_log 'NOTE: New Location for Package Parent Folder'
@@ -136,15 +155,16 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 
 	if ! $critical_error_occurred; then
-		
+
 		# INSTALL GLOBAL APPS
 		# Do this before creating reset Snapshot since we want the customer to have these Apps pre-installed.
-		
+
 		for this_global_app_installer in "$2/Global/Apps/all-versions/"*'.'* "$2/Global/Apps/darwin-${DARWIN_MAJOR_VERSION}/"*'.'*; do
 			if [[ -f "${this_global_app_installer}" ]]; then
-				if [[ "${this_global_app_installer}" == *'.zip' ]]; then
-					this_global_app_name="$(basename "${this_global_app_installer}" '.zip')"
+				this_global_app_name="${this_global_app_installer##*/}"
+				this_global_app_name="${this_global_app_name%.*}"
 
+				if [[ "${this_global_app_installer}" == *'.zip' ]]; then
 					write_to_log "Installing Global App \"${this_global_app_name}\""
 
 					rm -rf "/Applications/${this_global_app_name}.app" # Delete app if it already exist from previous customization before reset.
@@ -155,14 +175,15 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 						chown -R 501:20 "/Applications/${this_global_app_name}.app" # Make sure the customer user account ends up owning the pre-installed apps.
 					fi
 				elif [[ "${this_global_app_installer}" == *'.dmg' ]]; then
-					#write_to_log "Mounting \"$(basename "${this_global_app_installer}" '.dmg')\" Disk Image for Global Apps"
+					#write_to_log "Mounting \"${this_global_app_name}\" Disk Image for Global Apps"
 
-					dmg_mount_path="$(hdiutil attach "${this_global_app_installer}" -nobrowse -readonly -plist 2> /dev/null | awk -F '<string>|</string>' '/<string>\/Volumes\// { print $2; exit }')"
+					dmg_mount_path="$(hdiutil attach "${this_global_app_installer}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
 
 					if [[ -d "${dmg_mount_path}" ]]; then
 						for this_dmg_app in "${dmg_mount_path}/"*'.app'; do
 							if [[ -d "${this_dmg_app}" ]]; then
-								this_global_app_name="$(basename "${this_dmg_app}" '.app')"
+								this_global_app_name="${this_dmg_app##*/}"
+								this_global_app_name="${this_global_app_name%.*}"
 
 								write_to_log "Installing Global App \"${this_global_app_name}\""
 
@@ -177,7 +198,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 							fi
 						done
 
-						#write_to_log "Unmounting \"$(basename "${this_global_app_installer}" '.dmg')\" Disk Image for Global Apps"
+						#write_to_log "Unmounting \"${this_global_app_name}\" Disk Image for Global Apps"
 						hdiutil detach "${dmg_mount_path}" &> /dev/null
 					fi
 				else
@@ -203,7 +224,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			rm -rf "${snapshot_reset_resources_install_path}"
 			ditto "$2/fg-snapshot-reset" "${snapshot_reset_resources_install_path}"
 			chmod +x "${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh"
-			
+
 			PlistBuddy \
 				-c 'Add :Label string org.freegeek.fg-snapshot-reset' \
 				-c "Add :Program string ${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh" \
@@ -211,14 +232,14 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 				-c 'Add :StandardOutPath string /dev/null' \
 				-c 'Add :StandardErrorPath string /dev/null' \
 				'/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' &> /dev/null
-			
+
 			if [[ ! -f "${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh" || ! -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' ]]; then
 				write_to_log 'ERROR: Failed to Setup Reset Snapshot LaunchDaemon'
 				critical_error_occurred=true
 			fi
 
 			if ! $critical_error_occurred; then
-			
+
 				if [[ "$(tmutil listlocalsnapshots /)" == *'com.apple.TimeMachine'* ]]; then
 					# Make sure there are not previous Snapshots (which should not happen since this is a clean install, just being thorough).
 					write_to_log 'Deleting Previous Snapshots'
@@ -229,7 +250,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 				if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
 					# Network Time will already have been synced and turned off if started via LaunchDaemon since drastic time manipulation during the install can cause an indefinite hang.
 					# So, only make sure time is synced here if running via "startosinstall --installpackage" which does not have an issue with drastic time manipulation during this package installation.
-					
+
 					write_to_log 'Turning On Network Time Before Creating Reset Snapshot'
 
 					systemsetup -setusingnetworktime on &> /dev/null
@@ -244,7 +265,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 					systemsetup -setusingnetworktime off &> /dev/null
 					systemsetup -settime '00:00:00' &> /dev/null
-					
+
 					# Once, the time did not get set to midnight properly, so keep setting it in a loop for 10 seconds and confirm it was set to be sure.
 					for (( set_time_to_midnight_attempt = 0; set_time_to_midnight_attempt < 10; set_time_to_midnight_attempt ++ )); do
 						if [[ "$(date '+%T')" != '00:0'* ]]; then
@@ -264,15 +285,15 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 					# See comments at the top of "fg-snapshot-preserver" for more information about this and another solution that is used to prevent the reset Snapshot from being deleted by macOS.
 				fi
 
-				if [[ -f '/Users/Shared/fg-install-packages/actual-snapshot-time.txt' ]]; then
+				if [[ -f '/Users/Shared/fg-customization-resources/actual-snapshot-time.txt' ]]; then
 					# If time was already set back by fg-install-packages, then save that actual time for Snapshot reset, and set back to it after reset Snapshot is created.
-					actual_snapshot_time="$(cat /Users/Shared/fg-install-packages/actual-snapshot-time.txt)"
+					actual_snapshot_time="$(cat /Users/Shared/fg-customization-resources/actual-snapshot-time.txt)"
 				fi
-				
+
 				echo "${actual_snapshot_time}" > "${snapshot_reset_resources_install_path}/actual-snapshot-time.txt" # Save actual_snapshot_time to be used during Snapshot reset.
 
 				actual_snapshot_date="$(date '+%F')" # Must load this "date" command (used to validate the reset Snapshot) before turning back on Network Time in case the date is not synced when creating the Snapshot.
-				
+
 				write_to_log 'Creating Reset Snapshot'
 
 				tmutil localsnapshot &> /dev/null # Create the reset Snapshot.
@@ -295,67 +316,24 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 				else
 					echo "${reset_snapshot_name}" > '/Users/Shared/.fgResetSnapshotLost'
 					echo "LOST REASON: Snapshot Name != com.apple.TimeMachine.${actual_snapshot_date}-00*" >> '/Users/Shared/.fgResetSnapshotLost'
-					
+
 					tmutil deletelocalsnapshots / &> /dev/null
-					
+
 					# Still setup fg-snapshot-preserver even if the Snapshot creation failed so that it can be used to display an error instead of preserving the Snapshot.
 				fi
 
-				if [[ ! -f '/Users/Shared/.fgResetSnapshotCreated' ]]; then
+				rm -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' # Only want this to launch on first boot after restoring from the reset Snapshot, never another time.
+
+				if [[ ! -f '/Users/Shared/.fgResetSnapshotCreated' || -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' ]]; then
 					write_to_log 'ERROR: Failed to Create Reset Snapshot'
 					critical_error_occurred=true
 				fi
 
-				if ! $critical_error_occurred; then
-
-					write_to_log 'Setting Up Snapshot Preserver LaunchDaemon'
-
-					# Copy fg-snapshot-preserver out of fg-snapshot-reset resources to keep it around and start is running with a LaunchDaemon.
-					snapshot_preserver_resources_install_path='/Users/Shared/.fg-snapshot-preserver' # NOTICE: INVISIBLE folder.
-					mkdir -p "${snapshot_preserver_resources_install_path}"
-					mv "${snapshot_reset_resources_install_path}/fg-snapshot-preserver.sh" "${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh"
-					mv "${snapshot_reset_resources_install_path}/Resources" "${snapshot_preserver_resources_install_path}/Resources"
-					chmod +x "${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh"
-
-					# Setting StartCalendarInterval to run ever 5th minute instead of setting a StartInterval of 300 because want to be sure that fg-snapshot-preserver is always run at the top of every hour,
-					# since 00:00:00 is the most important and StartInterval cannot guarantee that run time. Also want to run at the top of every other hour in case a network time sync changed the time resulting in the date needing to be updated at some time other than midnight.
-					# And want to run every 5 minutes just to be extra safe and to allow for prompt manual time syncs if a previous manual sync failed or was blocked. Also want to have a more promptly logged record of when a reset Snapshot is lost, if that happens.
-					# Also, if the reset Snapshot does somehow get lost, this will be used to launch "Snapshot Helper" which will display an alert about this critical error, which we want to be opened promptly and re-opened often if closed.
-					# I tried using both StartCalendarInterval and StartInterval which seemed to work well at first (the StartCalendarInterval would actually reset the interval that StartInterval would run on which would make it pretty precise after the first hour had passed),
-					# but extended testing showed that the StartInterval would eventually take precedence over StartCalendarInterval and it would not run right at 00:00:00 and the reset Snapshot could get deleted by macOS.
-					# So, I switched to only using StartCalendarInterval which then made the actual issue apparent. The actual issue was that when the date was set to the past, the StartCalendarInterval would stop being processed until
-					# the date and time caught back up to the next scheduled run before the date was set to the past, and that would only leave the StartInterval running since it was not dependent on a specifically scheduled run time.
-					# To workaround this issue, the LaunchDaemon will now reboot the computer whenever the date is manipulated to make sure macOS runs the LaunchDaemon on the intended StartCalendarInterval.
-					# See REBOOT AFTER DATE IS SET BACK IN TIME comments in fg-snapshot-preserver for more information about this.
-					# This means that StartCalendarInterval and StartInterval could actually be used together, but now there is no real benefit to switching back to that over the existing StartCalendarInterval setup.
-					echo "
-Add :Label string org.freegeek.fg-snapshot-preserver
-Add :Program string ${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh
-Add :RunAtLoad bool true
-Add :StandardOutPath string /dev/null
-Add :StandardErrorPath string /dev/null
-Add :StartCalendarInterval array
-$(for (( start_calendar_interval_minute = 55; start_calendar_interval_minute >= 0; start_calendar_interval_minute -= 5 )); do echo "Add :StartCalendarInterval:0 dict
-Add :StartCalendarInterval:0:Minute integer ${start_calendar_interval_minute}"; done)
-Save
-" | PlistBuddy '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist' &> /dev/null
-
-					if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]]; then
-						# Do not need to load right away if started via LaunchDaemon since we will restart.
-						launchctl load -w '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist'
-					fi
-					
-					rm -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' # Only want this to launch on first boot after restoring from the reset Snapshot, never another time.
-					rm -rf "${snapshot_reset_resources_install_path}" # Delete remaining fg-snapshot-reset resources since they are only needed on first boot after restoring from the reset Snapshot.
-
-					if [[ ! -f "${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh" || ! -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist' || -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' || -d "${snapshot_reset_resources_install_path}" ]]; then
-						write_to_log 'ERROR: Failed to Setup Snapshot Preserver LaunchDaemon'
-						critical_error_occurred=true
-					fi
-				fi
+				# NOTE: Previously would create fg-snapshot-preserver LaunchDaemon here, but now creating during User Specific Tasks setup so that the LaunchDeamon can be properly associated with the "Free Geek Snapshot Helper"
+				# app when on macOS 13 Ventura (via the new "AssociatedBundleIdentifiers" key), which requires the app be installed before the LaunchDaemon is created for the app name to be displayed properly in the list of login items.
 			fi
 		else
-		
+
 			# FIX EXPIRED LET'S ENCRYPT CERTFICATE FOR MOJAVE AND OLDER
 			# This removes the expired Let's Encrypt certificate based on these instructions: https://docs.hedge.video/remove-dst-root-ca-x3-certificate
 			# If the expired certificate exists, using curl with sites using Let's Encrypt will fail, but just removing the certificate allows curl to work.
@@ -363,35 +341,35 @@ Save
 
 			# Newer versions of macOS do not need this fix and the versions that do need it don't use a the Snapshot reset technique,
 			# so it's fine for this to be in this "else" statement only when a Snapshot is NOT being made.
-			
+
 			mv -f '/private/etc/ssl/cert.pem' '/private/etc/ssl/cert-orig.pem'
-			
+
 			awk '
 (!remove_cert) {
-    if (is_cert_body) {
-        print
-    } else if ($0 == "-----BEGIN CERTIFICATE-----") {
-        print cert_header $0
-        cert_header = ""
-        is_cert_body = 1
-    } else if (!is_cert_body) {
-        if ($1 == "44:af:b0:80:d6:a3:27:ba:89:30:39:86:2e:f8:40:6b") {
-            remove_cert = 1
-            cert_header = ""
-        } else {
-            cert_header = cert_header $0 "\n"
-        }
-    }
+	if (is_cert_body) {
+		print
+	} else if ($0 == "-----BEGIN CERTIFICATE-----") {
+		print cert_header $0
+		cert_header = ""
+		is_cert_body = 1
+	} else if (!is_cert_body) {
+		if ($1 == "44:af:b0:80:d6:a3:27:ba:89:30:39:86:2e:f8:40:6b") {
+			remove_cert = 1
+			cert_header = ""
+		} else {
+			cert_header = cert_header $0 "\n"
+		}
+	}
 }
 ($0 == "-----END CERTIFICATE-----") {
-    is_cert_body = 0
-    remove_cert = 0
+	is_cert_body = 0
+	remove_cert = 0
 }
 ' '/private/etc/ssl/cert-orig.pem' > '/private/etc/ssl/cert.pem'
 
 
 			if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
-				
+
 				# MAKE SURE TIME IS SYNCED
 				# This will already have been done if launched via LaunchDaemon or will be done in this script after reset Snapshot is created if on macOS 10.15 Catalina and newer.
 
@@ -413,7 +391,7 @@ Save
 
 
 	if ! $critical_error_occurred; then
-	
+
 		# DISABLE SLEEP
 
 		write_to_log 'Disabling System Sleep'
@@ -422,24 +400,29 @@ Save
 
 
 		# SET COMPUTER NAME
-		
+
 		write_to_log 'Setting Computer Name'
 
-		sp_hardware_plist_path="${TMPDIR:-/private/tmp/}fg-prepare-os-sp-hardware.plist"
+		is_laptop=false # This "is_laptop" variable will be set based on whether the "short model name" (machine_name) contains "Book", and it is used later in this script.
+
+		sp_hardware_plist_path="${TMPDIR}fg-prepare-os-sp-hardware.plist"
 		for (( get_model_id_attempt = 0; get_model_id_attempt < 60; get_model_id_attempt ++ )); do
 			rm -rf "${sp_hardware_plist_path}"
 			system_profiler -xml SPHardwareDataType > "${sp_hardware_plist_path}"
 
 			model_id="$(PlistBuddy -c 'Print :0:_items:0:machine_model' "${sp_hardware_plist_path}" 2> /dev/null)"
-			
+
 			if [[ "${model_id}" == *'Mac'* ]]; then
+				short_model_name="$(PlistBuddy -c 'Print :0:_items:0:machine_name' "${sp_hardware_plist_path}" 2> /dev/null)"
+				if [[ "${short_model_name}" == *'Book'* ]]; then is_laptop=true; fi
+
 				serial_number="$(PlistBuddy -c 'Print :0:_items:0:serial_number' "${sp_hardware_plist_path}" 2> /dev/null)"
-				
+
 				if [[ -z "${serial_number}" || "${serial_number}" == 'Not Available' ]]; then
 					serial_number="$(PlistBuddy -c 'Print :0:_items:0:riser_serial_number' "${sp_hardware_plist_path}" 2> /dev/null)"
 
 					if [[ -z "${serial_number}" || "${serial_number}" == 'Not Available' ]]; then
-						serial_number="UNKNOWNSERIAL-$(jot -r 1 100 999)"
+						serial_number="UNKNOWNSERIAL-$(jot -rs '' 3 0 9)"
 					fi
 				fi
 				rm -f "${sp_hardware_plist_path}"
@@ -522,7 +505,7 @@ Save
 				if networksetup -getairportpower "${this_network_interface}" 2> /dev/null | grep -q '): Off$'; then
 					networksetup -setairportpower "${this_network_interface}" on &> /dev/null
 				fi
-				
+
 				networksetup -setairportnetwork "${this_network_interface}" "${wifi_ssid}" "${wifi_password}" &> /dev/null
 			fi
 		done
@@ -533,8 +516,9 @@ Save
 
 		for this_global_script_zip in "$2/Global/Scripts/"*'.zip'; do
 			if [[ -f "${this_global_script_zip}" ]]; then
-				this_global_script_name="$(basename "${this_global_script_zip}" '.zip')"
-				
+				this_global_script_name="${this_global_script_zip##*/}"
+				this_global_script_name="${this_global_script_name%.*}"
+
 				write_to_log "Installing Global Script \"${this_global_script_name}\""
 
 				ditto -x -k --noqtn "${this_global_script_zip}" '/Applications' &> /dev/null
@@ -560,7 +544,7 @@ Save
 			critical_error_occurred=true
 		fi
 
-		
+
 		fg_user_picture_path="$2/Global/Users/Free Geek User Picture.png"
 
 
@@ -569,7 +553,7 @@ Save
 			# CREATE HIDDEN ADMIN USER
 
 			write_to_log "Creating Hidden Admin User \"${hidden_admin_user_full_name}\" (${hidden_admin_user_account_name})"
-			
+
 			declare -a create_hidden_admin_user_options=( '--account-name' "${hidden_admin_user_account_name}" )
 			create_hidden_admin_user_options+=( '--full-name' "${hidden_admin_user_full_name}" )
 			create_hidden_admin_user_options+=( '--generated-uid' '0CAA0000-0A00-0000-BA00-0B000C00B00A' ) # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT208050
@@ -593,23 +577,25 @@ Save
 			# See comments in fg-snapshot-reset for more info about deleting crypto user references on macOS 10.15 Catalina.
 
 			chmod +x "$2/Tools/mkuser.sh"
-			create_hidden_admin_user_error="$(echo "${hidden_admin_user_password}" | "$2/Tools/mkuser.sh" "${create_hidden_admin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
+			create_hidden_admin_user_error="$(printf '%s' "${hidden_admin_user_password}" | "$2/Tools/mkuser.sh" "${create_hidden_admin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
 			create_hidden_admin_user_exit_code="$?" # Do not check "create_user" exit code directly by putting the function within an "if" since we want to print it as well when an error occurs.
 
 			if (( create_hidden_admin_user_exit_code != 0 )) || [[ "$(id -u "${hidden_admin_user_account_name}" 2> /dev/null)" != '501' ]]; then # Confirm hidden_admin_user_account_name was assigned UID 501 to be sure all is as expected.
 				if [[ -z "${create_hidden_admin_user_error}" ]]; then create_hidden_admin_user_error="$(id -u "${hidden_admin_user_account_name}" 2>&1)"; fi
-				write_to_log "ERROR: \"${hidden_admin_user_account_name}\" User Creation Failed (${create_hidden_admin_user_error})"
+				write_to_log "ERROR: \"${hidden_admin_user_account_name}\" User Creation Failed:\n\t${create_hidden_admin_user_error//$'\n'/$'\n\t'}"
 				critical_error_occurred=true
+			elif [[ -n "${create_hidden_admin_user_error}" ]]; then
+				write_to_log "WARNINGS Creating Hidden Admin User:\n\t${create_hidden_admin_user_error//$'\n'/$'\n\t'}"
 			fi
 		fi
 
 
 		if ! $critical_error_occurred; then
-			
+
 			# CREATE STANDARD AUTO-LOGIN USER
 
 			write_to_log "Creating Standard Auto-Login User \"${standard_autologin_user_full_name}\" (${standard_autologin_user_account_name})"
-			
+
 			declare -a create_standard_autologin_user_options=( '--account-name' "${standard_autologin_user_account_name}" )
 			create_standard_autologin_user_options+=( '--full-name' "${standard_autologin_user_full_name}" )
 			create_standard_autologin_user_options+=( '--generated-uid' 'B0ABCAB0-D000-00C0-A0D0-00000CA000C0' ) # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT201548 (which is different from the one above)
@@ -625,13 +611,15 @@ Save
 			create_standard_autologin_user_options+=( '--suppress-status-messages' ) # Don't output stdout messages, but we will still get stderr to save to variable.
 
 			chmod +x "$2/Tools/mkuser.sh"
-			create_standard_autologin_user_error="$(echo "${standard_autologin_user_password}" | "$2/Tools/mkuser.sh" "${create_standard_autologin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
+			create_standard_autologin_user_error="$(printf '%s' "${standard_autologin_user_password}" | "$2/Tools/mkuser.sh" "${create_standard_autologin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
 			create_standard_autologin_user_exit_code="$?" # Do not check "create_user" exit code directly by putting the function within an "if" since we want to print it as well when an error occurs.
 
 			if (( create_standard_autologin_user_exit_code != 0 )) || [[ "$(id -u "${standard_autologin_user_account_name}" 2> /dev/null)" != '502' ]]; then # Confirm standard_autologin_user_account_name was assigned UID 502 to be sure all is as expected.
 				if [[ -z "${create_standard_autologin_user_error}" ]]; then create_standard_autologin_user_error="$(id -u "${standard_autologin_user_account_name}" 2>&1)"; fi
-				write_to_log "ERROR: \"${standard_autologin_user_account_name}\" User Creation Failed (${create_standard_autologin_user_error})"
+				write_to_log "ERROR: \"${standard_autologin_user_account_name}\" User Creation Failed:\n\t${create_standard_autologin_user_error//$'\n'/$'\n\t'}"
 				critical_error_occurred=true
+			elif [[ -n "${create_standard_autologin_user_error}" ]]; then
+				write_to_log "WARNINGS Creating Standard Auto-Login User:\n\t${create_standard_autologin_user_error//$'\n'/$'\n\t'}"
 			fi
 		fi
 
@@ -649,6 +637,12 @@ Save
 					if [[ -n "${this_uid}" && -d "${this_home_folder}/Library" ]]; then
 
 						write_to_log "Setting Custom User Preferences for \"${this_username}\" User"
+
+						# NOTE: Tried to use "sysadminctl -screenLock off" (when running on macOS 10.14 Mojave or newer since that's when it was added) at this point to
+						# disable Screen Lock for the users in advance (by running the command as each user properly like all other commands are done at this point), but
+						# it seems to always fail for users that are not currently graphically logged in (even after they have logged in before to create their Keychain).
+						# The error that it outputs is: MKBDeviceSetGracePeriod error -8
+						# That's alright though since the "Free Geek Setup" app will successfully disable Screen Lock right when it launches at login.
 
 
 						# SET USER LANGUAGE AND LOCALE
@@ -691,7 +685,7 @@ Save
 
 
 						# DISABLE DICTATION (Don't want to alert to turn on dictation when clicking Fn multiple times)
-						
+
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.HIToolbox' AppleDictationAutoEnable -bool false
 
 
@@ -713,6 +707,41 @@ Save
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.driver.AppleHIDMouse' Button3 -int 3
 
 
+						# SET KEYBOARD SHORTCUT SETTINGS
+						# This disables the default F11 action to Show Desktop so that the keyboard can be fully tested without activating the Show Desktop action.
+
+						# Use "default export" to make a copy of the current "com.apple.symbolichotkeys" preferences to a location that is safe to manually edit by non-cfprefsd means since "defaults" cannot modify nested dictionaries.
+						# This "com.apple.symbolichotkeys.plist" exists in the "User Template" folder so it will always exist right when the user's home folder is created, and we just need to add the "36" and "37" keys that we are setting here since they do not exist in the default plist.
+
+						temp_symbolichotkeys_plist="/private/tmp/fg-prepare-os-com.apple.symbolichotkeys.plist" # MUST use "/private/tmp/" instead of "TMPDIR" since the latter will be the root owned package-specific temporary directoy which "this_username" won't be able to write to or read from since "defaults export" and "defaults import" are being run as that user, not root.
+						rm -rf "${temp_symbolichotkeys_plist}"
+
+						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults export 'com.apple.symbolichotkeys' "${temp_symbolichotkeys_plist}"
+
+						# The following values have been confirmed to be the same on macOS 10.13 High Sierra, macOS 10.14 Mojave, macOS 10.15 Catalina, macOS 11 Big Sur, and macOS 12 Monterey
+						PlistBuddy \
+							-c 'Add :AppleSymbolicHotKeys:36 dict' \
+							-c 'Add :AppleSymbolicHotKeys:36:enabled bool false' \
+							-c 'Add :AppleSymbolicHotKeys:36:value dict' \
+							-c 'Add :AppleSymbolicHotKeys:36:value:parameters array' \
+							-c 'Add :AppleSymbolicHotKeys:36:value:parameters: integer 65535' \
+							-c 'Add :AppleSymbolicHotKeys:36:value:parameters: integer 103' \
+							-c 'Add :AppleSymbolicHotKeys:36:value:parameters: integer 8388608' \
+							-c 'Add :AppleSymbolicHotKeys:36:value:type string standard' \
+							-c 'Add :AppleSymbolicHotKeys:37 dict' \
+							-c 'Add :AppleSymbolicHotKeys:37:enabled bool false' \
+							-c 'Add :AppleSymbolicHotKeys:37:value dict' \
+							-c 'Add :AppleSymbolicHotKeys:37:value:parameters array' \
+							-c 'Add :AppleSymbolicHotKeys:37:value:parameters: integer 65535' \
+							-c 'Add :AppleSymbolicHotKeys:37:value:parameters: integer 103' \
+							-c 'Add :AppleSymbolicHotKeys:37:value:parameters: integer 8519680' \
+							-c 'Add :AppleSymbolicHotKeys:37:value:type string standard' \
+							"${temp_symbolichotkeys_plist}" &> /dev/null
+
+						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults import 'com.apple.symbolichotkeys' "${temp_symbolichotkeys_plist}" # Use "default import" to write our manually modified plist so that the values are properly updated through cfprefsd.
+						rm -f "${temp_symbolichotkeys_plist}"
+
+
 						# DISABLE SCREEN SAVER
 
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults -currentHost write 'com.apple.screensaver' idleTime -int 0
@@ -721,7 +750,7 @@ Save
 						# DISABLE NOTIFICATIONS
 
 						if (( DARWIN_MAJOR_VERSION >= 20 )); then
-							# In macOS 11 Big Sur, the Do Not Distrub data is stored as binary of a plist within the "dnd_prefs" of "com.apple.ncprefs": 
+							# In macOS 11 Big Sur, the Do Not Distrub data is stored as binary of a plist within the "dnd_prefs" of "com.apple.ncprefs":
 							# https://www.reddit.com/r/osx/comments/ksbmay/big_sur_how_to_test_do_not_disturb_status_in/gjb72av/
 							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' dnd_prefs -data "$(echo '<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -758,6 +787,19 @@ Save
 						fi
 
 
+						# DISABLE NOTIFICATIONS FOR BACKGROUND TASK MANAGEMENT ON VENTURA (TO HIDE NOTIFICATIONS WHEN ADDING A LAUNCHDAEMON OR LAUNCHAGENT)
+						# On macOS 13 Ventura, each new login item, LaunchDaemon, or LaunchAgent added posts a notification to inform the user, which is great for regular users but unecessary for our technicians during testing (such as when the "Free Geek Demo Helper" LaunchAgent is created by "Free Geek Setup").
+						# So, completely disblale all notifications from the "BTMNotificationAgent" process which will hide these new "Background Task Management" notifications.
+						# Credit to @LucasM on the MacAdmins Slack for discovering and sharing how to disable these notifications: https://macadmins.slack.com/archives/GA92U9YV9/p1663919213484999?thread_ts=1663782045.275729&channel=GA92U9YV9&message_ts=1663919213.484999
+
+						notification_center_disable_all_flags='8401217' # macOS 11 Big Sur and newer: "Allow Notifications" disabled, alert style "None", and every checkbox option disabled.
+
+						if (( DARWIN_MAJOR_VERSION >= 22 )) && [[ -d '/System/Library/UserNotifications/Bundles/com.apple.BTMNotificationAgent.bundle' ]]; then
+							write_to_log "Disabling \"Background Task Management\" Notifications for \"${this_username}\" User"
+							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "<dict><key>bundle-id</key><string>com.apple.BTMNotificationAgent</string><key>flags</key><integer>${notification_center_disable_all_flags}</integer><key>path</key><string>/System/Library/UserNotifications/Bundles/com.apple.BTMNotificationAgent.bundle</string></dict>"
+						fi
+
+
 						# DISABLE SAFARI AUTO-FILL AND AUTO-OPENING DOWNLOADS
 						# Safari 13 and newer are now Sandboxed and store their preferences at "~/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari.plist"
 						# This Safari Container location is also protected: https://lapcatsoftware.com/articles/containers.html
@@ -767,16 +809,15 @@ Save
 
 						# BUT: This no longer works in macOS 12 Monterey because the Safari Container is created upon login instead of first Safari launch.
 						# The preferences within the Safari Container don't exist until launch, but the preferences from the old location DO NOT get migrated like they do on older versions of macOS because the Safari Container already exists.
-						# Modifying the preferences within the Safari Container requires Full Disk Access TCC privileges, and the only applet that gets FDA is the "Free Geek Snapshot Helper".
-						# Therefore, "Free Geek Snapshot Helper" has a Safari preferences check added to it to set these prefernences value within the Safari Container location AFTER it has been granted FDA.
-						# I don't love the idea of overloading "Free Geek Snapshot Helper" with this functionality, but it is the simplest option instead of making a new dedicated applet and granting that FDA as well for such a simple task.
+						# Modifying the preferences within the Safari Container requires Full Disk Access TCC privileges.
+						# Therefore, "Free Geek Setup Setup" will set these Safari preferences within the Safari Container location on first login since it will always be granted Full Disk Access right off the bat during a customized installation by "fg-install-os" (which you can read about in the comments in that script).
 
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.Safari' AutoFillPasswords -bool false
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.Safari' AutoFillFromAddressBook -bool false
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.Safari' AutoFillCreditCardData -bool false
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.Safari' AutoFillMiscellaneousForms -bool false
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.Safari' AutoOpenSafeDownloads -bool false
-						
+
 
 						# USER SPECIFIC TASKS IF USER RESOURCES EXIST
 
@@ -785,7 +826,7 @@ Save
 
 						if [[ -d "${this_user_resources_folder}" ]]; then
 							if [[ -d "${this_user_resources_folder}/Pics" ]]; then
-								
+
 								# UNZIP FREE GEEK PROMO PICS TO USER PICTURES FOLDER (FOR SCREENSAVER AUTOMATION DURING DEMO MODE)
 
 								this_user_pictures_folder="${this_home_folder}/Pictures"
@@ -803,29 +844,36 @@ Save
 
 
 							if [[ -d "${this_user_resources_folder}/Apps" ]]; then
-								
+
 								# INSTALL USER APPS
 
 								mkdir -p "${this_user_apps_folder}"
 
 								for this_user_app_installer in "${this_user_resources_folder}/Apps/"*'.'*; do
 									if [[ -f "${this_user_app_installer}" ]]; then
+										this_user_app_name="${this_user_app_installer##*/}"
+										this_user_app_name="${this_user_app_name%.*}"
+
 										if [[ "${this_user_app_installer}" == *'.zip' ]]; then
-											this_user_app_name="$(basename "${this_user_app_installer}" '.zip' | tr '-' ' ')"
-											if [[ "${this_user_app_name}" == 'QAHelper'* ]]; then this_user_app_name='QA Helper'; fi
+											this_user_app_name="${this_user_app_name//-/ }"
 
-											write_to_log "Installing User App \"${this_user_app_name}\" for \"${this_username}\" User"
+											if [[ "${this_user_app_name}" != 'Free Geek Snapshot Helper' ]] || (( DARWIN_MAJOR_VERSION >= 20 )); then # Don't install "Free Geek Snapshot Helper" on macOS 10.15 Catalina and older since IS NOT used on those version (it's only used on macOS 11 Big Sur and newer), since mounting the Snapshot on macOS 10.15 Catalina does not help (see CAVEAT notes in "fg-snapshot-preserver" script) and no reset Snapshot is created on macOS 10.14 Mojave and older (where the "fgreset" script is used instead).
+												if [[ "${this_user_app_name}" == 'QAHelper'* ]]; then this_user_app_name='QA Helper'; fi
 
-											ditto -x -k --noqtn "${this_user_app_installer}" "${this_user_apps_folder}" &> /dev/null
+												write_to_log "Installing User App \"${this_user_app_name}\" for \"${this_username}\" User"
+
+												ditto -x -k --noqtn "${this_user_app_installer}" "${this_user_apps_folder}" &> /dev/null
+											fi
 										elif [[ "${this_user_app_installer}" == *'.dmg' ]]; then
-											#write_to_log "Mounting \"$(basename "${this_user_app_installer}" .'dmg')\" Disk Image for \"${this_username}\" User Apps"
+											#write_to_log "Mounting \"${this_user_app_name}\" Disk Image for \"${this_username}\" User Apps"
 
-											dmg_mount_path="$(hdiutil attach "${this_user_app_installer}" -nobrowse -readonly -plist 2> /dev/null | awk -F '<string>|</string>' '/<string>\/Volumes\// { print $2; exit }')"
+											dmg_mount_path="$(hdiutil attach "${this_user_app_installer}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
 
 											if [[ -d "${dmg_mount_path}" ]]; then
 												for this_dmg_app in "${dmg_mount_path}/"*'.app'; do
 													if [[ -d "${this_dmg_app}" ]]; then
-														this_user_app_name="$(basename "${this_dmg_app}" '.app')"
+														this_user_app_name="${this_dmg_app##*/}"
+														this_user_app_name="${this_user_app_name%.*}"
 
 														write_to_log "Installing User App \"${this_user_app_name}\" for \"${this_username}\" User"
 
@@ -833,10 +881,10 @@ Save
 													fi
 												done
 
-												#write_to_log "Unmounting \"$(basename "${this_global_app_installer}" '.dmg')\" Disk Image for \"${this_username}\" User Apps"
+												#write_to_log "Unmounting \"${this_user_app_name}\" Disk Image for \"${this_username}\" User Apps"
 												hdiutil detach "${dmg_mount_path}" &> /dev/null
 											fi
-										else
+										elif [[ "${this_user_app_installer}" != *'.driveDxLicense' ]]; then
 											write_to_log "Skipping Unrecognized \"${this_username}\" User App Installer (${this_user_app_installer})"
 										fi
 									fi
@@ -846,70 +894,165 @@ Save
 								touch "${this_user_apps_folder}/"*'.app' &> /dev/null
 
 								chown -R "${this_username}" "${this_user_apps_folder}"
-								
+
+
+								# DISABLE NOTIFICATIONS FOR QA HELPER AND DRIVEDX (AND SET PREFERENCES AND LICENSE FOR DRIVEDX)
+								# Disable notifications so that notification approval is not prompted for the technician to have to dismiss (even though QA Helper does not send any notifications and DriveDx will have all notifications disabled).
+								# Doing this because the notification approval prompt is not hidden with Do Not Disturb enabled on macOS 11 Big Sur like it is on macOS 10.15 Catalina and older (but went ahead and disabled notifications for all versions of macOS anyway).
+
+								if (( DARWIN_MAJOR_VERSION == 18 || DARWIN_MAJOR_VERSION == 19 )); then
+									notification_center_disable_all_flags='8409409' # macOS 10.14 Mojave & macOS 10.15 Catalina: "Allow Notifications" disabled, alert style "None", notification previews "when unlocked", and every checkbox option disabled.
+								elif (( DARWIN_MAJOR_VERSION == 17 )); then
+									notification_center_disable_all_flags='4417' # macOS 10.13 High Sierra: Alert style "None", and every checkbox option disabled.
+								fi
 
 								if [[ -d "${this_user_apps_folder}/QA Helper.app" ]]; then
-
-									# DISABLE NOTIFICATIONS FOR QA HELPER
-									# Disable notifications so that notification approval is not prompted for the technician to have to dismiss (even though QA Helper does not send any notifications).
-									# Doing this because the notification approval prompt is not hidden with Do Not Disturb enabled on macOS 11 Big Sur like it is on macOS 10.15 Catalina and older (but went ahead and disabled notifications for all versions of macOS anyway).
-
-									write_to_log "Disabling \"QA Helper\" Notifications for \"${this_username}\" User"
-
-									notification_center_disable_all_flags='8401217' # macOS 11 Big Sur: "Allow Notifications" disabled, alert style "None", and every checkbox option disabled.
-									if (( DARWIN_MAJOR_VERSION == 18 || DARWIN_MAJOR_VERSION == 19 )); then
-										notification_center_disable_all_flags='8409409' # macOS 10.14 Mojave & macOS 10.15 Catalina: "Allow Notifications" disabled, alert style "None", notification previews "when unlocked", and every checkbox option disabled.
-									elif (( DARWIN_MAJOR_VERSION == 17 )); then
-										notification_center_disable_all_flags='4417' # macOS 10.13 High Sierra: Alert style "None", and every checkbox option disabled.
-									fi
-
+									write_to_log "Disabling \"QA Helper\" App Notifications for \"${this_username}\" User"
 									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "<dict><key>bundle-id</key><string>org.freegeek.QA-Helper</string><key>flags</key><integer>${notification_center_disable_all_flags}</integer><key>path</key><string>${this_user_apps_folder}/QA Helper.app</string></dict>"
 								fi
 
+								if [[ -d "${this_user_apps_folder}/KeyboardCleanTool.app" ]]; then
+									write_to_log "Setting Preferences for \"KeyboardCleanTool\" App for \"${this_username}\" User"
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.hegenberg.KeyboardCleanTool' startAfterStart -bool true # Start cleaning mode (disabling keyboard) upon app launch.
+								fi
 
-								if [[ -d "${this_user_apps_folder}/Automation Guide.app" ]]; then
-									
-									write_to_log "Preparing \"Automation Guide\" for \"${this_username}\" User"
+								if [[ -d "${this_user_apps_folder}/DriveDx.app" ]]; then
+									write_to_log "Disabling \"DriveDx\" App Notifications for \"${this_username}\" User"
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "<dict><key>bundle-id</key><string>com.binaryfruit.DriveDx</string><key>flags</key><integer>${notification_center_disable_all_flags}</integer><key>path</key><string>${this_user_apps_folder}/DriveDx.app</string></dict>"
+
+									write_to_log "Setting Preferences for \"DriveDx\" App for \"${this_username}\" User"
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' App_UIMode -int 1 # Only show in Dock (not Menu Bar).
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_AutoCheck -bool false # Do not check drive health periodically.
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_Notifications_ShowDiskStatus -bool false # Do not show drive health notifications.
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_Tests_ShowNotification -bool false # Do not show notification when self-test is complete.
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_DisplayTemperatureInFahrenheit -bool true # Show temps in Fahrenheit.
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDx_OS_Mode -bool true # Sync diagnostics KB online.
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' App_Updater_CheckForUpdates -bool false # Do not check for updates.
+
+									if [[ -f "${this_user_resources_folder}/Apps/DriveDx.driveDxLicense" ]]; then
+										ditto "${this_user_resources_folder}/Apps/DriveDx.driveDxLicense" "${this_home_folder}/Library/Application Support/DriveDx/DriveDx.driveDxLicense" &> /dev/null # Do not need to "mkdir" first since "ditto" takes care of that automatically.
+									fi
+
+									if [[ "$(sysctl -in hw.optional.arm64)" == '1' && "$(file "${this_user_apps_folder}/DriveDx.app/Contents/MacOS/DriveDx")" != *'executable arm64'* ]] && ! arch -x86_64 /usr/bin/true 2> /dev/null; then # https://mostlymac.blog/2022/01/13/detecting-if-rosetta-2-is-installed-on-an-apple-silicon-mac/
+										# If is running on Apple Silicon and DriveDx isn't native (as version 1.11.0 is not) and Rosetta isn't aleady installed (which it will never be),
+										# install Rosetta (which requires internet and if it fails then the tech will just be prompted to install Rosetta when DriveDx is launched).
+
+										write_to_log "Installing Rosetta for \"DriveDx\" App"
+										softwareupdate --install-rosetta --agree-to-license &> /dev/null
+									fi
+								fi
 
 
-									# SYMLINK AUTOMATION GUIDE ON DESKTOP
+								if [[ -d "${this_user_apps_folder}/Free Geek Setup.app" ]]; then
+
+									write_to_log "Preparing \"Free Geek Setup\" for \"${this_username}\" User"
+
+
+									# SYMLINK FREE GEEK SETUP ON DESKTOP
 
 									this_user_desktop_folder="${this_home_folder}/Desktop"
 
-									ln -s "${this_user_apps_folder}/Automation Guide.app" "${this_user_desktop_folder}"
+									ln -s "${this_user_apps_folder}/Free Geek Setup.app" "${this_user_desktop_folder}"
 									chown -R "${this_username}" "${this_user_desktop_folder}"
 
 
-									# SETUP AUTOMATION GUIDE AUTO-LAUNCH
+									# SETUP FREE GEEK SETUP AUTO-LAUNCH
 
 									this_user_launch_agents_folder="${this_home_folder}/Library/LaunchAgents"
 
 									mkdir -p "${this_user_launch_agents_folder}"
 
+									# NOTE: In the following "Free Geek Setup" LaunchAgent, the AssociatedBundleIdentifiers key is set to "org.freegeek.Free-Geek-Setup" so that the LaunchAgent is displayed nicely in the new Login Items section in macOS 13 Ventura.
+									# This also requires "Program" argument be a SIGNED script or binary with with the same Team ID as the app of the AssociatedBundleIdentifiers, so the "Launch Free Geek Setup" script
+									# (which just runs "open" and the path to the app) is created and signed by "MacLand Script Builder" when an applet has the build flag "IncludeSignedLauncher" which the "Free Geek Setup" app has specified.
+									# This LaunchAgent is setup AFTER the "Free Geek Setup" app is installed since macOS must know about the app before the LaunchAgent is setup for its name to be displayed properly in the new login items list in the System Setting app.
+									# See this documentation from Apple for more info: https://developer.apple.com/documentation/servicemanagement/updating_helper_executables_from_earlier_versions_of_macos?language=objc#4065210
+
+									# ALSO NOTE: The following 2 commands are necessary for making the "Free Geek Setup" app name and icon properly show for the following LaunchAgent in the Login Items section in macOS 13 Ventura.
+									# As the documentation linked above states, "LSRegisterURL" is required, to make macOS aware of the application before it has been launched, I believe especially since it is not within the global Applications folder.
+									# But, I found that only running "LSRegisterURL" made the icon of the "Free Geek Setup" app display correctly, but the name was still only listed as "Pico Mitchell" (the Team ID name name for the signed script).
+									# In an attempt to make both the icon and the name display correctly, I tried ALSO launching the app as the "fg-demo" user, and THAT WORKED.
+									# To confirm I was doing truly required steps, I tried the following things which DID NOT work: Only running "LSRegisterURL" as "fg-demo" user without launching the app, only launching the app as "fg-demo" without running "LSRegisterURL" as root, launching the app as root after running "LSRegisterURL" as root.
+									# All this testing indicated that running BOTH "LSRegisterURL" as root AND launching the app as the "fg-demo" user are required to make the icon and name correctly show as "Free Geek Setup" for this LaunchDaemon right of the bat.
+									# In prior testing, I found that running "stltool resetbtm" upon first boot to completely clear the Background Task Management database and then rebooting made the app icon and name display correctly in the list after reboot,
+									# I think because by that time the app had been fully registered and launched. But, I that was not a solution to the problem of making the app icon and name display correctly right away.
+									# It's also worth noting that the following "open" command will fail because the app cannot be launched before login during this setup phase.
+									# But, whatever "open" is doing internally before failing to actually launch to app makes the icon and name show correctly for the LaunchDaemon.
+
+									OSASCRIPT_ENV_APP_PATH="${this_user_apps_folder}/Free Geek Setup.app" osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); $.LSRegisterURL($.NSURL.fileURLWithPath($.NSProcessInfo.processInfo.environment.objectForKey("OSASCRIPT_ENV_APP_PATH")), true)' &> /dev/null
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" open -na "${this_user_apps_folder}/Free Geek Setup.app"
+
 									PlistBuddy \
-										-c 'Add :Label string org.freegeek.Automation-Guide' \
-										-c 'Add :ProgramArguments array' \
-										-c 'Add :ProgramArguments: string /usr/bin/open' \
-										-c 'Add :ProgramArguments: string -n' \
-										-c 'Add :ProgramArguments: string -a' \
-										-c "Add :ProgramArguments: string '${this_user_apps_folder}/Automation Guide.app'" \
+										-c 'Add :Label string org.freegeek.Free-Geek-Setup' \
+										-c "Add :Program string '${this_user_apps_folder}/Free Geek Setup.app/Contents/Resources/Launch Free Geek Setup'" \
+										-c 'Add :AssociatedBundleIdentifiers string org.freegeek.Free-Geek-Setup' \
 										-c 'Add :RunAtLoad bool true' \
-										-c 'Add :StartInterval integer 300' \
+										-c 'Add :StartInterval integer 600' \
 										-c 'Add :StandardOutPath string /dev/null' \
 										-c 'Add :StandardErrorPath string /dev/null' \
-										"${this_user_launch_agents_folder}/org.freegeek.Automation-Guide.plist" &> /dev/null
+										"${this_user_launch_agents_folder}/org.freegeek.Free-Geek-Setup.plist" &> /dev/null
 
 									chown -R "${this_username}" "${this_user_launch_agents_folder}"
+								fi
+
+								if [[ -f '/Users/Shared/.fgResetSnapshotCreated' && -d "${this_user_apps_folder}/Free Geek Snapshot Helper.app" ]]; then
+
+									write_to_log 'Setting Up Snapshot Preserver LaunchDaemon'
+
+									# Copy fg-snapshot-preserver out of fg-snapshot-reset resources to keep it around and start is running with a LaunchDaemon.
+									snapshot_preserver_resources_install_path='/Users/Shared/.fg-snapshot-preserver' # NOTICE: INVISIBLE folder.
+									mkdir -p "${snapshot_preserver_resources_install_path}"
+									mv "${snapshot_reset_resources_install_path}/fg-snapshot-preserver.sh" "${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh"
+									mv "${snapshot_reset_resources_install_path}/Resources" "${snapshot_preserver_resources_install_path}/Resources"
+									chmod +x "${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh"
+
+									rm -rf "${snapshot_reset_resources_install_path}" # Delete remaining fg-snapshot-reset resources since they are only needed on first boot after restoring from the reset Snapshot.
+
+									# Setting StartCalendarInterval to run ever 5th minute instead of setting a StartInterval of 300 because want to be sure that fg-snapshot-preserver is always run at the top of every hour,
+									# since 00:00:00 is the most important and StartInterval cannot guarantee that run time. Also want to run at the top of every other hour in case a network time sync changed the time resulting in the date needing to be updated at some time other than midnight.
+									# And want to run every 5 minutes just to be extra safe and to allow for prompt manual time syncs if a previous manual sync failed or was blocked. Also want to have a more promptly logged record of when a reset Snapshot is lost, if that happens.
+									# Also, if the reset Snapshot does somehow get lost, this will be used to launch "Snapshot Helper" which will display an alert about this critical error, which we want to be opened promptly and re-opened often if closed.
+									# I tried using both StartCalendarInterval and StartInterval which seemed to work well at first (the StartCalendarInterval would actually reset the interval that StartInterval would run on which would make it pretty precise after the first hour had passed),
+									# but extended testing showed that the StartInterval would eventually take precedence over StartCalendarInterval and it would not run right at 00:00:00 and the reset Snapshot could get deleted by macOS.
+									# So, I switched to only using StartCalendarInterval which then made the actual issue apparent. The actual issue was that when the date was set to the past, the StartCalendarInterval would stop being processed until
+									# the date and time caught back up to the next scheduled run before the date was set to the past, and that would only leave the StartInterval running since it was not dependent on a specifically scheduled run time.
+									# To workaround this issue, the LaunchDaemon will now reboot the computer whenever the date is manipulated to make sure macOS runs the LaunchDaemon on the intended StartCalendarInterval.
+									# See REBOOT AFTER DATE IS SET BACK IN TIME comments in fg-snapshot-preserver for more information about this.
+									# This means that StartCalendarInterval and StartInterval could actually be used together, but now there is no real benefit to switching back to that over the existing StartCalendarInterval setup.
+
+									# NOTE: See comments above in "Free Geek Setup" LaunchAgent setup about setting up this app with "AssociatedBundleIdentifiers" to properly display in the Login Items section in macOS 13 Ventura (including the following two commands being necessary).
+									# This also requires the "fg-snapshot-preserver.sh" script being SIGNED with the same Team ID as the app of the AssociatedBundleIdentifiers, so that script is signed in the "build-fg-prepare-os-pkg.sh" script.
+
+									OSASCRIPT_ENV_APP_PATH="${this_user_apps_folder}/Free Geek Snapshot Helper.app" osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); $.LSRegisterURL($.NSURL.fileURLWithPath($.NSProcessInfo.processInfo.environment.objectForKey("OSASCRIPT_ENV_APP_PATH")), true)' &> /dev/null
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" open -na "${this_user_apps_folder}/Free Geek Snapshot Helper.app"
+
+									echo "
+Add :Label string org.freegeek.fg-snapshot-preserver
+Add :Program string ${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh
+Add :AssociatedBundleIdentifiers string org.freegeek.Free-Geek-Snapshot-Helper
+Add :RunAtLoad bool true
+Add :StandardOutPath string /dev/null
+Add :StandardErrorPath string /dev/null
+Add :StartCalendarInterval array
+$(for (( start_calendar_interval_minute = 55; start_calendar_interval_minute >= 0; start_calendar_interval_minute -= 5 )); do echo "Add :StartCalendarInterval:0 dict
+Add :StartCalendarInterval:0:Minute integer ${start_calendar_interval_minute}"; done)
+Save
+" | PlistBuddy '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist' &> /dev/null
+
+									if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]]; then # Do not need to load right away if started via LaunchDaemon since we will restart.
+										launchctl bootstrap system '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist'
+									fi
 								fi
 							fi
 						fi
 
 
 						# SETUP DOCK
-						# Add QA Helper to the front (if installed), add LibreOffice after Reminders,
-						# replace Safari with Firefox (if installed, which it will be on macOS 10.13 High Sierra),
+						# Add "QA Helper" to the front (if installed), add "KeyboardCleanTool" after "QA Helper" (if installed and is a laptop),
+						# replace "Safari" with "Firefox" (if installed, which it will be on macOS 10.13 High Sierra),
+						# add "LibreOffice" after "Reminders" (if installed, which it won't be anymore but the code is left in place as an example),
 						# lock contents size and position, and hide recents (on macOS 10.14 Mojave and newer).
-						
+
 						# NOTE: The user Dock prefs will not exist yet, so we need start with the "persistent-apps" from the default source plist within the Dock app.
 						# Do this AFTER user specific tasks so that we can check if QA Helper was installed for this user.
 
@@ -921,64 +1064,64 @@ Save
 						fi
 
 						if [[ -f "${default_dock_plist}" ]]; then # Do not try to customize the Dock contents if the default Dock plist is moved in a future version of macOS.
-							default_dock_persistent_apps="$(plutil -extract persistent-apps xml1 -o - "${default_dock_plist}")"
+							declare -a custom_dock_persistent_apps=()
 
-							if [[ "${default_dock_persistent_apps}" == *'<key>tile-data</key>'* ]]; then # Do not try to customize the Dock contents if extracting "persistent-apps" failed for some reason.
-								dock_app_dict_for_path() {
-									if [[ -n "$1" && -d "$1" ]]; then
-										echo "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>$1</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>"
-									fi
-								}
-
-								declare -a custom_dock_persistent_apps=()
-
-								if [[ -d "${this_user_apps_folder}/QA Helper.app" ]]; then
-									custom_dock_persistent_apps+=( "$(dock_app_dict_for_path "${this_user_apps_folder}/QA Helper.app")" )
+							dock_app_dict_for_path() { # This function will generate a plist dict fragment string that is suitable to be passed to "defaults write ... -array".
+								if [[ "$1" != *'.app' || ! -d "$1" ]]; then # Make sure the specified path is for an app that exists.
+									return 1
 								fi
 
-								did_add_libreoffice_to_dock=false
+								# Need to escape any characters in the app path which would be cause an XML/plist syntax error.
+								# There are 5 characters that need to be escaped for XML/plist overall, but only the following 2 need to be escaped for a text value: https://stackoverflow.com/a/1091953
+								# Even though we won't currently be dealing with any paths containing these special characters, I've still included this escaping to be as safe and thorough as possible.
+								local app_path_escaped_for_plist="${1//&/&amp;}"
+								app_path_escaped_for_plist="${app_path_escaped_for_plist//</&lt;}"
 
-								IFS=$'\n'
-								this_dock_persistent_app=''
-								this_dock_persistent_app_exists=false
-								for this_dock_persistent_apps_line in ${default_dock_persistent_apps}; do
-									if [[ "${this_dock_persistent_apps_line}" == $'\t'* ]]; then
-										this_dock_persistent_app+="${this_dock_persistent_apps_line}"
+								printf '<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>%s</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>' "${app_path_escaped_for_plist}"
+							}
 
-										if [[ "${this_dock_persistent_apps_line}" == *'.app</string>' ]]; then
-											# The default Dock contents will include Pages, Numbers, and Keynote which will not be installed, so make sure to only include existing apps to our Dock.
-											# If the Dock were allowed to initialize on it's own, these app would be removed from the Dock by macOS when they are not installed.
-											this_dock_persistent_app_exists="$([[ -d "$(echo "${this_dock_persistent_apps_line}" | awk -F '<string>|</string>' '{ print $2; exit }')" ]] && echo 'true' || echo 'false')"
-										elif [[ "${this_dock_persistent_apps_line}" == $'\t</dict>'* ]]; then
-											if [[ "${this_dock_persistent_app}" == *'/Applications/Safari.app'* && -d '/Applications/Firefox.app' ]]; then
-												custom_dock_persistent_apps+=( "$(dock_app_dict_for_path '/Applications/Firefox.app')" )
-											elif $this_dock_persistent_app_exists; then
-												custom_dock_persistent_apps+=( "${this_dock_persistent_app}" )
+							if dock_app_dict_for_qa_helper="$(dock_app_dict_for_path "${this_user_apps_folder}/QA Helper.app")"; then # Always add "QA Helper" as the first item in the Dock (which will be displayed right after "Finder").
+								custom_dock_persistent_apps+=( "${dock_app_dict_for_qa_helper}" )
+							fi
 
-												if [[ "${this_dock_persistent_app}" == *'/Applications/Reminders.app'* && -d '/Applications/LibreOffice.app' ]]; then
-													custom_dock_persistent_apps+=( "$(dock_app_dict_for_path '/Applications/LibreOffice.app')" )
-													did_add_libreoffice_to_dock=true
-												fi
-											fi
+							if $is_laptop && dock_app_dict_for_keyboard_clean_tool="$(dock_app_dict_for_path "${this_user_apps_folder}/KeyboardCleanTool.app")"; then # Add "KeyboardCleanTool" after "QA Helper" item in the Dock, when the Mac is a laptop.
+								custom_dock_persistent_apps+=( "${dock_app_dict_for_keyboard_clean_tool}" )
+							fi
 
-											this_dock_persistent_app=''
-											this_dock_persistent_app_exists=false
+							dock_app_dict_for_libreoffice="$(dock_app_dict_for_path '/Applications/LibreOffice.app')" # This app dict fragment will be added into the Dock below if the app exists (see comments below for more info).
+
+							# The following loop will iterate through every app path listed in the default Dock and generate a new Dock app list suitable to be passed to "defaults write ... -array" by replacing and adding custom apps as well as removing any defaults that aren't installed (see comments below for more info).
+							for (( this_dock_persistent_app_index = 0; ; this_dock_persistent_app_index ++ )); do # This would loop forever on its own, but we'll manually break out of the loop below when there are no more indexes in the array within the plist (since we can't easily get the count of the array in advance).
+								if ! this_dock_persistent_app_path="$(PlistBuddy -c "Print :persistent-apps:${this_dock_persistent_app_index}:tile-data:file-data:_CFURLString" "${default_dock_plist}" 2> /dev/null)"; then
+									break # Must check if failed to retrieve this_dock_persistent_app_path which indicates there are no more indexes in the array within the plist and we need to break this infinite loop.
+								fi
+
+								if dock_app_dict_for_this_app_path="$(dock_app_dict_for_path "${this_dock_persistent_app_path}")"; then
+									# The default Dock contents will include Pages, Numbers, and Keynote which will not be installed, so make sure to only include existing apps to the customized Dock.
+									# If the Dock were allowed to initialize on it's own, these app would be removed from the Dock by macOS when they are not installed.
+
+									if [[ "${this_dock_persistent_app_path}" == *'/Applications/Safari.app' ]] && dock_app_dict_for_firefox="$(dock_app_dict_for_path '/Applications/Firefox.app')"; then # Replace "Safari" with "Firefox" if it has been installed (which will only be done on macOS 10.13 High Sierra).
+										custom_dock_persistent_apps+=( "${dock_app_dict_for_firefox}" )
+									else
+										custom_dock_persistent_apps+=( "${dock_app_dict_for_this_app_path}" )
+
+										if [[ "${this_dock_persistent_app_path}" == *'/Applications/Reminders.app' && -n "${dock_app_dict_for_libreoffice}" ]]; then # Add "LibreOffice" after "Reminders" if it has been installed (which will no longer be done anymore, but leave this here as an example of how to add a new app after an existing app if needed in the future).
+											custom_dock_persistent_apps+=( "${dock_app_dict_for_libreoffice}" )
+											dock_app_dict_for_libreoffice='' # Clear this variable to indicate that it has already been added to the Dock so that the fallback check after the loop is done will not add it again to the end of the Dock.
 										fi
 									fi
-								done
-								unset IFS
-
-								if ! $did_add_libreoffice_to_dock && [[ -d '/Applications/LibreOffice.app' ]]; then
-									# This should never happen, but in case Reminders was not in the Dock then add LibreOffice to the end.
-									custom_dock_persistent_apps+=( "$(dock_app_dict_for_path '/Applications/LibreOffice.app')" )
 								fi
+							done
 
-								launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.dock' persistent-apps -array "${custom_dock_persistent_apps[@]}"
-
-								# VERY IMPORTANT: If this "version" key is not set, the Dock contents will get reset when Dock runs.
-								# I've confirmed it to get set to "1" by Dock on macOS 10.13 High Sierra through macOS 11 Big Sur.
-								launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.dock' version -int 1
+							if [[ -n "${dock_app_dict_for_libreoffice}" ]]; then # This should never happen when "LibreOffice" installed (which it will no longer be anymore), but in case "Reminders" was not in the Dock then add "LibreOffice" to the end of the Dock (also still leaving this here as an example fallback for the "add after existing app" code above).
+								custom_dock_persistent_apps+=( "${dock_app_dict_for_libreoffice}" )
 							fi
+
+							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.dock' persistent-apps -array "${custom_dock_persistent_apps[@]}"
+
+							# VERY IMPORTANT: If this "version" key is not set, the Dock contents will get reset when Dock runs.
+							# I've confirmed it to get set to "1" by Dock on macOS 10.13 High Sierra through macOS 12 Monterey.
+							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.dock' version -int 1
 						fi
 
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.dock' contents-immutable -bool true
@@ -992,8 +1135,13 @@ Save
 			done
 
 
-			if [[ ! -d "/Users/${standard_autologin_user_account_name}/Applications/Automation Guide.app" || ! -f "/Users/${standard_autologin_user_account_name}/Library/LaunchAgents/org.freegeek.Automation-Guide.plist" ]]; then
-				write_to_log 'ERROR: Automation Guide Not Installed or LaunchAgent Not Configured'
+			if [[ ! -d "/Users/${standard_autologin_user_account_name}/Applications/Free Geek Setup.app" || ! -f "/Users/${standard_autologin_user_account_name}/Library/LaunchAgents/org.freegeek.Free-Geek-Setup.plist" ]]; then
+				write_to_log 'ERROR: Free Geek Setup Not Installed or LaunchAgent Not Configured'
+				critical_error_occurred=true
+			fi
+
+			if [[ -f '/Users/Shared/.fgResetSnapshotCreated' && ( ! -d "/Users/${standard_autologin_user_account_name}/Applications/Free Geek Snapshot Helper.app" || ! -f "${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh" || ! -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist' || -d "${snapshot_reset_resources_install_path}" ) ]]; then
+				write_to_log 'ERROR: Free Geek Snapshot Helper Not Installed or LaunchDaemon Not Configured'
 				critical_error_occurred=true
 			fi
 
@@ -1003,10 +1151,10 @@ Save
 			fi
 		fi
 	fi
-	
+
 
 	if $critical_error_occurred; then
-		
+
 		if id "${standard_autologin_user_account_name}"; then
 
 			# HIDE STANDARD AUTO-LOGIN USER (in case it got created before the critical error)
@@ -1023,10 +1171,10 @@ Save
 		fi
 
 		if [[ -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist' ]]; then
-			
+
 			# LOAD fg-error-occurred LAUNCH DAEMON (so error is announced and shown next at Login Window if was not run on boot via LaunchDaemon)
 
-			launchctl load -w '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist'
+			launchctl bootstrap system '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist'
 		fi
 	else
 
@@ -1050,7 +1198,7 @@ else
 
 	# ANNOUNCE ERROR (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
 	# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.
-	
+
 	for (( wait_to_play_seconds = 0; wait_to_play_seconds < 60; wait_to_play_seconds ++ )); do
 		osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
 		if afplay "$2/Announcements/fg-error-occurred.aiff" &> /dev/null; then
@@ -1065,7 +1213,7 @@ fi
 
 # DELETE INSTALLED RESOURCES FOLDER
 
-if [[ -n "$2" && -d "$2" && "$2" == *'fg-prepare-os'* ]]; then
+if [[ "$2" == *'fg-prepare-os'* && -d "$2" ]]; then
 	rm -rf "$2"
 fi
 

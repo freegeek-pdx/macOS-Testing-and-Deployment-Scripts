@@ -16,19 +16,19 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.3.1-2
+-- Version: 2022.10.24-1
 
 -- App Icon is “Donut” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 use AppleScript version "2.7"
 use scripting additions
-use framework "Cocoa"
+use framework "AppKit"
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -99,6 +99,47 @@ on error checkReadOnlyErrorMessage
 	end if
 end try
 
+
+set freeGeekUpdaterAppPath to "/Applications/Free Geek Updater.app"
+set freeGeekUpdaterIsRunning to false
+try
+	((freeGeekUpdaterAppPath as POSIX file) as alias)
+	set freeGeekUpdaterIsRunning to (application freeGeekUpdaterAppPath is running)
+end try
+
+set adminUsername to "Staff"
+set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
+
+set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
+
+try
+	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
+	
+	try
+		do shell script ("mkdir " & (quoted form of buildInfoPath))
+	end try
+	try
+		set AppleScript's text item delimiters to "-"
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+	end try
+	
+	if (not freeGeekUpdaterIsRunning) then
+		try
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			do shell script "open -na '/Applications/Test Boot Setup.app'"
+		end try
+	end if
+	
+	quit
+	delay 10
+end try
+
+if (freeGeekUpdaterIsRunning) then -- Quit if Updater is running so that this app can be updated if needed.
+	quit
+	delay 10
+end if
+
+
 try
 	(("/Applications/GpuTest_OSX_x64_0.7.0/GpuTest.app" as POSIX file) as alias)
 on error
@@ -124,12 +165,6 @@ on error
 end try
 
 
-set dialogIconName to "applet"
-try
-	((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-	set dialogIconName to (name of me)
-end try
-
 set systemVersion to (system version of (system info))
 considering numeric strings
 	set isMojaveOrNewer to (systemVersion ≥ "10.14")
@@ -142,12 +177,10 @@ if (isMojaveOrNewer) then
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences"
-					try
-						activate
-					end try
-					reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-				end tell
+				tell application "System Preferences" to activate
+			end try
+			try
+				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 			end try
 			try
 				activate
@@ -168,9 +201,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the “System Events” checkbox underneath it.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -189,12 +222,10 @@ on error (assistiveAccessTestErrorMessage)
 			on error automationAccessErrorMessage number automationAccessErrorNumber
 				if (automationAccessErrorNumber is equal to -1743) then
 					try
-						tell application "System Preferences"
-							try
-								activate
-							end try
-							reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-						end tell
+						tell application "System Preferences" to activate
+					end try
+					try
+						do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 					end try
 					try
 						activate
@@ -215,9 +246,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the “TextEdit” checkbox underneath it.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 						try
-							do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+							do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 						end try
 					end try
 					quit
@@ -263,40 +294,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the checkbox next to it. If “" & (name of me) & "” IS NOT in the list, drag-and-drop the app icon from Finder into the list.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 			try
-				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		end try
 		quit
 		delay 10
 	end if
-end try
-
-
-set adminUsername to "Staff"
-if (isCatalinaOrNewer) then set adminUsername to "staff"
-set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
-
-set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
-try
-	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
-	
-	try
-		do shell script ("mkdir " & (quoted form of buildInfoPath))
-	end try
-	try
-		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
-	end try
-	
-	try
-		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-		do shell script "open -n -a '/Applications/Test Boot Setup.app'"
-	end try
-	
-	quit
-	delay 10
 end try
 
 
@@ -580,38 +585,44 @@ if (shouldRunGPUStressTest) then
 				set screenBounds to {0, 23, 1280, 764}
 				set tmpFileForScreenBounds to tmpPath & "DetectingScreenSize"
 				try
-					set textEditAttemptCount to 1
-					repeat 3 times
+					repeat with textEditAttemptCount from 1 to 5
 						try
 							set didGetScreenBounds to false
 							do shell script "touch " & (quoted form of tmpFileForScreenBounds)
 							try
 								do shell script "open -b com.apple.TextEdit " & (quoted form of tmpFileForScreenBounds)
 							end try
-							delay (textEditAttemptCount - 0.5)
+							delay textEditAttemptCount
+							set originalWindowBounds to {0, 0, -1, 0}
 							tell application ("Text" & "Edit") -- This stops Script Editor from opening TextEdit automatially.
 								repeat with thisTextEditWindow in windows
 									if ((name of thisTextEditWindow) ends with "DetectingScreenSize") then
 										tell thisTextEditWindow
-											set zoomed to true
-											exit repeat
+											set originalWindowBounds to (get bounds)
+											if ((textEditAttemptCount is equal to 2) or (textEditAttemptCount is equal to 4)) then -- Try performing "AXZoomWindow" action a couple times if "set zoomed" isn't working.
+												try
+													tell application "System Events" to tell application process ("Text" & "Edit") to tell (first window whose name ends with "Untitled") to perform action "AXZoomWindow" of (first button whose subrole is "AXFullScreenButton")
+												on error
+													set zoomed to true
+												end try
+											else
+												set zoomed to true
+											end if
 										end tell
+										exit repeat
 									end if
 								end repeat
-								delay (textEditAttemptCount - 0.5)
+								delay textEditAttemptCount
 								repeat with thisTextEditWindow in windows
 									if ((name of thisTextEditWindow) ends with "DetectingScreenSize") then
-										tell thisTextEditWindow
-											set screenBounds to (get bounds)
-											set didGetScreenBounds to true
-											exit repeat
-										end tell
+										tell thisTextEditWindow to set screenBounds to (get bounds)
+										if (((item 3 of originalWindowBounds) is not equal to -1) and (((item 3 of originalWindowBounds) is not equal to (item 3 of screenBounds)) or ((item 4 of originalWindowBounds) is not equal to (item 4 of screenBounds)))) then set didGetScreenBounds to true
+										exit repeat
 									end if
 								end repeat
 								quit
 							end tell
-							if (didGetScreenBounds and ((item 3 of screenBounds) ≥ 640) and ((item 4 of screenBounds) ≥ 480)) then exit repeat
-							set textEditAttemptCount to (textEditAttemptCount + 1)
+							if (didGetScreenBounds and ((item 3 of screenBounds) ≥ 1280) and ((item 4 of screenBounds) ≥ 764)) then exit repeat
 						on error (errorMessage) number (errorNumber)
 							try
 								with timeout of 1 second
@@ -621,7 +632,7 @@ if (shouldRunGPUStressTest) then
 							if (errorNumber is equal to -128) then error errorMessage number errorNumber
 						end try
 					end repeat
-					if (((item 3 of screenBounds) < 640) or ((item 4 of screenBounds) < 480)) then error "Couldn't Get Screen Bounds"
+					if (((item 3 of screenBounds) < 1280) or ((item 4 of screenBounds) < 764)) then error "Couldn't Get Screen Bounds"
 				on error (getScreenBoundsErrorMessage) number (getScreenBoundsErrorNumber)
 					set screenBounds to {0, 23, 1280, 764} -- Want GPU Test to run with smaller window even if screen bounds fails. So, we also don't collect the errors.
 					if ((getScreenBoundsErrorNumber is equal to -128) and (setupAppsErrorMessages does not contain getScreenBoundsErrorMessage)) then set end of setupAppsErrorMessages to getScreenBoundsErrorMessage
@@ -1189,19 +1200,14 @@ to test the internal hard drive?" message ("If this Mac happens to have multiple
 		end if
 	on error
 		try
-			(("/Applications/Firmware Checker.app" as POSIX file) as alias)
 			(("/Applications/Internet Test.app" as POSIX file) as alias)
-			if (application ("Firmware" & " Checker") is not running) then
+			if (application ("Internet" & " Test") is not running) then
 				try
 					activate
 				end try
 				display alert "
-Would you like to launch “Firmware Checker”?" buttons {"Launch “Internet Test” Instead", "No", "Yes"} cancel button 2 default button 3 giving up after 15
-				if ((gave up of result) or ((button returned of result) is equal to "Yes")) then
-					do shell script "open -n -a '/Applications/Firmware Checker.app'"
-				else
-					do shell script "open -n -a '/Applications/Internet Test.app'"
-				end if
+Would you like to launch “Internet Test”?" buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 15
+				do shell script "open -na '/Applications/Internet Test.app'"
 			end if
 		end try
 	end try

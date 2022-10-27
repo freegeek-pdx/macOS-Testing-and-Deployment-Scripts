@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.5.19-1
+-- Version: 2022.10.26-1
 
 -- App Icon is “Microscope” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -27,7 +27,7 @@ use scripting additions
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -101,11 +101,46 @@ on error checkReadOnlyErrorMessage
 end try
 
 
-set dialogIconName to "applet"
+
+set freeGeekUpdaterAppPath to "/Applications/Free Geek Updater.app"
+set freeGeekUpdaterIsRunning to false
 try
-	((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-	set dialogIconName to (name of me)
+	((freeGeekUpdaterAppPath as POSIX file) as alias)
+	set freeGeekUpdaterIsRunning to (application freeGeekUpdaterAppPath is running)
 end try
+
+set adminUsername to "Staff"
+set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
+
+set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
+
+try
+	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
+	
+	try
+		do shell script ("mkdir " & (quoted form of buildInfoPath))
+	end try
+	try
+		set AppleScript's text item delimiters to "-"
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+	end try
+	
+	if (not freeGeekUpdaterIsRunning) then
+		try
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			do shell script "open -na '/Applications/Test Boot Setup.app'"
+		end try
+	end if
+	
+	quit
+	delay 10
+end try
+
+if (freeGeekUpdaterIsRunning) then -- Quit if Updater is running so that this app can be updated if needed.
+	quit
+	delay 10
+end if
+
 
 set systemVersion to (system version of (system info))
 considering numeric strings
@@ -120,12 +155,10 @@ if (isMojaveOrNewer) then
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences"
-					try
-						activate
-					end try
-					reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-				end tell
+				tell application "System Preferences" to activate
+			end try
+			try
+				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 			end try
 			try
 				activate
@@ -146,9 +179,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the “System Events” checkbox underneath it.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -197,41 +230,15 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the checkbox next to it. If “" & (name of me) & "” IS NOT in the list, drag-and-drop the app icon from Finder into the list.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
 			delay 10
 		end if
 	end try
-end try
-
-
-set adminUsername to "Staff"
-if (isCatalinaOrNewer) then set adminUsername to "staff"
-set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
-
-set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
-try
-	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
-	
-	try
-		do shell script ("mkdir " & (quoted form of buildInfoPath))
-	end try
-	try
-		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
-	end try
-	
-	try
-		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-		do shell script "open -n -a '/Applications/Test Boot Setup.app'"
-	end try
-	
-	quit
-	delay 10
 end try
 
 
@@ -283,17 +290,21 @@ repeat
 		set supportsCatalina to false
 		set supportsBigSur to false
 		set supportsMonterey to false
+		set supportsVentura to false
 		set shortModelName to "UNKNOWN Model Name  ⚠️"
 		set modelIdentifier to "UNKNOWN Model Identifier"
 		set memorySize to "⚠️	UNKNOWN Size"
 		set memorySlots to {}
 		set chipType to "UNKNOWN Chip" -- For Apple Silicon
+		set isAppleSilicon to false
 		set processorTotalCoreCount to "❓"
 		set processorHyperthreadingValue to ""
 		set processorsCount to "❓"
+		set hasT2chip to false
 		set serialNumber to "UNKNOWNXXXXX"
 		set serialNumberDatePart to "AA"
 		set serialNumberModelPart to "XXXX"
+		set modelIdentifierName to "⚠️	UNKNOWN Model ID"
 		set modelIdentifierNumber to "⚠️	UNKNOWN Model ID"
 		set modelIdentifierMajorNumber to 0
 		set modelIdentifierMinorNumber to 0
@@ -306,11 +317,13 @@ repeat
 					
 					try
 						set serialNumber to ((value of property list item "serial_number" of hardwareItems) as string) -- https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/
-						if (((length of serialNumber) ≥ 11) and (serialNumber is not equal to "Not Available")) then
+						if (serialNumber is equal to "Not Available") then
+							set serialNumber to "UNKNOWNXXXXX"
+						else if ((length of serialNumber) ≥ 11) then
 							set serialNumberDatePart to (text 3 thru 5 of serialNumber)
 							if ((count of serialNumber) is equal to 12) then set serialNumberDatePart to (text 2 thru -1 of serialNumberDatePart)
 							set serialNumberModelPart to (text 9 thru -1 of serialNumber) -- The model part of the serial is the last 4 characters for 12 character serials and the last 3 characters for 11 character serials (which are very old and shouldn't actually be encountered).
-						else
+						else if ((length of serialNumber) < 8) then -- https://www.macrumors.com/2021/03/09/apple-randomized-serial-numbers-early-2021/
 							set serialNumber to "UNKNOWNXXXXX"
 						end if
 					on error
@@ -323,26 +336,30 @@ repeat
 						set isLaptop to true
 					end if
 					set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
+					set modelIdentifierName to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -d '[:digit:],'") -- Need use this whenever comparing along with Model ID numbers since there could be false matches for the newer "MacXX,Y" style Model IDs if I used shortModelName in those conditions instead (which I used to do).
 					set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
 					set AppleScript's text item delimiters to ","
 					set modelNumberParts to (every text item of modelIdentifierNumber)
 					set modelIdentifierMajorNumber to ((item 1 of modelNumberParts) as number)
 					set modelIdentifierMinorNumber to ((last item of modelNumberParts) as number)
 					
-					if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 10)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 3)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 4)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 5)) or (shortModelName is equal to "iMac Pro")) then set supportsHighSierra to true
+					if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 6)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 6)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 3)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 4)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 5)) or (modelIdentifierName is equal to "iMacPro")) then set supportsHighSierra to true
 					
-					if ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber = 5)) then set supportsMojaveWithMetalCapableGPU to true
+					if ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber = 5)) then set supportsMojaveWithMetalCapableGPU to true
 					
-					if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 13)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 9)) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 5)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then set supportsCatalina to true
+					if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 13)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 9)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 5)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 6)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 6)) or (modelIdentifierName is equal to "iMacPro")) then set supportsCatalina to true
 					
-					if (((shortModelName is equal to "iMac") and ((modelIdentifierNumber is equal to "14,4") or (modelIdentifierMajorNumber ≥ 15))) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 11)) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 6)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro")) then set supportsBigSur to true
+					if (((modelIdentifierName is equal to "iMac") and ((modelIdentifierNumber is equal to "14,4") or (modelIdentifierMajorNumber ≥ 15))) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 11)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 6)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 7)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 6)) or (modelIdentifierName is equal to "iMacPro")) then set supportsBigSur to true
 					
-					if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((shortModelName is equal to "MacBook Pro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((shortModelName is equal to "MacBook Air") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber ≥ 7)) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro") or (shortModelName is equal to "Mac Studio")) then set supportsMonterey to true
+					if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((modelIdentifierName is equal to "MacBookPro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 7)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 7)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 6)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsMonterey to true
+					
+					if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 18)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 14)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 7)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsVentura to true
 					
 					set memorySize to ((value of property list item "physical_memory" of hardwareItems) as string)
 					
 					try
 						set chipType to ((value of property list item "chip_type" of hardwareItems) as string) -- This will only exist when running natively on Apple Silicon
+						set isAppleSilicon to true
 					end try
 					
 					try
@@ -370,43 +387,45 @@ repeat
 		end repeat
 		do shell script "rm -f " & (quoted form of hardwareInfoPath)
 		
+		-- https://web.archive.org/web/20220620162055/https://support.apple.com/en-us/HT212163
+		set macBookPro2016and2017RecalledBatteryRecall to ({"MacBookPro13,1", "MacBookPro13,2", "MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3"} contains modelIdentifier)
+		
 		-- https://support.apple.com/15-inch-macbook-pro-battery-recall
-		set macBookPro15inch2015RecalledBatteryModels to {"MacBookPro11,4", "MacBookPro11,5"}
-		set macBookPro15inch2015PossibleBatteryRecall to (macBookPro15inch2015RecalledBatteryModels contains modelIdentifier)
+		set macBookPro15inch2015PossibleBatteryRecall to ({"MacBookPro11,4", "MacBookPro11,5"} contains modelIdentifier)
+		
 		-- https://support.apple.com/keyboard-service-program-for-mac-notebooks
-		set macBookProButterflyKeyboardRecallModels to {"MacBook8,1", "MacBook9,1", "MacBook10,1", "MacBookAir8,1", "MacBookAir8,2", "MacBookPro13,1", "MacBookPro13,2", "MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4"}
-		set macBookProButterflyKeyboardRecall to (macBookProButterflyKeyboardRecallModels contains modelIdentifier)
+		set macBookProButterflyKeyboardRecall to ({"MacBook8,1", "MacBook9,1", "MacBook10,1", "MacBookAir8,1", "MacBookAir8,2", "MacBookPro13,1", "MacBookPro13,2", "MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4"} contains modelIdentifier)
+		
 		-- https://support.apple.com/13-inch-macbook-pro-display-backlight-service
-		set macBookPro13inch2016RecalledBacklightModels to {"MacBookPro13,1", "MacBookPro13,2"}
-		set macBookPro13inch2016PossibleBacklightRecall to (macBookPro13inch2016RecalledBacklightModels contains modelIdentifier)
+		set macBookPro13inch2016PossibleBacklightRecall to ({"MacBookPro13,1", "MacBookPro13,2"} contains modelIdentifier)
+		
 		-- Only the 2016 13-inch is covered by Apple for the FLEXGATE issue, but the 15-inch and 2017 models may also have the same issue
-		set macBookProOtherFlexgateModels to {"MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3"}
-		set macBookProOtherFlexgate to (macBookProOtherFlexgateModels contains modelIdentifier)
+		set macBookProOtherFlexgate to ({"MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3"} contains modelIdentifier)
+		
 		-- https://support.apple.com/13-inch-macbook-pro-solid-state-drive-service
-		set macBookPro13inch2017RecalledSSDModels to {"MacBookPro14,1"}
-		set macBookPro13inch2017PossibleSSDRecall to (macBookPro13inch2017RecalledSSDModels contains modelIdentifier)
+		set macBookPro13inch2017PossibleSSDRecall to ("MacBookPro14,1" is equal to modelIdentifier)
+		
 		-- https://support.apple.com/13inch-macbookpro-battery-replacement
-		set macBookPro13inch2016RecalledBatteryModels to {"MacBookPro13,1", "MacBookPro14,1"}
-		set macBookPro13inch2016PossibleBatteryRecall to (macBookPro13inch2016RecalledBatteryModels contains modelIdentifier)
+		set macBookPro13inch2016PossibleBatteryRecall to ({"MacBookPro13,1", "MacBookPro14,1"} contains modelIdentifier)
+		
 		-- https://www.macrumors.com/2017/11/17/apple-extends-free-staingate-repairs/
-		set macBookProScreenDelaminationModels to {"MacBook8,1", "MacBook9,1", "MacBook10,1", "MacBookPro11,4", "MacBookPro11,5", "MacBookPro12,1", "MacBookPro13,1", "MacBookPro13,2", "MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3"}
-		set macBookProScreenDelaminationRecall to (macBookProScreenDelaminationModels contains modelIdentifier)
-		-- https://www.apple.com/support/macbookpro-videoissues/
-		set macBookProRecalledGraphicsModels to {"MacBookPro8,2", "MacBookPro8,3", "MacBookPro10,1"}
-		set macBookProPossibleBadGraphics to (macBookProRecalledGraphicsModels contains modelIdentifier)
+		set macBookProScreenDelaminationRecall to ({"MacBook8,1", "MacBook9,1", "MacBook10,1", "MacBookPro11,4", "MacBookPro11,5", "MacBookPro12,1", "MacBookPro13,1", "MacBookPro13,2", "MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3"} contains modelIdentifier)
+		
+		-- https://web.archive.org/web/20190105114612/https://www.apple.com/support/macbookpro-videoissues/ & https://www.macrumors.com/2017/05/20/apple-ends-2011-macbook-pro-repair-program/
+		set macBookProPossibleBadGraphics to ({"MacBookPro8,2", "MacBookPro8,3", "MacBookPro10,1"} contains modelIdentifier)
+		
 		-- https://www.macrumors.com/2016/11/29/imac-broken-hinge-refunds-repair-program/
-		set iMacHingeRecallModels to {"iMac14,2"}
-		set iMacHingeRecall to (iMacHingeRecallModels contains modelIdentifier)
+		set iMacHingeRecall to ("iMac14,2" is equal to modelIdentifier)
+		
 		-- https://www.macrumors.com/2013/08/16/apple-initiates-graphic-card-replacement-program-for-mid-2011-27-inch-imac/
-		set iMacRecalledGraphicsSerialModelParts to {"DHJQ", "DHJW", "DL8Q", "DNGH", "DNJ9", "DMW8", "DPM1", "DPM2", "DPNV", "DNY0", "DRVP", "DY6F", "F610"}
-		set iMacPossibleBadGraphics to ((shortModelName is equal to "iMac") and (iMacRecalledGraphicsSerialModelParts contains serialNumberModelPart))
+		set iMacPossibleBadGraphics to ((shortModelName is equal to "iMac") and ({"DHJQ", "DHJW", "DL8Q", "DNGH", "DNJ9", "DMW8", "DPM1", "DPM2", "DPNV", "DNY0", "DRVP", "DY6F", "F610"} contains serialNumberModelPart))
+		
 		-- https://www.macrumors.com/2016/02/06/late-2013-mac-pro-video-issues-repair-program/
-		set macProRecalledSerialDateParts to {"P5", "P6", "P7", "P8", "P9", "PC", "PD", "PF", "PG", "PH"}
-		set macProRecalledSerialDatePartsMatched to ((shortModelName is equal to "Mac Pro") and (macProRecalledSerialDateParts contains serialNumberDatePart))
+		set macProRecalledSerialDatePartsMatched to ((shortModelName is equal to "Mac Pro") and ({"P5", "P6", "P7", "P8", "P9", "PC", "PD", "PF", "PG", "PH"} contains serialNumberDatePart))
 		set macProRecalledGraphicsCards to {"AMD FirePro D500", "AMD FirePro D700"}
 		set macProPossibleBadGraphics to false
 		
-		set restOfSystemOverviewInfoToLoad to {"SPMemoryDataType", "SPSerialATADataType", "SPNVMeDataType", "SPDisplaysDataType", "SPAirPortDataType", "SPBluetoothDataType", "SPDiscBurningDataType"}
+		set restOfSystemOverviewInfoToLoad to {"SPMemoryDataType", "SPNVMeDataType", "SPSerialATADataType", "SPDisplaysDataType", "SPAirPortDataType", "SPBluetoothDataType", "SPDiscBurningDataType"}
 		if (isLaptop) then set (end of restOfSystemOverviewInfoToLoad) to "SPPowerDataType"
 		set AppleScript's text item delimiters to space
 		set systemProfilerPID to (do shell script "system_profiler -xml " & (restOfSystemOverviewInfoToLoad as string) & " > " & (quoted form of restOfSystemOverviewInfoPath) & " 2> /dev/null & echo $!")
@@ -446,7 +465,7 @@ repeat
 				set processorHyperthreadingNote to " + HT"
 			end if
 			
-			if (chipType is not equal to "UNKNOWN Chip") then
+			if (isAppleSilicon) then
 				-- "machdep.cpu.brand_string" did not give useful info on Apple Silicon in macOS 11 prior to 11.1 (it would be "Apple" natively or "VirtualApple @ 2.50GHz processor" under Rosetta, but now is correctly "Apple M1" either way).
 				-- Still, just use "Chip" from system_profiler instead since it is the same info and outputs the correct info regardless of OS version.
 				-- For Apple Silicon, processorTotalCoreCount will looks like "proc 8:4:4" which means "8 cores (4 performance and 4 efficiency)"
@@ -492,6 +511,14 @@ repeat
 				if ((processorHyperthreadingValue is equal to "") and (setProcessorTotalThreadCount > processorTotalCoreCount)) then set processorHyperthreadingNote to " + HT"
 				
 				set processorInfo to processorTotalCoreCount & "-Core" & processorHyperthreadingNote & ": " & processorsCountPart & processorModelPart & " @ " & processorSpeed & " GHz"
+				
+				try
+					if ((do shell script "ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1") contains "Apple T2 Controller") then
+						set hasT2chip to true
+						set processorInfo to (processorInfo & "
+	T2 Security Chip")
+					end if
+				end try
 			end if
 		on error (processorInfoErrorMessage) number (processorInfoErrorNumber)
 			log "Processor Info Error: " & processorInfoErrorMessage
@@ -569,7 +596,7 @@ repeat
 				
 				set cycleCountLimit to designCycleCount
 				if (not macBookProPossibleBadGraphics) then set cycleCountLimit to (round (designCycleCount * 0.8))
-				if ((designCycleCount > 0) and (cycleCount > (cycleCountLimit + 10))) then -- https://support.apple.com/en-us/HT201585
+				if ((designCycleCount > 0) and (cycleCount > (cycleCountLimit + 10))) then -- https://support.apple.com/HT201585
 					set batteryCapacityPercentage to batteryCapacityPercentage & "
 	⚠️	BATTERY OVER " & cycleCountLimit & " MAX CYCLES  ⚠️"
 				end if
@@ -591,59 +618,110 @@ repeat
 🔌	Loading Power Adapter Information"
 			
 			-- LAPTOP POWER ADAPTER INFO (https://support.apple.com/HT201700)
+			-- BUT, I wrote a script (in "Other Scripts/get_power_adapters_from_all_mac_specs_pages.sh") to extract every Power Adapter for each Model ID from every specs URL from the Model pages linked here: https://support.apple.com/HT213325
 			
 			set powerAdapterType to "⚠️	UNKNOWN Power Adapter  ⚠️"
-			if (shortModelName is equal to "MacBook") then
-				if (modelIdentifierMajorNumber ≥ 8) then
-					set powerAdapterType to "29W USB-C"
-				else
-					set powerAdapterType to "60W MagSafe 1"
-				end if
-			else if (shortModelName is equal to "MacBook Pro") then
-				-- 5,4 is "MacBook Pro (15-inch, 2.53 GHz, Mid 2009)" which uses 60W for some reason, the rest are all 13 inch Pro's
-				if ((modelIdentifierNumber is equal to "5,4") or (modelIdentifierNumber is equal to "5,5") or (modelIdentifierNumber is equal to "7,1") or (modelIdentifierNumber is equal to "8,1") or (modelIdentifierNumber is equal to "9,2")) then
-					set powerAdapterType to "60W MagSafe 1"
-				else if ((modelIdentifierNumber is equal to "10,2") or (modelIdentifierNumber is equal to "11,1") or (modelIdentifierNumber is equal to "12,1")) then
-					set powerAdapterType to "60W MagSafe 2"
-				else if (modelIdentifierMajorNumber ≥ 17) then
-					-- CONTINUOUS TODO: Check future MacBook Pro's to make sure Model ID pattern continues
-					if (modelIdentifierMinorNumber = 1) then
-						powerAdapterType = "61W USB-C"
-					else
-						powerAdapterType = "96W USB-C"
-					end if
-				else if (modelIdentifierMajorNumber ≥ 16) then
-					if ((modelIdentifierMinorNumber = 2) or (modelIdentifierMinorNumber = 3)) then
-						set powerAdapterType to "61W USB-C"
-					else
-						set powerAdapterType to "96W USB-C"
-					end if
-				else if (modelIdentifierMajorNumber ≥ 15) then
-					if ((modelIdentifierMinorNumber = 2) or (modelIdentifierMinorNumber = 4)) then
-						set powerAdapterType to "61W USB-C"
-					else
-						set powerAdapterType to "87W USB-C"
-					end if
-				else if (modelIdentifierMajorNumber ≥ 13) then
-					if (modelIdentifierMinorNumber ≥ 3) then
-						set powerAdapterType to "87W USB-C"
-					else
-						set powerAdapterType to "61W USB-C"
-					end if
-				else if (modelIdentifierMajorNumber ≥ 10) then
-					set powerAdapterType to "85W MagSafe 2"
-				else
-					set powerAdapterType to "85W MagSafe 1"
-				end if
-			else if (shortModelName is equal to "MacBook Air") then
-				if (modelIdentifierMajorNumber ≥ 8) then
-					set powerAdapterType to "30W USB-C"
-				else if (modelIdentifierMajorNumber ≥ 5) then
-					set powerAdapterType to "45W MagSafe 2"
-				else
-					set powerAdapterType to "45W MagSafe 1"
-				end if
+			
+			-- Power Adapter Model IDs Last Updated: 8/11/22
+			if ({"MacBookPro1,1", "MacBookPro1,2", "MacBookPro2,1", "MacBookPro2,2", "MacBookPro3,1", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro8,2", "MacBookPro8,3", "MacBookPro9,1"} contains modelIdentifier) then
+				set powerAdapterType to "85W MagSafe 1"
+			else if ({"MacBook1,1", "MacBook2,1", "MacBook3,1", "MacBook4,1", "MacBook5,1", "MacBook5,2", "MacBook6,1", "MacBook7,1", "MacBookPro5,4", "MacBookPro5,5", "MacBookPro7,1", "MacBookPro8,1", "MacBookPro9,2"} contains modelIdentifier) then
+				set powerAdapterType to "60W MagSafe 1"
+			else if ({"MacBookAir1,1", "MacBookAir2,1", "MacBookAir3,1", "MacBookAir3,2", "MacBookAir4,1", "MacBookAir4,2"} contains modelIdentifier) then
+				set powerAdapterType to "45W MagSafe 1"
+			else if ({"MacBookPro10,1", "MacBookPro11,2", "MacBookPro11,3", "MacBookPro11,4", "MacBookPro11,5"} contains modelIdentifier) then
+				set powerAdapterType to "85W MagSafe 2"
+			else if ({"MacBookPro10,2", "MacBookPro11,1", "MacBookPro12,1"} contains modelIdentifier) then
+				set powerAdapterType to "60W MagSafe 2"
+			else if ({"MacBookAir5,1", "MacBookAir5,2", "MacBookAir6,1", "MacBookAir6,2", "MacBookAir7,1", "MacBookAir7,2"} contains modelIdentifier) then
+				set powerAdapterType to "45W MagSafe 2"
+			else if ({"MacBookPro16,1", "MacBookPro16,4"} contains modelIdentifier) then
+				set powerAdapterType to "96W USB-C"
+			else if ({"MacBookPro13,3", "MacBookPro14,3", "MacBookPro15,1", "MacBookPro15,3"} contains modelIdentifier) then
+				set powerAdapterType to "87W USB-C"
+			else if ({"Mac14,7"} contains modelIdentifier) then
+				set powerAdapterType to "67W USB-C"
+			else if ({"MacBookPro13,1", "MacBookPro13,2", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro15,2", "MacBookPro15,4", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro17,1"} contains modelIdentifier) then
+				set powerAdapterType to "61W USB-C"
+			else if ({"MacBook10,1", "MacBookAir8,1", "MacBookAir8,2", "MacBookAir9,1", "MacBookAir10,1"} contains modelIdentifier) then
+				set powerAdapterType to "30W USB-C"
+			else if ({"MacBook8,1", "MacBook9,1"} contains modelIdentifier) then
+				set powerAdapterType to "29W USB-C"
+			else if ({"MacBookPro18,1", "MacBookPro18,2"} contains modelIdentifier) then
+				set powerAdapterType to "140W USB-C/MagSafe 3"
+			else if ({"MacBookPro18,3", "MacBookPro18,4"} contains modelIdentifier) then
+				set powerAdapterType to "67W or 96W USB-C/MagSafe 3"
+			else if ({"Mac14,2"} contains modelIdentifier) then
+				set powerAdapterType to "30W or 35W Dual Port or 67W USB-C/MagSafe 3"
 			end if
+			
+			(* OLD CODE (Last Updated: 8/10/22)
+				if (shortModelName is equal to "MacBook") then
+					if (modelIdentifierMajorNumber = 10) then
+						set powerAdapterType to "30W USB-C"
+					else if (modelIdentifierMajorNumber ≥ 8) then
+						set powerAdapterType to "29W USB-C"
+					else
+						set powerAdapterType to "60W MagSafe 1"
+					end if
+				else if (shortModelName is equal to "MacBook Pro") then
+					if (modelIdentifierName is equal to "Mac") then
+						-- Starting with the Mac Studio, all Model IDs are now just "MacXX,Y" so if this is a MacBook Pro, the Model IDs start back at "Mac14,7" for the "MacBook Pro (13-inch, M2, 2022)"
+						-- which would get detected wrong in the conditions after this point which are all for the older style "MacBookProXX,Y" Model IDs.
+						if (modelIdentifierNumber is equal to "14,7") then -- This is the only one that's out yet, and it appers the numbers are shared across all models (not just MacBook Pros) of that Apple Silicon generation, so there will likely be less of a pattern to the numbers ending of the numbers.
+							set powerAdapterType to "67W USB-C"
+						end if
+					else if ((modelIdentifierNumber is equal to "5,4") or (modelIdentifierNumber is equal to "5,5") or (modelIdentifierNumber is equal to "7,1") or (modelIdentifierNumber is equal to "8,1") or (modelIdentifierNumber is equal to "9,2")) then
+						-- 5,4 is "MacBook Pro (15-inch, 2.53 GHz, Mid 2009)" which uses 60W for some reason, the rest are all 13 inch Pro's
+						set powerAdapterType to "60W MagSafe 1"
+					else if ((modelIdentifierNumber is equal to "10,2") or (modelIdentifierNumber is equal to "11,1") or (modelIdentifierNumber is equal to "12,1")) then
+						set powerAdapterType to "60W MagSafe 2"
+					else if (modelIdentifierMajorNumber = 18) then
+						if (modelIdentifierMinorNumber ≤ 2) then
+							set powerAdapterType to "140W USB-C/MagSafe 3"
+						else
+							set powerAdapterType to "67W or 96W USB-C/MagSafe 3"
+						end if
+					else if (modelIdentifierMajorNumber = 17) then --  There was only a 17,1 model 13" MacBook Pro (the first Apple Silicon MBP)
+						set powerAdapterType to "61W USB-C"
+					else if (modelIdentifierMajorNumber = 16) then
+						if ((modelIdentifierMinorNumber = 2) or (modelIdentifierMinorNumber = 3)) then
+							set powerAdapterType to "61W USB-C"
+						else
+							set powerAdapterType to "96W USB-C"
+						end if
+					else if (modelIdentifierMajorNumber = 15) then
+						if ((modelIdentifierMinorNumber = 2) or (modelIdentifierMinorNumber = 4)) then
+							set powerAdapterType to "61W USB-C"
+						else
+							set powerAdapterType to "87W USB-C"
+						end if
+					else if (modelIdentifierMajorNumber ≥ 13) then
+						if (modelIdentifierMinorNumber ≥ 3) then
+							set powerAdapterType to "87W USB-C"
+						else
+							set powerAdapterType to "61W USB-C"
+						end if
+					else if (modelIdentifierMajorNumber ≥ 10) then
+						set powerAdapterType to "85W MagSafe 2"
+					else
+						set powerAdapterType to "85W MagSafe 1"
+					end if
+				else if (shortModelName is equal to "MacBook Air") then
+					if (modelIdentifierName is equal to "Mac") then -- See comments above in the MacBook Pro section about the new Model ID naming style
+						if (modelIdentifierNumber is equal to "14,2") then
+							set powerAdapterType to "30W or 35W Dual Port or 67W USB-C/MagSafe 3"
+						end if
+					else if (modelIdentifierMajorNumber ≥ 8) then
+						set powerAdapterType to "30W USB-C"
+					else if (modelIdentifierMajorNumber ≥ 5) then
+						set powerAdapterType to "45W MagSafe 2"
+					else
+						set powerAdapterType to "45W MagSafe 1"
+					end if
+				end if
+			*)
+			
 			set powerAdapterRows to "
 
 🔌	Power Adapter:
@@ -654,32 +732,39 @@ repeat
 		
 		
 		-- BLADE SSD COMPATIBILITY (https://beetstech.com/blog/apple-proprietary-ssd-ultimate-guide-to-specs-and-upgrades)
+		-- Blade SSD Compatibility Last Updated: 8/5/22
 		
 		set compatibleBladeSSDs to ""
-		if (shortModelName is equal to "MacBook Air") then
+		if (modelIdentifierName is equal to "MacBookAir") then
 			if ((modelIdentifierMajorNumber = 3) or (modelIdentifierMajorNumber = 4)) then
-				set compatibleBladeSSDs to "Gen 1"
+				set compatibleBladeSSDs to "Gen 1 / Model C"
 			else if (modelIdentifierMajorNumber = 5) then
-				set compatibleBladeSSDs to "Gen 2B"
+				set compatibleBladeSSDs to "Gen 2B / Model E (Narrow)"
 			else if (modelIdentifierMajorNumber = 6) then
-				set compatibleBladeSSDs to "Gen 3A"
+				set compatibleBladeSSDs to "Gen 3A / Model F (Narrow)"
 			else if (modelIdentifierMajorNumber = 7) then
 				if (modelIdentifierMinorNumber = 1) then
-					set compatibleBladeSSDs to "Gen 4C"
+					set compatibleBladeSSDs to "Gen 4C / Model H"
 				else
-					set compatibleBladeSSDs to "Gen 4A"
+					set compatibleBladeSSDs to "Gen 4A / Model G (Narrow)"
 				end if
 			end if
-		else if (((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber = 10)) or ((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber = 13))) then
-			set compatibleBladeSSDs to "Gen 2A"
-		else if (((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber = 11) and (modelIdentifierMinorNumber ≤ 3)) or ((shortModelName is equal to "iMac") and ((modelIdentifierMajorNumber = 14) or (modelIdentifierMajorNumber = 15))) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber = 6)) or ((shortModelName is equal to "Mac mini") and (modelIdentifierMajorNumber = 7))) then
-			set compatibleBladeSSDs to "Gen 3A or 3B"
-		else if (((shortModelName is equal to "MacBook Pro") and ((modelIdentifierMajorNumber = 12) or ((modelIdentifierMajorNumber = 11) and (modelIdentifierMinorNumber ≥ 4)))) or ((shortModelName is equal to "iMac") and ((modelIdentifierMajorNumber = 16) or (modelIdentifierMajorNumber = 17)))) then
-			set compatibleBladeSSDs to "Gen 4A or 4B"
-		else if ((shortModelName is equal to "MacBook Pro") and (((modelIdentifierMajorNumber = 13) or (modelIdentifierMajorNumber = 14)) and (modelIdentifierMinorNumber = 1))) then
-			set compatibleBladeSSDs to "Gen 5A"
-		else if ((shortModelName is equal to "iMac") and ((modelIdentifierMajorNumber = 18) and ((modelIdentifierMinorNumber = 2) and (modelIdentifierMinorNumber = 3)))) then
-			set compatibleBladeSSDs to "Gen 5B"
+		else if (((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber = 10)) or ((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber = 13))) then
+			set compatibleBladeSSDs to "Gen 2A / Model E (Wide)"
+		else if (((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber = 11) and (modelIdentifierMinorNumber ≤ 3)) or ((modelIdentifierName is equal to "iMac") and ((modelIdentifierMajorNumber = 14) or (modelIdentifierMajorNumber = 15))) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber = 6)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber = 7))) then
+			set compatibleBladeSSDs to "Gen 3A or 3B / Model F"
+			if (modelIdentifierName is equal to "iMac") then set compatibleBladeSSDs to (compatibleBladeSSDs & " (or Gen 4A or 4B / Model G)") -- iMac14,X that shipped around at least mid 2015 shipped with Gen 4/Model G drives (seen first hand with in situ wiped iMac14,1).
+		else if (((modelIdentifierName is equal to "MacBookPro") and ((modelIdentifierMajorNumber = 12) or ((modelIdentifierMajorNumber = 11) and (modelIdentifierMinorNumber ≥ 4)))) or ((modelIdentifierName is equal to "iMac") and ((modelIdentifierMajorNumber = 16) or (modelIdentifierMajorNumber = 17)))) then
+			set compatibleBladeSSDs to "Gen 4A or 4B / Model G"
+			if ((modelIdentifierName is equal to "iMac") and ((modelIdentifierMajorNumber = 16) or (modelIdentifierMajorNumber = 17))) then set compatibleBladeSSDs to (compatibleBladeSSDs & " (or Gen 4C / Model H)") -- Late 2015 iMacs (iMac16,X & iMac17,X) that shipped with fusion drives or maybe when they shipped around at least mid 2016 started shipping with Gen 4C/Model H NVMe drives (seen first hand with in situ wiped iMac17,1), so those must be allowed as well (there were previously issues with those models getting firmware updates, probably because of these NVMe drive, but I think Apple fixed that). Reference: https://eclecticlight.co/2021/02/06/could-this-fix-firmware-updating-in-the-imac-retina-5k-27-inch-late-2015-imac171/
+			
+		else if ((modelIdentifierName is equal to "MacBookPro") and (((modelIdentifierMajorNumber = 13) or (modelIdentifierMajorNumber = 14)) and (modelIdentifierMinorNumber = 1))) then
+			set compatibleBladeSSDs to "Gen 5A / Model J"
+		else if ((modelIdentifierName is equal to "iMac") and ((modelIdentifierMajorNumber = 18) or (modelIdentifierMajorNumber = 19))) then
+			-- Models with Gen 5B Blade SSD not listed in Beetstech Blog post linked above:
+			-- 2017 iMac: https://www.ifixit.com/Guide/iMac+Intel+21.5-Inch+Retina+4K+Display+(2017)+Blade+SSD+Replacement/101104 & https://www.userbenchmark.com/System/Apple-iMac181/60967 & https://discussions.apple.com/thread/251660820?answerId=253197784022#253197784022 & https://www.userbenchmark.com/System/Apple-iMac182/58934 & https://www.userbenchmark.com/System/Apple-iMac183/58155
+			-- 2019 iMac: https://www.ifixit.com/Guide/iMac+Intel+27-Inch+Retina+5K+Display+2019+Blade+SSD+Replacement/137596 & https://www.ebay.com/itm/234634547975 & https://www.userbenchmark.com/System/Apple-iMac191/138712 & https://www.userbenchmark.com/System/Apple-iMac192/139386
+			set compatibleBladeSSDs to "Gen 5B / Model L"
 		end if
 		
 		
@@ -690,11 +775,18 @@ repeat
 		-- MARKETING MODEL NAME INFORMATION
 		
 		set modelInfo to ""
+		set modelPartNumber to ""
 		set marketingModelName to ""
 		set rawMarketingModelName to shortModelName
 		set didGetLocalMarketingModelName to false
 		
-		if (chipType is not equal to "UNKNOWN Chip") then
+		if (hasT2chip or isAppleSilicon) then -- This "M####LL/A" style Model Part Number is only be accessible in software on T2 and Apple Silicon Macs.
+			try
+				set modelPartNumber to (do shell script "/usr/libexec/remotectl dumpstate | awk '($1 == \"RegionInfo\") { if ($NF == \"=>\") { region_info = \"LL/A\" } else { region_info = $NF } } ($1 == \"ModelNumber\") { print $NF region_info; exit }'")
+			end try
+		end if
+		
+		if (isAppleSilicon) then
 			try
 				-- This local marketing model name only exists on Apple Silicon Macs.
 				set marketingModelName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< \"$(ioreg -arc IOPlatformDevice -k product-name)\" | tr -dc '[:print:]'"))) -- Remove non-printable characters because this decoded value could end with a null char.
@@ -794,6 +886,7 @@ repeat
 					set showInternetRequiredErrorPart to ""
 					if (marketingModelNameErrorMessage is not equal to "Unknown Marketing Model Name") then set showInternetRequiredErrorPart to " - Internet REQUIRED"
 					set modelInfo to shortModelName & " (⚠️ UNKNOWN Marketing Name" & showInternetRequiredErrorPart & " ⚠️)"
+					if (modelPartNumber is not equal to "") then set modelInfo to (modelInfo & " / " & modelPartNumber)
 					
 					if (showSystemInfoAppButton) then
 						set modelInfo to modelInfo & "
@@ -806,7 +899,9 @@ repeat
 				end try
 				do shell script "rm -f " & (quoted form of marketingModelNameXMLpath)
 			else
-				set modelInfo to shortModelName & " (⚠️ UNKNOWN Marketing Name - NO SERIAL ⚠️)
+				set modelInfo to shortModelName & " (⚠️ UNKNOWN Marketing Name - NO SERIAL ⚠️)"
+				if (modelPartNumber is not equal to "") then set modelInfo to (modelInfo & " / " & modelPartNumber)
+				set modelInfo to modelInfo & "
 	‼️	LOOK UP MARKETING MODEL NAME FROM MODEL ID OR EMC  ‼️"
 			end if
 		end if
@@ -814,6 +909,7 @@ repeat
 		if ((modelInfo is equal to "") and (marketingModelName is not equal to "")) then
 			if (marketingModelName is equal to shortModelName) then
 				set modelInfo to shortModelName & " (No Marketing Model Name Specified)"
+				if (modelPartNumber is not equal to "") then set modelInfo to (modelInfo & " / " & modelPartNumber)
 			else
 				set rawMarketingModelName to marketingModelName
 				if (marketingModelName contains "Thunderbolt 3") then
@@ -832,9 +928,12 @@ repeat
 				end if
 				set AppleScript's text item delimiters to "”"
 				set modelInfo to (marketingModelNameParts as string)
+				if (modelPartNumber is not equal to "") then set modelInfo to (modelInfo & " / " & modelPartNumber)
 			end if
 		else if (modelInfo is equal to "") then
-			set modelInfo to shortModelName & " (⚠️ UNKNOWN Marketing Name  - UNKNOWN ERROR ⚠️)
+			set modelInfo to shortModelName & " (⚠️ UNKNOWN Marketing Name  - UNKNOWN ERROR ⚠️)"
+			if (modelPartNumber is not equal to "") then set modelInfo to (modelInfo & " / " & modelPartNumber)
+			set modelInfo to modelInfo & "
 	‼️	CHECK “About This Mac” FOR MARKETING MODEL NAME  ‼️"
 			set showAboutMacWindowButton to true
 		end if
@@ -846,6 +945,7 @@ repeat
 		
 		set didGetHardDriveInfo to false
 		set hardDriveDiskIDs to {}
+		set hardDrivesList to {}
 		set maxSataRevision to 0
 		set storageInfo to "⚠️	NOT Detected  ⚠️
 	‼️	CHECK IF A HARD DRIVE IS INSTALLED	‼️
@@ -874,7 +974,7 @@ repeat
 	‼️	         CHECK IF A DISC DRIVE IS INSTALLED								 ‼️
 	‼️	CHECK CONNECTIONS, REPLACE IF NECESSARY		‼️"
 		
-		if (((shortModelName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 13)) or ((shortModelName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((shortModelName is equal to "MacBook Pro") and (modelIdentifierMajorNumber ≥ 10)) or (shortModelName is equal to "MacBook Air") or ((shortModelName is equal to "Mac mini") and (((offset of "Server" in rawMarketingModelName) > 0) or (modelIdentifierMajorNumber ≥ 5))) or ((shortModelName is equal to "Mac Pro") and (modelIdentifierMajorNumber ≥ 6)) or (shortModelName is equal to "iMac Pro") or (shortModelName is equal to "Mac Studio")) then
+		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 13)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 10)) or (modelIdentifierName is equal to "MacBookAir") or ((modelIdentifierName is equal to "Macmini") and (((offset of "Server" in rawMarketingModelName) > 0) or (modelIdentifierMajorNumber ≥ 5))) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 6)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then
 			set discDriveDetected to "N/A (Manufactured Without Disc Drive)"
 			set didGetDiscDriveInfo to true
 		end if
@@ -938,7 +1038,10 @@ repeat
 									set thisMemorySlot to "Empty"
 									if (thisMemoryType is not equal to "empty") then
 										if (memoryType contains "UNKNOWN") then
-											set memoryType to ((first word of thisMemoryType) as string)
+											try
+												set thisMemoryType to (do shell script "echo " & (quoted form of thisMemoryType) & " | sed 's/ SO-DIMM//'") -- Remove " SO-DIMM" suffix that exists on iMacs with DDR4 RAM.
+												if (thisMemoryType contains "DDR") then set memoryType to thisMemoryType
+											end try
 											set memorySpeed to (" @ " & ((value of property list item "dimm_speed" of thisMemoryItem) as string))
 										end if
 										
@@ -957,14 +1060,13 @@ repeat
 								delay 10
 							end if
 						end try
-					else if ((thisDataType is equal to "SPSerialATADataType") or (thisDataType is equal to "SPNVMeDataType")) then -- HARD DRIVE INFORMATION
+					else if ((thisDataType is equal to "SPNVMeDataType") or (thisDataType is equal to "SPSerialATADataType")) then -- HARD DRIVE INFORMATION
 						try
 							tell me
 								set progress completed steps to (progress completed steps + 1)
 								set progress description to "
 📁	Loading Storage Information"
 							end tell
-							set hardDrivesList to {}
 							set sataItems to (property list item "_items" of thisDataTypeProperties)
 							repeat with j from 1 to (number of property list items in sataItems)
 								set thisSataController to (property list item j of sataItems)
@@ -1042,7 +1144,7 @@ repeat
 													--	64GB Toshiba: APPLE SSD TS064C
 													--	256GB Samsung: APPLE SSD SM256C
 													-- Gen 2B Examples:
-													--	65GB Toshiba: APPLE SSD TS064E
+													--	64GB Toshiba: APPLE SSD TS064E
 													--	512GB Samsung: APPLE SSD SM512E
 													-- Gen 2A Examples:
 													--	128GB Samsung: APPLE SSD SM128E
@@ -1059,7 +1161,7 @@ repeat
 													-- Gen 5A Examples:
 													--	128GB: APPLE SSD AP0128J
 													-- Gen 5B Examples:
-													--	2TB: APPLE SSD AP2048L (https://www.ebay.com/itm/352638228107)
+													--	2TB: APPLE SSD SM2048L (https://www.ebay.com/itm/352638228107)
 													
 													set installedBladeSSD to ""
 													if (thisDiskModelName ends with "C") then
@@ -1109,7 +1211,7 @@ repeat
 													if (thisSataControllerDriveSataRevision is not equal to thisSataControllerPortSataRevision) then
 														if ((thisSataControllerDriveSataRevision is equal to 2) and (thisSataControllerPortSataRevision is equal to 3) and (thisSataItemMediumType is equal to "Rotational")) then
 															set incorrectDriveInstalledNote to "
-	👉	HDD NEGOTIATED TO SATA II (3 Gb/s) SPEED, BUT THATS OK  👍" -- https://discussions.apple.com/thread/250036019 & https://todo.freegeek.org/Ticket/Display.html?id=86977 & https://todo.freegeek.org/Ticket/Display.html?id=86981
+	👉	HDD NEGOTIATED TO SATA II (3 Gb/s) SPEED, BUT THAT'S OK  👍" -- https://discussions.apple.com/thread/250036019 & https://todo.freegeek.org/Ticket/Display.html?id=86977 & https://todo.freegeek.org/Ticket/Display.html?id=86981
 														else
 															set incorrectDriveInstalledNote to "
 	⚠️	INCORRECT SATA DRIVE SPEED INSTALLED  ⚠️"
@@ -1137,12 +1239,10 @@ repeat
 									end repeat
 								end if
 							end repeat
-							if ((count of hardDrivesList) > 0) then
-								set AppleScript's text item delimiters to (linefeed & tab)
-								set storageInfo to (hardDrivesList as string)
-							end if
 							set didGetHardDriveInfo to true
 						on error (storageInfoErrorMessage) number (storageInfoErrorNumber)
+							set hardDriveDiskIDs to {}
+							set hardDrivesList to {}
 							log "Storage Info Error: " & storageInfoErrorMessage
 							if (storageInfoErrorNumber is equal to -128) then
 								do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
@@ -1260,14 +1360,31 @@ repeat
 								try -- The spairport_airport_interfaces array has 2 items on Monterey and only one of them contains spairport_status_information etc.
 									set wiFiStatus to ((value of property list item "spairport_status_information" of thisWiFiInterface) as string)
 									if (wiFiStatus is not equal to "spairport_status_connected") then
-										set wiFiInfo to "Wi-Fi Detected (⚠️ UNKNOWN Protocols - Wi-Fi DISABLED ⚠️)
+										set wiFiInfo to "Wi-Fi Detected (⚠️ UNKNOWN Versions/Protocols - Wi-Fi DISABLED ⚠️)
 	‼️	ENABLE WI-FI AND RELOAD  ‼️"
 									end if
 									set possibleWiFiProtocols to (words of ((value of property list item "spairport_supported_phymodes" of thisWiFiInterface) as string))
 									repeat with thisPossibleWiFiProtocol in possibleWiFiProtocols
-										set uppercasePossibleWiFiProtocol to (do shell script "echo " & (quoted form of (thisPossibleWiFiProtocol as string)) & " | tr '[:lower:]' '[:upper:]'")
-										if ((uppercasePossibleWiFiProtocol is not equal to "802.11") and (wiFiProtocolsList does not contain uppercasePossibleWiFiProtocol)) then
-											set (end of wiFiProtocolsList) to uppercasePossibleWiFiProtocol
+										set thisWiFiVersionAndProtocol to (thisPossibleWiFiProtocol as string)
+										if (thisWiFiVersionAndProtocol is not equal to "802.11") then
+											if (thisWiFiVersionAndProtocol is equal to "b") then
+												set thisWiFiVersionAndProtocol to ("1/" & thisWiFiVersionAndProtocol)
+											else if (thisWiFiVersionAndProtocol is equal to "a") then
+												set thisWiFiVersionAndProtocol to ("2/" & thisWiFiVersionAndProtocol)
+											else if (thisWiFiVersionAndProtocol is equal to "g") then
+												set thisWiFiVersionAndProtocol to ("3/" & thisWiFiVersionAndProtocol)
+											else if (thisWiFiVersionAndProtocol is equal to "n") then
+												set thisWiFiVersionAndProtocol to ("4/" & thisWiFiVersionAndProtocol)
+											else if (thisWiFiVersionAndProtocol is equal to "ac") then
+												set thisWiFiVersionAndProtocol to ("5/" & thisWiFiVersionAndProtocol)
+											else if (thisWiFiVersionAndProtocol is equal to "ax") then
+												set thisWiFiVersionAndProtocol to ("6/" & thisWiFiVersionAndProtocol)
+											else if (thisWiFiVersionAndProtocol is equal to "be") then
+												set thisWiFiVersionAndProtocol to ("7/" & thisWiFiVersionAndProtocol)
+											end if
+											if (wiFiProtocolsList does not contain thisWiFiVersionAndProtocol) then
+												set (end of wiFiProtocolsList) to thisWiFiVersionAndProtocol
+											end if
 										end if
 									end repeat
 								end try
@@ -1276,23 +1393,22 @@ repeat
 							if ((count of wiFiProtocolsList) > 0) then
 								set lastWiFiProtocol to ""
 								if ((count of wiFiProtocolsList) > 1) then
+									set AppleScript's text item delimiters to linefeed
+									set wiFiProtocolsList to (paragraphs of (do shell script ("echo " & (quoted form of (wiFiProtocolsList as string)) & " | sort -V")))
 									set lastWiFiProtocol to (last item of wiFiProtocolsList)
 									set wiFiProtocolsList to (reverse of (rest of (reverse of wiFiProtocolsList)))
 								end if
 								set AppleScript's text item delimiters to ", "
 								set wiFiProtocolsString to (wiFiProtocolsList as string)
-								set singularOrPluralProtocols to " Protocols"
 								if (lastWiFiProtocol is not equal to "") then
 									set commaAndOrJustAnd to ", and "
 									if ((count of wiFiProtocolsList) = 1) then set commaAndOrJustAnd to " and "
 									set wiFiProtocolsString to wiFiProtocolsString & commaAndOrJustAnd & lastWiFiProtocol
-								else
-									set singularOrPluralProtocols to " Protocol"
 								end if
 								
-								set wiFiInfo to "Wi-Fi Detected (Supports " & wiFiProtocolsString & singularOrPluralProtocols & ")"
+								set wiFiInfo to "Wi-Fi Detected (Supports " & wiFiProtocolsString & ")"
 							else
-								error "No Wi-Fi Protocols Detected"
+								error "No Wi-Fi Versions/Protocols Detected"
 							end if
 							set didGetWiFiInfo to true
 						on error (wiFiInfoErrorMessage) number (wiFiInfoErrorNumber)
@@ -1310,13 +1426,13 @@ repeat
 								set progress description to "
 📡	Loading Wireless Information"
 							end tell
+							set bluetoothSupportedFeaturesList to {}
 							set bluetoothItems to (first property list item of property list item "_items" of thisDataTypeProperties)
 							try
 								set bluetoothInfo to (property list item "local_device_title" of bluetoothItems)
 								set bluetoothVersion to ((first word of ((value of property list item "general_hci_version" of bluetoothInfo) as string)) as string)
 								if (bluetoothVersion starts with "0x") then set bluetoothVersion to ((first word of ((value of property list item "general_lmp_version" of bluetoothInfo) as string)) as string)
 								if (bluetoothVersion is equal to "0x9") then set bluetoothVersion to "5.0" -- BT 5.0 will not be detected properly on High Sierra.
-								set bluetoothSupportedFeaturesList to {}
 								try
 									set bluetoothLEsupported to ((value of property list item "general_supports_lowEnergy" of bluetoothInfo) as string)
 									if (bluetoothLEsupported is equal to "attrib_Yes") then set (end of bluetoothSupportedFeaturesList) to "BLE"
@@ -1325,21 +1441,50 @@ repeat
 									set bluetoothHandoffSupported to ((value of property list item "general_supports_handoff" of bluetoothInfo) as string)
 									if (bluetoothHandoffSupported is equal to "attrib_Yes") then set (end of bluetoothSupportedFeaturesList) to "Handoff"
 								end try
+								set bluetoothInfo to "Bluetooth " & bluetoothVersion & " Detected"
+								set didGetBluetoothInfo to true
+							on error
+								set bluetoothInfo to (property list item "controller_properties" of bluetoothItems)
+								set bluetoothChipset to ((value of property list item "controller_chipset" of bluetoothInfo) as string)
+								if (bluetoothChipset is not equal to "") then
+									-- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
+									-- BUT, I wrote a script (in "Other Scripts/get_bluetooth_from_all_mac_specs_pages.sh") to extract every Bluetooth version from every specs URL to be able to know what version this model has if Bluetooth is detected.
+									
+									-- Bluetooth Model IDs Last Updated: 8/15/22
+									if ({"Mac13,1", "Mac13,2", "Mac14,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"} contains modelIdentifier) then
+										set bluetoothInfo to "Bluetooth 5.0 Detected"
+										set (end of bluetoothSupportedFeaturesList) to "BLE"
+										set (end of bluetoothSupportedFeaturesList) to "Handoff"
+									else if ({"MacBook10,1", "MacBookAir8,1", "MacBookAir8,2", "MacBookPro11,4", "MacBookPro11,5", "MacBookPro13,1", "MacBookPro13,2", "MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3", "iMac18,1", "iMac18,2", "iMac18,3", "iMac19,1", "iMac19,2"} contains modelIdentifier) then
+										set bluetoothInfo to "Bluetooth 4.2 Detected"
+										set (end of bluetoothSupportedFeaturesList) to "BLE"
+										set (end of bluetoothSupportedFeaturesList) to "Handoff" -- All Bluetooth 4.2 and newer models support Handoff
+									else if ({"MacBook8,1", "MacBook9,1", "MacBookAir4,1", "MacBookAir4,2", "MacBookAir5,1", "MacBookAir5,2", "MacBookAir6,1", "MacBookAir6,2", "MacBookAir7,1", "MacBookAir7,2", "MacBookPro9,1", "MacBookPro9,2", "MacBookPro10,1", "MacBookPro10,2", "MacBookPro11,1", "MacBookPro11,2", "MacBookPro11,3", "MacBookPro12,1", "MacPro6,1", "Macmini5,1", "Macmini5,2", "Macmini5,3", "Macmini6,1", "Macmini6,2", "Macmini7,1", "iMac13,1", "iMac13,2", "iMac14,1", "iMac14,2", "iMac14,4", "iMac15,1", "iMac16,1", "iMac16,2", "iMac17,1"} contains modelIdentifier) then
+										-- SOME of these models with Bluetooth 4.0 DON'T support Monterey, but it would be more effor to not include them.
+										set bluetoothInfo to "Bluetooth 4.0 Detected"
+										set (end of bluetoothSupportedFeaturesList) to "BLE" -- All Bluetooth 4.0 and above is BLE
+										if ({"MacBookAir4,1", "MacBookAir4,2", "Macmini5,1", "Macmini5,2", "Macmini5,3"} does not contain modelIdentifier) then
+											set bluetoothHandoff to true -- Most Bluetooth 4.0 models support Handoff, but some early models don't, so show support for all EXCEPT those models: https://support.apple.com/en-us/HT204689
+										end if
+									else if ({"MacBook5,2", "MacBook6,1", "MacBook7,1", "MacBookAir2,1", "MacBookAir3,1", "MacBookAir3,2", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro5,5", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro7,1", "MacBookPro8,1", "MacBookPro8,2", "MacBookPro8,3", "MacPro4,1", "MacPro5,1", "Macmini3,1", "Macmini4,1", "iMac9,1", "iMac10,1", "iMac11,2", "iMac11,3", "iMac12,1", "iMac12,2"} contains modelIdentifier) then
+										-- NONE of these models with Bluetooth 2.1 (plus EDR) support Monterey, but it's no extra effort to include them anyways.
+										set bluetoothInfo to "Bluetooth 2.1 Detected"
+									else
+										set bluetoothInfo to "Bluetooth Detected"
+									end if
+									
+									set didGetBluetoothInfo to true
+								end if
+							end try
+							
+							if (didGetBluetoothInfo) then
 								set bluetoothSupportedFeatures to ""
 								if ((count of bluetoothSupportedFeaturesList) > 0) then
 									set AppleScript's text item delimiters to ", "
 									set bluetoothSupportedFeatures to " (Supports " & (bluetoothSupportedFeaturesList as string) & ")"
 								end if
-								set bluetoothInfo to "Bluetooth " & bluetoothVersion & " Detected" & bluetoothSupportedFeatures
-								set didGetBluetoothInfo to true
-							on error -- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
-								set bluetoothInfo to (property list item "controller_properties" of bluetoothItems)
-								set bluetoothChipset to ((value of property list item "controller_chipset" of bluetoothInfo) as string)
-								if (bluetoothChipset is not equal to "") then
-									set bluetoothInfo to "Bluetooth Detected"
-									set didGetBluetoothInfo to true
-								end if
-							end try
+								set bluetoothInfo to (bluetoothInfo & bluetoothSupportedFeatures)
+							end if
 						on error (bluetoothInfoErrorMessage) number (bluetoothInfoErrorNumber)
 							log "Bluetooth Info Error: " & bluetoothInfoErrorMessage
 							if (bluetoothInfoErrorNumber is equal to -128) then
@@ -1410,7 +1555,7 @@ repeat
 								set thisPowerItem to (property list item j of powerItems)
 								try
 									set batteryCondition to ((value of property list item "sppower_battery_health" of property list item "sppower_battery_health_info" of thisPowerItem) as string)
-									if (batteryCondition is not equal to "Good") then -- https://support.apple.com/en-us/HT204054#battery
+									if (batteryCondition is not equal to "Good") then -- https://support.apple.com/HT204054#battery
 										set batteryCapacityPercentage to batteryCapacityPercentage & "
 	⚠️	BATTERY CONDITION IS NOT NORMAL  ⚠️
 	‼️	CONDITION IS “" & batteryCondition & "”  ‼️"
@@ -1440,6 +1585,10 @@ repeat
 		end try
 		do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
 		
+		if ((count of hardDrivesList) > 0) then
+			set AppleScript's text item delimiters to (linefeed & tab)
+			set storageInfo to (hardDrivesList as string)
+		end if
 		
 		if (not didGetMemoryInfo) then
 			set memoryNote to "
@@ -1523,13 +1672,13 @@ repeat
 			try
 				do shell script "system_profiler -xml SPBluetoothDataType > " & (quoted form of bluetoothInfoPath)
 				tell application "System Events" to tell property list file bluetoothInfoPath
+					set bluetoothSupportedFeaturesList to {}
 					set bluetoothItems to (first property list item of property list item "_items" of first property list item)
 					try
 						set bluetoothInfo to (property list item "local_device_title" of bluetoothItems)
 						set bluetoothVersion to ((first word of ((value of property list item "general_hci_version" of bluetoothInfo) as string)) as string)
 						if (bluetoothVersion starts with "0x") then set bluetoothVersion to ((first word of ((value of property list item "general_lmp_version" of bluetoothInfo) as string)) as string)
 						if (bluetoothVersion is equal to "0x9") then set bluetoothVersion to "5.0" -- BT 5.0 will not be detected properly on High Sierra.
-						set bluetoothSupportedFeaturesList to {}
 						try
 							set bluetoothLEsupported to ((value of property list item "general_supports_lowEnergy" of bluetoothInfo) as string)
 							if (bluetoothLEsupported is equal to "attrib_Yes") then set (end of bluetoothSupportedFeaturesList) to "BLE"
@@ -1538,19 +1687,49 @@ repeat
 							set bluetoothHandoffSupported to ((value of property list item "general_supports_handoff" of bluetoothInfo) as string)
 							if (bluetoothHandoffSupported is equal to "attrib_Yes") then set (end of bluetoothSupportedFeaturesList) to "Handoff"
 						end try
+						set bluetoothInfo to "Bluetooth " & bluetoothVersion & " Detected"
+					on error -- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
+						set bluetoothInfo to (property list item "controller_properties" of bluetoothItems)
+						set bluetoothChipset to ((value of property list item "controller_chipset" of bluetoothInfo) as string)
+						if (bluetoothChipset is not equal to "") then
+							-- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
+							-- BUT, I wrote a script (in "Other Scripts/get_bluetooth_from_all_mac_specs_pages.sh") to extract every Bluetooth version from every specs URL to be able to know what version this model has if Bluetooth is detected.
+							
+							-- Bluetooth Model IDs Last Updated: 8/15/22
+							if ({"Mac13,1", "Mac13,2", "Mac14,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"} contains modelIdentifier) then
+								set bluetoothInfo to "Bluetooth 5.0 Detected"
+								set (end of bluetoothSupportedFeaturesList) to "BLE"
+								set (end of bluetoothSupportedFeaturesList) to "Handoff"
+							else if ({"MacBook10,1", "MacBookAir8,1", "MacBookAir8,2", "MacBookPro11,4", "MacBookPro11,5", "MacBookPro13,1", "MacBookPro13,2", "MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3", "iMac18,1", "iMac18,2", "iMac18,3", "iMac19,1", "iMac19,2"} contains modelIdentifier) then
+								set bluetoothInfo to "Bluetooth 4.2 Detected"
+								set (end of bluetoothSupportedFeaturesList) to "BLE"
+								set (end of bluetoothSupportedFeaturesList) to "Handoff" -- All Bluetooth 4.2 and newer models support Handoff
+							else if ({"MacBook8,1", "MacBook9,1", "MacBookAir4,1", "MacBookAir4,2", "MacBookAir5,1", "MacBookAir5,2", "MacBookAir6,1", "MacBookAir6,2", "MacBookAir7,1", "MacBookAir7,2", "MacBookPro9,1", "MacBookPro9,2", "MacBookPro10,1", "MacBookPro10,2", "MacBookPro11,1", "MacBookPro11,2", "MacBookPro11,3", "MacBookPro12,1", "MacPro6,1", "Macmini5,1", "Macmini5,2", "Macmini5,3", "Macmini6,1", "Macmini6,2", "Macmini7,1", "iMac13,1", "iMac13,2", "iMac14,1", "iMac14,2", "iMac14,4", "iMac15,1", "iMac16,1", "iMac16,2", "iMac17,1"} contains modelIdentifier) then
+								-- SOME of these models with Bluetooth 4.0 DON'T support Monterey, but it would be more effor to not include them.
+								set bluetoothInfo to "Bluetooth 4.0 Detected"
+								set (end of bluetoothSupportedFeaturesList) to "BLE" -- All Bluetooth 4.0 and above is BLE
+								if ({"MacBookAir4,1", "MacBookAir4,2", "Macmini5,1", "Macmini5,2", "Macmini5,3"} does not contain modelIdentifier) then
+									set bluetoothHandoff to true -- Most Bluetooth 4.0 models support Handoff, but some early models don't, so show support for all EXCEPT those models: https://support.apple.com/en-us/HT204689
+								end if
+							else if ({"MacBook5,2", "MacBook6,1", "MacBook7,1", "MacBookAir2,1", "MacBookAir3,1", "MacBookAir3,2", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro5,5", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro7,1", "MacBookPro8,1", "MacBookPro8,2", "MacBookPro8,3", "MacPro4,1", "MacPro5,1", "Macmini3,1", "Macmini4,1", "iMac9,1", "iMac10,1", "iMac11,2", "iMac11,3", "iMac12,1", "iMac12,2"} contains modelIdentifier) then
+								-- NONE of these models with Bluetooth 2.1 (plus EDR) support Monterey, but it's no extra effort to include them anyways.
+								set bluetoothInfo to "Bluetooth 2.1 Detected"
+							else
+								set bluetoothInfo to "Bluetooth Detected"
+							end if
+							
+							set didGetBluetoothInfo to true
+						end if
+					end try
+					
+					if (didGetBluetoothInfo) then
 						set bluetoothSupportedFeatures to ""
 						if ((count of bluetoothSupportedFeaturesList) > 0) then
 							set AppleScript's text item delimiters to ", "
 							set bluetoothSupportedFeatures to " (Supports " & (bluetoothSupportedFeaturesList as string) & ")"
 						end if
-						set bluetoothInfo to "Bluetooth " & bluetoothVersion & " Detected" & bluetoothSupportedFeatures
-					on error -- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
-						set bluetoothInfo to (property list item "controller_properties" of bluetoothItems)
-						set bluetoothChipset to ((value of property list item "controller_chipset" of bluetoothInfo) as string)
-						if (bluetoothChipset is not equal to "") then
-							set bluetoothInfo to "Bluetooth Detected"
-						end if
-					end try
+						set bluetoothInfo to (bluetoothInfo & bluetoothSupportedFeatures)
+					end if
 				end tell
 			on error (bluetoothInfoErrorMessage) number (bluetoothInfoErrorNumber)
 				log "Bluetooth Info Error: " & bluetoothInfoErrorMessage
@@ -1606,10 +1785,10 @@ repeat
 						activate
 					end try
 					display alert "Would you like to check for
-Remote Management (DEP/MDM)?" message "Remote Management check will be skipped in 10 seconds." buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 10
+Remote Management (ADE/DEP/MDM)?" message "Remote Management check will be skipped in 10 seconds." buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 10
 					if (gave up of result) then error number -128
 					set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" with prompt "Administrator Permission is required
-to check for Remote Management (DEP/MDM)." with administrator privileges)
+to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
 				end try
 			end try
 			
@@ -1653,25 +1832,35 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 						set remoteManagementOrganizationContactInfo to {}
 						
 						repeat with thisRemoteManagementOutputPart in remoteManagementOutputParts
-							set organizationNameOffset to (offset of "OrganizationName = \"" in thisRemoteManagementOutputPart)
-							set organizationDepartmentOffset to (offset of "OrganizationDepartment = \"" in thisRemoteManagementOutputPart)
-							set organizationEmailOffset to (offset of "OrganizationEmail = \"" in thisRemoteManagementOutputPart)
-							set organizationPhoneOffset to (offset of "OrganizationPhone = \"" in thisRemoteManagementOutputPart)
-							set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = \"" in thisRemoteManagementOutputPart)
+							set organizationNameOffset to (offset of "OrganizationName = " in thisRemoteManagementOutputPart)
+							set organizationDepartmentOffset to (offset of "OrganizationDepartment = " in thisRemoteManagementOutputPart)
+							set organizationEmailOffset to (offset of "OrganizationEmail = " in thisRemoteManagementOutputPart)
+							set organizationSupportEmailOffset to (offset of "OrganizationSupportEmail = " in thisRemoteManagementOutputPart)
+							set organizationPhoneOffset to (offset of "OrganizationPhone = " in thisRemoteManagementOutputPart)
+							set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = " in thisRemoteManagementOutputPart)
 							
 							if (organizationNameOffset > 0) then
-								set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart)
+								set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart) -- Leave quotes around Organization Name.
+								if ((remoteManagementOrganizationName does not start with "\"") or (remoteManagementOrganizationName does not end with "\"")) then set remoteManagementOrganizationName to ("\"" & remoteManagementOrganizationName & "\"") -- Or add quotes if somehow they don't exist.
 							else if (organizationDepartmentOffset > 0) then
-								set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 26) thru -3 of thisRemoteManagementOutputPart)
+								set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 25) thru -2 of thisRemoteManagementOutputPart)
+								if ((remoteManagementOrganizationDepartment starts with "\"") and (remoteManagementOrganizationDepartment ends with "\"")) then set remoteManagementOrganizationDepartment to (text 2 thru -2 of remoteManagementOrganizationDepartment) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
 								if ((remoteManagementOrganizationDepartment is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationDepartment)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationDepartment
 							else if (organizationEmailOffset > 0) then
-								set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 21) thru -3 of thisRemoteManagementOutputPart)
+								set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 20) thru -2 of thisRemoteManagementOutputPart)
+								if ((remoteManagementOrganizationEmail starts with "\"") and (remoteManagementOrganizationEmail ends with "\"")) then set remoteManagementOrganizationEmail to (text 2 thru -2 of remoteManagementOrganizationEmail) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
 								if ((remoteManagementOrganizationEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationEmail
+							else if (organizationSupportEmailOffset > 0) then
+								set remoteManagementOrganizationSupportEmail to (text (organizationSupportEmailOffset + 27) thru -2 of thisRemoteManagementOutputPart)
+								if ((remoteManagementOrganizationSupportEmail starts with "\"") and (remoteManagementOrganizationSupportEmail ends with "\"")) then set remoteManagementOrganizationSupportEmail to (text 2 thru -2 of remoteManagementOrganizationSupportEmail) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+								if ((remoteManagementOrganizationSupportEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportEmail
 							else if (organizationPhoneOffset > 0) then
-								set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 21) thru -3 of thisRemoteManagementOutputPart)
+								set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 20) thru -2 of thisRemoteManagementOutputPart)
+								if ((remoteManagementOrganizationPhone starts with "\"") and (remoteManagementOrganizationPhone ends with "\"")) then set remoteManagementOrganizationPhone to (text 2 thru -2 of remoteManagementOrganizationPhone) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
 								if ((remoteManagementOrganizationPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationPhone
 							else if (organizationSupportPhoneOffset > 0) then
-								set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 28) thru -3 of thisRemoteManagementOutputPart)
+								set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 27) thru -2 of thisRemoteManagementOutputPart)
+								if ((remoteManagementOrganizationSupportPhone starts with "\"") and (remoteManagementOrganizationSupportPhone ends with "\"")) then set remoteManagementOrganizationSupportPhone to (text 2 thru -2 of remoteManagementOrganizationSupportPhone) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
 								if ((remoteManagementOrganizationSupportPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportPhone
 							end if
 						end repeat
@@ -1732,7 +1921,11 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 🔋	Battery:
 	" & batteryCapacityPercentage
 		
-		if (macBookPro13inch2016PossibleBatteryRecall or macBookPro15inch2015PossibleBatteryRecall) then
+		if (macBookPro2016and2017RecalledBatteryRecall) then
+			set batteryRows to batteryRows & "
+	⚠️	BATTERY MAY BE RECALLED FOR REPLACEMENT  ⚠️
+	‼️	IF WON'T CHARGE OR CONDITION NOT NORMAL  ‼️"
+		else if (macBookPro13inch2016PossibleBatteryRecall or macBookPro15inch2015PossibleBatteryRecall) then
 			set batteryRows to batteryRows & "
 	⚠️	BATTERY MAY BE RECALLED FOR REPLACEMENT  ⚠️
 	‼️	CHECK SERIAL NUMBER ON APPLE'S BATTERY RECALL PAGE  ‼️
@@ -1743,24 +1936,28 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	set showMojaveOnOldMacProButton to false
 	
 	set supportedOS to "
-	OS X 10.11 “El Capitan”"
-	if (supportsMonterey) then
+	OS X 10.11 El Capitan"
+	if (supportsVentura) then
 		set supportedOS to "
- 	macOS 12 “Monterey”"
+ 	macOS 13 Ventura"
+	else if (supportsMonterey) then
+		set supportedOS to "
+ 	macOS 12 Monterey
+	⚠️	DOES NOT SUPPORT macOS 13 Ventura or Newer"
 	else if (supportsBigSur) then
 		set supportedOS to "
-	macOS 11 “Big Sur”
-	⚠️	WILL NOT SUPPORT macOS 12 “Monterey”"
+	macOS 11 Big Sur
+	⚠️	DOES NOT SUPPORT macOS 12 Monterey or Newer"
 	else if (supportsCatalina) then
 		set supportedOS to "
-	macOS 10.15 “Catalina”
-	⚠️	DOES NOT SUPPORT macOS 11 “Big Sur”"
+	macOS 10.15 Catalina
+	⚠️	DOES NOT SUPPORT macOS 11 Big Sur or Newer"
 	else if (supportsHighSierra) then
 		set supportedOS to "
-	macOS 10.13 “High Sierra”"
+	macOS 10.13 High Sierra"
 		if (supportsMojaveWithMetalCapableGPU) then
 			set supportedOS to (supportedOS & "
-	✅	CAN SUPPORT macOS 10.14 “Mojave”
+	✅	CAN SUPPORT macOS 10.14 Mojave
 		👉	With Recommended Metal-Capable GPU
 			(Including MSI Gaming Radeon RX 560
 			  and Sapphire Radeon PULSE RX 580)")
@@ -1841,10 +2038,10 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 📀	Disc Drive:
 	" & discDriveDetected & batteryRows & powerAdapterRows & "
 
-💎	Supported OS:" & supportedOS
+🍏	Supported OS:" & supportedOS
 		
 		set reloadButton to "Reload"
-		if (macBookPro13inch2016PossibleBatteryRecall or macBookPro15inch2015PossibleBatteryRecall) then
+		if (macBookPro13inch2016PossibleBatteryRecall or macBookPro15inch2015PossibleBatteryRecall or macBookPro2016and2017RecalledBatteryRecall) then
 			set reloadButton to "Open Battery Recall Info & Reload"
 		else if (macBookPro13inch2017PossibleSSDRecall) then
 			set reloadButton to "Open SSD Recall Info & Reload"
@@ -1876,7 +2073,9 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 			set progress description to "
 🔄	Reloading " & (name of me) & ""
 			try
-				if (macBookPro13inch2016PossibleBatteryRecall or macBookPro15inch2015PossibleBatteryRecall or macBookPro13inch2017PossibleSSDRecall) then
+				if (macBookPro2016and2017RecalledBatteryRecall) then
+					do shell script "open 'https://web.archive.org/web/20220620162055/https://support.apple.com/en-us/HT212163'"
+				else if (macBookPro13inch2016PossibleBatteryRecall or macBookPro15inch2015PossibleBatteryRecall or macBookPro13inch2017PossibleSSDRecall) then
 					set the clipboard to serialNumber
 					if (macBookPro13inch2016PossibleBatteryRecall) then
 						do shell script "open 'https://support.apple.com/13inch-macbookpro-battery-replacement'"
@@ -1911,7 +2110,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 					try
 						try
 							((aboutThisMacAppPath as POSIX file) as alias)
-							do shell script "open -n -a " & (quoted form of aboutThisMacAppPath)
+							do shell script "open -na " & (quoted form of aboutThisMacAppPath)
 						on error
 							tell application "System Events" to tell application process "Finder" to click menu item "About This Mac" of menu 1 of menu bar item "Apple" of menu bar 1
 						end try
@@ -2005,15 +2204,6 @@ try
 		set (end of listOfAvailableTests) to "🏥	Hard Drive Test (DriveDx)"
 	end try
 	try
-		(("/Applications/Firmware Checker.app" as POSIX file) as alias)
-		set (end of listOfAvailableTests) to "🎛	Firmware Checker"
-	end try
-	try
-		(("/Applications/Restore OS.app" as POSIX file) as alias)
-		(("/Users/Shared/Restore OS Images/" as POSIX file) as alias)
-		set (end of listOfAvailableTests) to "💾	Restore OS"
-	end try
-	try
 		(("/Applications/Startup Picker.app" as POSIX file) as alias)
 		set (end of listOfAvailableTests) to "🍏	Startup Picker"
 	end try
@@ -2042,31 +2232,27 @@ try
 			try
 				set selectedLaunchTest to (item 1 of launchTestReply)
 				if (selectedLaunchTest is equal to "📡	Internet Test") then
-					do shell script "open -n -a '/Applications/Internet Test.app'"
+					do shell script "open -na '/Applications/Internet Test.app'"
 				else if (selectedLaunchTest is equal to "📢	Audio Test") then
-					do shell script "open -n -a '/Applications/Audio Test.app'"
+					do shell script "open -na '/Applications/Audio Test.app'"
 				else if (selectedLaunchTest is equal to "🎙	Microphone Test") then
-					do shell script "open -n -a '/Applications/Microphone Test.app'"
+					do shell script "open -na '/Applications/Microphone Test.app'"
 				else if (selectedLaunchTest is equal to "🎥	Camera Test") then
-					do shell script "open -n -a '/Applications/Camera Test.app'"
+					do shell script "open -na '/Applications/Camera Test.app'"
 				else if (selectedLaunchTest is equal to "🇲🇺	Screen Test") then
-					do shell script "open -n -a '/Applications/Screen Test.app'"
+					do shell script "open -na '/Applications/Screen Test.app'"
 				else if (selectedLaunchTest is equal to "✌️	Trackpad Test") then
-					do shell script "open -n -a '/Applications/Trackpad Test.app'"
+					do shell script "open -na '/Applications/Trackpad Test.app'"
 				else if (selectedLaunchTest is equal to "⌨️	Keyboard Test") then
-					do shell script "open -n -a '/Applications/Keyboard Test.app'"
+					do shell script "open -na '/Applications/Keyboard Test.app'"
 				else if (selectedLaunchTest is equal to "🧠	CPU Stress Test") then
-					do shell script "open -n -a '/Applications/CPU Stress Test.app'"
+					do shell script "open -na '/Applications/CPU Stress Test.app'"
 				else if (selectedLaunchTest is equal to "🍩	GPU Stress Test") then
-					do shell script "open -n -a '/Applications/GPU Stress Test.app'"
+					do shell script "open -na '/Applications/GPU Stress Test.app'"
 				else if (selectedLaunchTest is equal to "🏥	Hard Drive Test (DriveDx)") then
-					do shell script "open -n -a '/Applications/DriveDx.app'"
-				else if (selectedLaunchTest is equal to "🎛	Firmware Checker") then
-					do shell script "open -n -a '/Applications/Firmware Checker.app'"
-				else if (selectedLaunchTest is equal to "💾	Restore OS") then
-					do shell script "open -n -a '/Applications/Restore OS.app'"
+					do shell script "open -na '/Applications/DriveDx.app'"
 				else if (selectedLaunchTest is equal to "🍏	Startup Picker") then
-					do shell script "open -n -a '/Applications/Startup Picker.app'"
+					do shell script "open -na '/Applications/Startup Picker.app'"
 				else if (selectedLaunchTest is equal to "🏥	Show Raw Hard Drive SMART Data in Terminal") then
 					if ((count of hardDriveDiskIDs) > 0) then
 						repeat with thisDiskID in hardDriveDiskIDs

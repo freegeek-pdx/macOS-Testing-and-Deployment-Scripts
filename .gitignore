@@ -14,6 +14,7 @@
 *.svg
 *.pxm
 *.iconsproj
+*.driveDxLicense
 
 # Ignore if name starts with in any location:
 OLD-*

@@ -1,0 +1,145 @@
+#!/usr/bin/osascript -l JavaScript
+
+//
+// Created by Pico Mitchell on 8/24/22.
+// For MacLand @ Free Geek
+//
+// MIT License
+//
+// Copyright (c) 2022 Free Geek
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
+// to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
+
+
+// Explanation of Code Signing Requirement Strings: https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements
+
+// ABOUT CSREQS *HEX* STRING DIFFERENCES AND THE PURPOSE OF THIS SCRIPT:
+
+// Hexadecimal string representations of Code Signing Requirements data are used when setting TCC permissions directly in the global and user TCC.db files like is done in "fg-install-os.sh" and "Free Geek Setup.applescript".
+// In my testing, it seems that including the CSReq hex strings in the TCC.db is not actually a necessary since macOS will fill them in after the app specified by the Bundle ID is launched for the first time.
+// But, that would mean that the first app to launch with the specified Bundle ID would have its CSReqs analyzed and the TCC permissions would then get locked to that apps CSReqs which could mean an alternate app spoofing that Bundle ID could theoretically be run first and "steal" the TCC permissions from the intended app.
+// Even though that is not at all a risk in our environment or use case here, I prefer to do the most correct and complete thing. So, I went about learning about how to generate the proper CSReq hex strings for the TCC.db files so that the permissions we manually set can only be applied to the exact intended app.
+
+// When first investigating the TCC.db structure, the https://www.rainforestqa.com/blog/macos-tcc-db-deep-dive post pointed me to https://stackoverflow.com/questions/52706542/how-to-get-csreq-of-macos-application-on-command-line/57259004#57259004
+// which showed how to create the CSReq hex string using the "codesign" and "csreq" (and "xxd") commands, and I streamline the commands from that post into the following one-liner:
+// codesign -dr - '/path/to/some.app' 2> /dev/null | awk -F ' => ' '($1 == "designated") { print $2; exit }' | csreq -r - -b /dev/stdout | xxd -p | tr -d '[:space:]'
+// "xxd -c 0 -p" can be used instead of "xxd -p | tr -d '[:space:]'" on at least macOS 11.6.8 Big Sur or newer, but "xxd" on macOS 11.6 Big Sur and older do not support "-c 0" to output a single line (not sure when exactly "xxd" was updated between 11.6 and 11.6.8 since I don't have easy access to all those versions and it's odd that it was even updated within those security updates, but it was).
+
+// Upon initial testing the CSReq hex string generated this way appeared to work fine, but with more testing I noticed issues on macOS 10.14 Mojave and 10.15 Catalina where the the apps were requesting
+// AppleEvents TCC access when they ran even though the permissions showed up properly in the Automation list (where AppleEvents TCC permissions are listed) of the Privacy & Security pane of the System Preferences.
+// Although, all the AppleEvents TCC worked fine on macOS 11 Big Sur and newer with the same exact CSReqs hex string being used across all versions of macOS.
+// What's odd is that the same CSReqs hex strings worked fine on all versions of macOS for other TCC permissions such as Microphone, Accessibility, and Full Disk Access, all of which DO NOT specify a target/indirect object like the AppleEvents TCC permissions do.
+// So, I'm not exactly sure why, but the issue with the CSReq hex strings I was using appeared to only be an issue for TCC permissions which specified a target/indirect object and only on macOS 10.14 Mojave and macOS 10.15 Catalina.
+
+// With more investigation, I noticed that on all versions of macOS, the CSReq hex strings being set by macOS in the TCC.db files were slighly different than the CSReq hex strings that I generated with the command above.
+// To extract the CSReq hex strings from the global TCC.db for a specific Bundle ID (if that app has been granted TCC permissions), you can use the following command when running in Terminal with "Full Disk Access":
+// sqlite3 '/Library/Application Support/com.apple.TCC/TCC.db' 'SELECT lower(hex(csreq)) FROM access WHERE (client = "some.bundle.id")'
+// And you can also check the user TCC.db using the "${HOME}/Library/Application Support/com.apple.TCC/TCC.db" path.
+
+// When using the CSReq hex strings that were set by macOS in the TCC.db files, the AppleEvents TCC permissions worked properly on macOS 10.14 Mojave and macOS 10.15 Catalina, as well as macOS 11 Big Sur and newer.
+// So, the issue appeared to be because of the CSReq hex strings that were generated with the original command I used.
+// But what was wrong with those CSReq hex strings and how and why were they different from the CSReq hex strings generated by macOS?
+
+// Next, I tested to see if these two different forms of CSReq hex strings were equal to different CSReq string values with the following command to reverse the hex data back into the CSReq string form using the "csreq" command:
+// echo '[CSREQ-HEX-STRING]' | xxd -r -p | csreq -r - -t /dev/stdin
+// When reversing these two different forms of CSReq hex strings into their CSReq string values, they both equal the exact same CSReq strings.
+// So even though they are "equal", there must be something different with how these CSReq hex strings are generated.
+
+// While I could have just stopped there and used the CSReq hex strings extracted from the TCC.db instead of generated from the "csreq" command, I wanted to understand what was going on here and why these CSReq hex strings were different.
+// When trying to understand more about how these CSReq hex strings were generated, I found the source code for the "csreq" command line tool (https://opensource.apple.com/source/security_systemkeychain/security_systemkeychain-55202/src/csreq.cpp.auto.html)
+// and started experimenting with the native "Code Signing Services" functions of the "Security.framework" (https://developer.apple.com/documentation/security/code_signing_services?language=objc) using the ObjC-bridge in JavaScript for Automation (JXA).
+
+// That research and investigation led to me writing the following JavaScript for Automation (JXA) code which generates the CSReq hex string in different ways.
+// It was through this research that I figured out how to generate the CSReq hex string that is identical to how macOS generates them for the TCC.db as well as why that CSReq hex string is slightly different than the form generated by the original commands I found.
+// I don't know why the two different forms don't both work the same on macOS 10.14 Mojave and macOS 10.15 Catalina, but that seems to be an unintentional bug since the behavior was fixed in macOS 11 Big Sur which allowed both forms of the CSReq hex strings to work the same.
+
+// The difference turned out to be because of the CSReq data (which was then converted to hex) being created from the CSReq *string* value (using the "SecRequirementCreateWithString" function)
+// vs being created directly from the app on disk (using "SecStaticCodeCreateWithPath" and "SecCodeCopyDesignatedRequirement" functions).
+// Clearly, macOS was getting the CSReq data directly from the app on disk rather than first extracting the CSReq string from the app and then converting that CSReq string to CSReq data.
+// Even though the string values of the CSReqs are the same in both cases, something in the data representations are slightly different based on how that data is generated.
+
+// The following code outputs BOTH CSReq hex strings generated from the CSReq string as well as the CSReqs generated directly from the app on disk to demonstrate the difference between the two.
+// Interestingly, using this code shows that when getting CSReq hex strings for Apple-signed apps, the CSReq hex strings seem to always be the same regardless of whether the CSReq string or the app on disk is used to generate the CSReq data.
+// But, when getting the CSReq hex string for 3rd-party apps, the CSReq hex strings will be different for *some* apps depending on if the CSReq data was generated from the CSReq hex string vs the app on disk, and I'm not sure what about the specific CSReqs make the CSReq hex strings different for some 3rd-party apps and not others.
+
+// Along with generating and displaying both forms of CSReq hex strings for research purposes, it will also show the CSReq *string* value and note when the hex strings are same or different.
+// But, the CSReq hex generated from the app on disk is the on that should always be used when placing CSReq hex strings directly into the TCC.db for the most compatibility.
+// For convenience, the CSReq hex string generated from the app on disk will be copied to the clipboard when the script is run.
+
+
+'use strict'
+// @ts-ignore: JXA-ObjC
+ObjC.import('Security')
+// @ts-ignore: JXA-ObjC
+ObjC.import('AppKit') // Only needed for "NSPasteboard".
+
+function run(argv) {
+	const pathToApp = argv[0]
+
+	// "csreq" source reference: https://opensource.apple.com/source/security_systemkeychain/security_systemkeychain-55202/src/csreq.cpp.auto.html
+
+	// @ts-ignore: JXA-ObjC
+	const staticCodeRef = $()
+	// @ts-ignore: JXA-ObjC
+	$.SecStaticCodeCreateWithPath($.NSURL.fileURLWithPath(pathToApp), $.kSecCSDefaultFlags, staticCodeRef)
+
+	// @ts-ignore: JXA-ObjC
+	const csreqRef = $()
+	// @ts-ignore: JXA-ObjC
+	$.SecCodeCopyDesignatedRequirement(staticCodeRef, $.kSecCSDefaultFlags, csreqRef)
+
+	// @ts-ignore: JXA-ObjC
+	const csreqDataRef = $()
+	// @ts-ignore: JXA-ObjC
+	$.SecRequirementCopyData(csreqRef, $.kSecCSDefaultFlags, csreqDataRef)
+
+	let csreqsOutput = '\nCSREQ HEX FROM APP ON DISK (this is what is written to TCC.db by macOS and what *SHOULD BE USED* for AppleEvents TCC to work on Mojave & Catalina):\n'
+	let csreqHexFromAppOnDisk = ''
+	for (let thisByteIndex = 0, csreqBytesArray = csreqDataRef.bytes, csreqBytesLength = csreqDataRef.length; thisByteIndex < csreqBytesLength; thisByteIndex ++)
+		csreqHexFromAppOnDisk += csreqBytesArray[thisByteIndex].toString(16).padStart(2, 0)
+	csreqsOutput += csreqHexFromAppOnDisk
+
+	// @ts-ignore: JXA-ObjC
+	const pasteboard = $.NSPasteboard.generalPasteboard
+	pasteboard.clearContents
+	const didCopy = (pasteboard.writeObjects([csreqHexFromAppOnDisk])) // Copy this best from of the CSReq from the app on disk to the Clipboard for convenience.
+	csreqsOutput += `\n>>> ${didCopy ? 'COPIED' : 'WARNING: *FAILED* TO COPY'} THIS CSREQ HEX STRING FROM THE APP ON DISK TO CLIPBOARD`
+
+	// @ts-ignore: JXA-ObjC
+	const csreqStringRef = $()
+	// @ts-ignore: JXA-ObjC
+	$.SecRequirementCopyString(csreqRef, $.kSecCSDefaultFlags, csreqStringRef) // This just gets the code requirement *string* from the specified app.
+	// @ts-ignore: JXA-ObjC
+	$.SecRequirementCreateWithString(csreqStringRef, $.kSecCSDefaultFlags, csreqRef) // Re-create the csreqRef based on the code requirements *string* instead of directly from the app on disk.
+
+	csreqsOutput += `\n\nCODE REQUIREMENTS STRING:\n${csreqStringRef.js}`
+
+	// THE FOLLOWING CSREQ HEX STRING *MAY* BE SLIGHTLY DIFFERENT BECAUSE SLIGHTLY DIFFERENT DATA IS PRODUCED WHEN
+	// CODE REQUIREMENTS DATA IS PRODUCED FROM A CODE REQUIREMENTS *STRING* (using SecRequirementCreateWithString)
+	// VS DIRECTLY FROM AN APP ON DISK (using SecStaticCodeCreateWithPath & SecCodeCopyDesignatedRequirement)
+	// See comment above for more detailed information about these differences.
+
+	// @ts-ignore: JXA-ObjC
+	$.SecRequirementCopyData(csreqRef, $.kSecCSDefaultFlags, csreqDataRef) // This and the next steps are the same as above, but now the csreqRef is coming from the code requirements *string* instead of directly from the app on disk.
+
+	csreqsOutput += '\n\nCSREQ HEX FROM CODE REQUIREMENTS STRING (this is what the "csreq" binary piped to "xxd" would output since the string is always the source which *MAY NOT WORK* on Mojave & Catalina for AppleEvents TCC which have a target app/indirect object):\n'
+	let csreqHexFromReqString = ''
+	for (let thisByteIndex = 0, csreqBytesArray = csreqDataRef.bytes, csreqBytesLength = csreqDataRef.length; thisByteIndex < csreqBytesLength; thisByteIndex ++)
+		csreqHexFromReqString += csreqBytesArray[thisByteIndex].toString(16).padStart(2, 0)
+	csreqsOutput += csreqHexFromReqString
+
+	return `${csreqsOutput}
+
+THE CSREQ *HEX* FROM THE APP ON DISK VS FROM THE CODE REQUIREMENTS STRING ${((csreqHexFromAppOnDisk == csreqHexFromReqString) ? 'MATCH!' : '*DO NOT* MATCH (even though they equal the same string value)')}
+See comments within the code of this script for more information about these two CSReq hex strings.
+`
+}

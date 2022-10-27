@@ -2,7 +2,7 @@
 
 # By: Pico Mitchell
 # For: MacLand @ Free Geek
-# Last Updated: April 8th, 2021
+# Last Updated: September 27th, 2022
 #
 # MIT License
 #
@@ -26,10 +26,11 @@
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin' # PATH must include "/usr/local/bin" for npm (and node) and nativefier.
 
-PROJECT_PATH="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
+PROJECT_PATH="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)"
 readonly PROJECT_PATH
 readonly BUILD_DIR="${PROJECT_PATH}/.."
 readonly ZIPS_FOR_AUTO_UPDATE_PATH="${BUILD_DIR}/../../ZIPs for Auto-Update"
+readonly FG_MIB_RESOURCES_PATH="${BUILD_DIR}/../../fgMIB Resources"
 
 readonly KEYBOARD_TESTER_URL='https://www.keyboardtester.com/tester.html'
 
@@ -44,62 +45,61 @@ sudo npm install -g nativefier
 
 echo -e "\n\nBUILDING KEYBOARD TEST APP (VERSION ${APP_VERSION}) WITH NATIVEFIER..."
 
-rm -rf "${BUILD_DIR}/Keyboard Test-darwin-x64"
-rm -rf "${BUILD_DIR}/Keyboard Test.app"
-rm -f "${BUILD_DIR}/Keyboard-Test.zip"
+rm -rf "${BUILD_DIR}/Keyboard Test-darwin-universal" "${BUILD_DIR}/Keyboard Test-darwin-x64" "${BUILD_DIR}/Keyboard Test.app" "${BUILD_DIR}/Keyboard-Test.zip" "${HOME}/Library/Application Support/keyboard-test"*
+# Any existing Application Support files are also being deleted since that stores the last window size which we don't want to remember if it's getting changed.
 
 nativefier \
     "${KEYBOARD_TESTER_URL}" \
     "${BUILD_DIR}" \
     --name 'Keyboard Test' \
-    --internal-urls "${KEYBOARD_TESTER_URL}" \
+    --arch 'universal' \
+    --app-version "${APP_VERSION}" \
+    --app-copyright '© KeyboardTester.com
+
+Modifications by Pico Mitchell for Free Geek
+
+App Wrapper Built with Nativefier
+
+App Icon is “Keyboard” from Twemoji by Twitter licensed under CC-BY 4.0' \
     --icon "${PROJECT_PATH}/Keyboard Test Icon/Twemoji Keyboard.icns" \
+    --internal-urls "${KEYBOARD_TESTER_URL//./\\.}" \
+    --strict-internal-urls \
     --inject "${PROJECT_PATH}/keyboard_test_modifications.js" \
     --inject "${PROJECT_PATH}/keyboard_test_modifications.css" \
-    --zoom 1.3 \
-    --min-width 964 \
-    --min-height 485 \
-    --max-width 964 \
-    --max-height 485 \
+    --min-width 939 \
+    --min-height 490 \
+    --max-width 939 \
+    --max-height 490 \
     --disable-dev-tools \
-    --disable-context-menu \
     --disable-gpu \
+    --disable-context-menu \
+    --darwin-dark-mode-support \
     --fast-quit \
     --single-instance \
     --disable-old-build-warning-yesiknowitisinsecure # Do not ever want the Keyboard Test app to prompt "Old build detected" since it really doesn't matter for this kind of app.
 
-
 echo -e '\n\nMODIFYING KEYBOARD TEST APP Info.plist & MOVING INTO BUILD DIR...'
 
-app_info_plist_path="${BUILD_DIR}/Keyboard Test-darwin-x64/Keyboard Test.app/Contents/Info.plist"
+app_info_plist_path="${BUILD_DIR}/Keyboard Test-darwin-universal/Keyboard Test.app/Contents/Info.plist"
 
-plutil -replace 'CFBundleShortVersionString' -string "${APP_VERSION}" "${app_info_plist_path}"
 plutil -remove 'CFBundleVersion' "${app_info_plist_path}"
 
 plutil -replace 'LSMinimumSystemVersion' -string '10.13' "${app_info_plist_path}"
 
 plutil -replace 'LSMultipleInstancesProhibited' -bool 'true' "${app_info_plist_path}"
 
-mv "${BUILD_DIR}/Keyboard Test-darwin-x64/Keyboard Test.app/Contents/Resources/electron.icns" "${BUILD_DIR}/Keyboard Test-darwin-x64/Keyboard Test.app/Contents/Resources/Keyboard Test.icns"
+mv "${BUILD_DIR}/Keyboard Test-darwin-universal/Keyboard Test.app/Contents/Resources/electron.icns" "${BUILD_DIR}/Keyboard Test-darwin-universal/Keyboard Test.app/Contents/Resources/Keyboard Test.icns"
 plutil -replace 'CFBundleIconFile' -string 'Keyboard Test' "${app_info_plist_path}"
-
-plutil -replace 'NSHumanReadableCopyright' -string '© KeyboardTester.com
-
-Modifications by Pico Mitchell for Free Geek
-
-App Wrapper Built with Nativefier
-
-App Icon is “Keyboard” from Twemoji by Twitter licensed under CC-BY 4.0' "${app_info_plist_path}"
 
 plutil -replace 'CFBundleIdentifier' -string 'org.freegeek.Keyboard-Test' "${app_info_plist_path}"
 
 rm -rf "${BUILD_DIR}/Keyboard Test.app"
-mv -f "${BUILD_DIR}/Keyboard Test-darwin-x64/Keyboard Test.app" "${BUILD_DIR}/Keyboard Test.app"
-rm -rf "${BUILD_DIR}/Keyboard Test-darwin-x64"
+mv -f "${BUILD_DIR}/Keyboard Test-darwin-universal/Keyboard Test.app" "${BUILD_DIR}/Keyboard Test.app"
+rm -rf "${BUILD_DIR}/Keyboard Test-darwin-universal"
 
 
 echo -e '\n\nCODE SIGNING KEYBOARD TEST APP...'
-codesign -s 'Developer ID Application' --deep --force "${BUILD_DIR}/Keyboard Test.app"
+codesign -fs 'Developer ID Application' --deep --strict "${BUILD_DIR}/Keyboard Test.app"
 
 
 echo -e '\n\nZIPPING KEYBOARD TEST APP & UPDATING VERSION IN latest-versions.txt...'
@@ -107,6 +107,10 @@ echo -e '\n\nZIPPING KEYBOARD TEST APP & UPDATING VERSION IN latest-versions.txt
 rm -f "${BUILD_DIR}/Keyboard-Test.zip"
 rm -f "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip"
 ditto -c -k --keepParent --sequesterRsrc --zlibCompressionLevel 9 "${BUILD_DIR}/Keyboard Test.app" "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip"
+
+mkdir -p "${FG_MIB_RESOURCES_PATH}/Prepare OS Package/Package Resources/User/fg-demo/Apps"
+rm -f "${FG_MIB_RESOURCES_PATH}/Prepare OS Package/Package Resources/User/fg-demo/Apps/Keyboard-Test.zip"
+ditto "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip" "${FG_MIB_RESOURCES_PATH}/Prepare OS Package/Package Resources/User/fg-demo/Apps/Keyboard-Test.zip"
 
 if grep -qF 'Keyboard Test:' "${ZIPS_FOR_AUTO_UPDATE_PATH}/latest-versions.txt"; then
     sed -i '' "s/Keyboard Test: .*/Keyboard Test: ${APP_VERSION}/" "${ZIPS_FOR_AUTO_UPDATE_PATH}/latest-versions.txt"

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.5.9-1
+-- Version: 2022.10.24-1
 
 -- App Icon is “Satellite Antenna” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -27,7 +27,7 @@ use scripting additions
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -99,26 +99,21 @@ on error checkReadOnlyErrorMessage
 end try
 
 
-set dialogIconName to "applet"
+set freeGeekUpdaterAppPath to "/Applications/Free Geek Updater.app"
+set freeGeekUpdaterIsRunning to false
 try
-	((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-	set dialogIconName to (name of me)
+	((freeGeekUpdaterAppPath as POSIX file) as alias)
+	set freeGeekUpdaterIsRunning to (application freeGeekUpdaterAppPath is running)
 end try
-
-set systemVersion to (system version of (system info))
-considering numeric strings
-	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
-end considering
-
 
 global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs to be accessible in doShellScriptAsAdmin function.
 set lastDoShellScriptAsAdminAuthDate to 0
 
 set adminUsername to "Staff"
-if (isCatalinaOrNewer) then set adminUsername to "staff"
 set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
 
 set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
+
 try
 	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
 	
@@ -130,14 +125,27 @@ try
 		doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string))))
 	end try
 	
-	try
-		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-		do shell script "open -n -a '/Applications/Test Boot Setup.app'"
-	end try
+	if (not freeGeekUpdaterIsRunning) then
+		try
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			do shell script "open -na '/Applications/Test Boot Setup.app'"
+		end try
+	end if
 	
 	quit
 	delay 10
 end try
+
+if (freeGeekUpdaterIsRunning) then -- Quit if Updater is running so that this app can be updated if needed.
+	quit
+	delay 10
+end if
+
+
+set systemVersion to (system version of (system info))
+considering numeric strings
+	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
+end considering
 
 
 repeat
@@ -146,10 +154,15 @@ repeat
 🔄	Checking for Ethernet Connection"
 	set progress additional description to ""
 	
+	set isLaptop to false
 	set manufacturedWithoutEthernetPort to false
 	try
+		set shortModelName to "Unknown Model"
+		try
+			set shortModelName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:machine_name' /dev/stdin <<< \"$(system_profiler -xml SPHardwareDataType)\"")))
+		end try
+		if ((words of shortModelName) contains "MacBook") then set isLaptop to true
 		set modelIdentifier to (do shell script "sysctl -n hw.model")
-		set isLaptop to (modelIdentifier contains "MacBook")
 		set modelIdentifierName to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -d '[:digit:],'")
 		set modelIdentifierMajorNumber to ((text ((length of modelIdentifierName) + 1) thru ((offset of "," in modelIdentifier) - 1) of modelIdentifier) as number)
 		set manufacturedWithoutEthernetPort to ((modelIdentifierName is equal to "MacBookAir") or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 8)))
@@ -223,7 +236,7 @@ repeat
 🔌	PLUG IN an Ethernet cable and then click \"Test Ethernet Again\".
 
 ‼️	If an Ethernet cable is plugged in and is not detected after multiple
-	attempts, click \"Skip Ethernet Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Ethernet Test", "Test Ethernet Again"} cancel button 2 default button 3 with title (name of me) with icon dialogIconName giving up after 30
+	attempts, click \"Skip Ethernet Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Ethernet Test", "Test Ethernet Again"} cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
 							if (button returned of noEthernetCableDetectedAlertReply is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
 							delay 2
 						on error
@@ -272,7 +285,7 @@ repeat
 	a DIFFERENT Ethernet cable and then click \"Test Ethernet Again\".
 
 ‼️	If the Ethernet cable is securely connected and this test fails after multiple
-	attempts, click \"Skip Ethernet Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Ethernet Test", "Test Ethernet Again"} cancel button 2 default button 3 with title (name of me) with icon dialogIconName giving up after 30
+	attempts, click \"Skip Ethernet Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Ethernet Test", "Test Ethernet Again"} cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
 						if (button returned of failedEthernetTestAlertReply is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
 						delay 2
 					on error
@@ -320,7 +333,7 @@ repeat
 
 ‼️	If Wi-Fi is turned on and the Ethernet cable is
 	disconnected and this test fails after multiple attempts,
-	click \"Skip Wi-Fi Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Wi-Fi Test", "Test Wi-Fi Again"} cancel button 2 default button 3 with title (name of me) with icon dialogIconName giving up after 30
+	click \"Skip Wi-Fi Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Wi-Fi Test", "Test Wi-Fi Again"} cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
 							if (button returned of failedToEnableWiFiAlertReply is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
 							delay 2
 						on error
@@ -425,7 +438,7 @@ repeat
 
 ‼️	If this computer is connected to a known good Wi-Fi
 	network and this test fails after multiple attempts,
-	click \"Skip Wi-Fi Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Wi-Fi Test", "Test Wi-Fi Again"} cancel button 2 default button 3 with title (name of me) with icon dialogIconName giving up after 30
+	click \"Skip Wi-Fi Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Wi-Fi Test", "Test Wi-Fi Again"} cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
 						if (button returned of wiFiTestFailedAlertReply is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
 						delay 2
 					on error
@@ -640,7 +653,7 @@ repeat
 				display dialog resultsTitle & "
 
 
-" & resultsOutput buttons {"Test Internet Again", "Done"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+" & resultsOutput buttons {"Test Internet Again", "Done"} cancel button 1 default button 2 with title (name of me) with icon note
 				exit repeat
 			end try
 		else
@@ -650,7 +663,7 @@ repeat
 			display dialog resultsTitle & "
 
 
-" & resultsOutput buttons {"Done"} default button 1 with title (name of me) with icon dialogIconName
+" & resultsOutput buttons {"Done"} default button 1 with title (name of me) with icon note
 			exit repeat
 		end if
 	else
@@ -658,7 +671,7 @@ repeat
 			display dialog resultsTitle & "
 
 
-" & resultsOutput buttons {"Test Internet Again", "Done"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+" & resultsOutput buttons {"Test Internet Again", "Done"} cancel button 1 default button 2 with title (name of me) with icon caution
 			exit repeat
 		end try
 	end if
@@ -672,7 +685,7 @@ try
 		end try
 		display alert "
 Would you like to launch “Audio Test”?" buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 30
-		do shell script "open -n -a '/Applications/Audio Test.app'"
+		do shell script "open -na '/Applications/Audio Test.app'"
 	end if
 end try
 

@@ -1,7 +1,7 @@
 /*
 * By: Pico Mitchell
 * For: MacLand @ Free Geek
-* Last Updated: December 30th, 2021
+* Last Updated: September 8th, 2022
 *
 * MIT License
 *
@@ -26,71 +26,137 @@ body {
 	display: none;
 }
 
+#logo {
+	margin: 10px 0px 6px 0px;
+	text-align: center;
+}
+
+#logo a, #logo a:hover, #logo a:visited {
+	text-decoration: none;
+	color:#0d2693;
+	font-size: 23px;
+}
+
 #resetbutton {
-	padding: 2px 14px 5px 14px !important;
+	padding: 0px !important;
 }
 
 #testarea {
+	font-size: 16px;
+	font-family: Arial, sans-serif;
 	resize: none;
-	margin: 31px 0px 5px 0px;
-	width: 691px;
-	height: 65px;
-	font-family: sans-serif;
-	font-size: 12px;
+	display: block;
+	margin: 0px auto 11px auto;
+	padding: 5px;
+	width: 877px;
+	height: 123px;
 }
 
-#soundArea, input[name="reset"], #key44, #key145, #key19, #key45, #key36, #key33, #key46, #key35, #key34, #key144, #key111, #key106, #key109b, #key103, #key104, #key105, #key107b, #key100, #key101, #key102, #key97, #key98, #key99, #key13b, #key96, #key110, #key224, #key224b, #key92, #key17b, .label, #notes
-{
-	display: none;
-}
-
-td {
-	vertical-align: bottom !important;
-}
-
-#keyboard {
-	padding-bottom: 20px;
-	background-color: white;
-}
-
-.key_un {
-	background-color: white;
-}
-
-.key_highlight {
-	border-color: orange !important;
-	background-color: #FFC864;
-}
-
-.key_pressed, .key_pressed_m {
-    border-color: green !important;
-    background-color: #2CB32C;
-    color: white;
-}
-
-.key_block tr td, .key_row div {
-    border-radius: 4px;
-    font-family: Arial, sans-serif !important;
-    font-size: 13px;
-}
-
-.key_small td
-{
-	padding-bottom: 0px !important;
-}
-
-.key_small .key_row div {
-    font-size: 9px !important;
-}
-
-textarea::placeholder {
+#testarea::placeholder {
 	text-align: center;
 	font-weight: bold;
-	font-size: 11px;
+	font-size: 15px;
 }
 
 #hidden_text_before {
     width: 1px;
     height: 1px;
-    border: 0
+    border: 0px;
+}
+
+#soundArea, input[name="reset"], #key44, #key145, #key19, #key45, #key36, #key33, #key46, #key35, #key34, #key144, #key111, #key106, #key109b, #key103, #key104, #key105, #key107b, #key100, #key101, #key102, #key97, #key98, #key99, #key13b, #key96, #key110, #key224, #key224b, #key92, #key17b, .label, #notes {
+	display: none;
+}
+
+#keyboard {
+	padding-bottom: 100px; /* Push Ad Banner Down Below Window Height */
+	background-color: white;
+}
+
+table {
+	margin: 0px auto;
+}
+
+td {
+	vertical-align: bottom !important;
+	padding: 0px !important;
+}
+
+.key_block td, .key_row div { /* All Keys */
+    font-size: 16px;
+	font-family: Arial, sans-serif !important;
+    border-radius: 6px;
+	padding: 6px 8px !important;
+	min-width: 22px;
+	text-align: center;
+	background-color: white;
+}
+
+.key_highlight {
+	background-color: #FFC864 !important;
+}
+
+.key_pressed, .key_pressed_m {
+    border-color: green !important;
+    background-color: #2CB32C !important;
+    color: white;
+}
+
+.key_small div { /* Function Keys */
+    font-size: 12px;
+	min-width: 29px;
+}
+
+#key8, #key9 { /* Delete, Tab */
+	min-width: 63px;
+}
+
+#key20 { /* Caps */
+	min-width: 68px;
+}
+
+#key13 { /* Return */
+	min-width: 67px;
+}
+
+#key16 { /* Left Shift */
+	min-width: 92px;
+}
+
+#key16b { /* Right Shift */
+	min-width: 93px;
+}
+
+#key32 { /* Spacebar */
+	min-width: 297px;
+}
+
+table.key_block { /* Arrow Keys */
+	margin: 0px -4px -4px 0px;
+}
+
+.key_block td { /* Arrow Keys */
+	font-size: 11px;
+	vertical-align: middle !important;
+}
+
+#key38, #key40 { /* Up Arrow, Down Arrow */
+	font-size: 12px;
+	padding: 8px !important;
+}
+
+@media (-webkit-min-device-pixel-ratio: 2),  (min-resolution: 192dpi) {
+	#testarea {
+		padding: 10px;
+		width: 867px;
+		height: 105px;
+	}
+
+	#key32 { /* Spacebar */
+		min-width: 297.5px;
+	}
+
+	#key38, #key40 { /* Up Arrow, Down Arrow */
+		font-size: 12.5px;
+	}
 }

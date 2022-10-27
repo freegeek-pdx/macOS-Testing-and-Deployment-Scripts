@@ -3,23 +3,26 @@
 
 # Command to Create Mac Test Boot
 
-cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && read "?'Mac Test Boot' Device Name (Probably $(diskutil list | grep "Mac Test Boot" | head -1 | awk '{ print $NF }')): " DEVICE_NAME && diskutil unmountDisk $DEVICE_NAME || diskutil unmountDisk force $DEVICE_NAME; sudo hdiutil create "FreeGeek-MacTestBoot-HighSierra-$(date +%Y%m%d).dmg" -srcdevice $DEVICE_NAME && sudo asr imagescan --source "FreeGeek-MacTestBoot-HighSierra-$(date +%Y%m%d).dmg"
-
-# Command to Restore Mac Test Boot
-
-# VOLUMES ARE SUFFIXED WITH RANDOM NUMBER FOR LATER IDENTIFICATION
-# SO MULTIPLE DRIVES CAN GET STARTED AND RUN AT ONCE WITHOUT CONFLICTING
-
-MTB_IMAGE_DATE=20220412; MTB_SOURCE_IMAGE=FreeGeek-MacTestBoot-HighSierra-$MTB_IMAGE_DATE.dmg; RANDOM_SUFFIX=$RANDOM; diskutil rename MTB MTB-$RANDOM_SUFFIX; cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && echo "RESTORING '$MTB_SOURCE_IMAGE' TO 'MTB-$RANDOM_SUFFIX'" && sudo asr restore --source $MTB_SOURCE_IMAGE --target /Volumes/MTB-$RANDOM_SUFFIX --erase --noprompt
-
-# Command to Restore Mac Test Boot with High Sierra, Catalina, and Big Sur Installers
-
-MTB_IMAGE_DATE=20210712; MTB_SOURCE_IMAGE=FreeGeek-MacTestBoot-HighSierra-$MTB_IMAGE_DATE.dmg; RANDOM_SUFFIX=$RANDOM; diskutil rename MTB MTB-$RANDOM_SUFFIX; diskutil rename InstallHighSierra InstallHighSierra-$RANDOM_SUFFIX; diskutil rename InstallCatalina InstallCatalina-$RANDOM_SUFFIX; diskutil rename InstallBigSur InstallBigSur-$RANDOM_SUFFIX; cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && echo "RESTORING '$MTB_SOURCE_IMAGE' TO 'MTB-$RANDOM_SUFFIX'" && sudo asr restore --source $MTB_SOURCE_IMAGE --target /Volumes/MTB-$RANDOM_SUFFIX --erase --noprompt; echo "CREATING HIGH SIERRA INSTALLER ON 'InstallHighSierra-$RANDOM_SUFFIX'" && sudo '/Volumes/Install macOS High Sierra/Install macOS High Sierra.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallHighSierra-$RANDOM_SUFFIX --nointeraction; echo "CREATING CATALINA INSTALLER ON 'InstallCatalina-$RANDOM_SUFFIX'" && sudo '/Volumes/Install macOS Catalina/Install macOS Catalina.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallCatalina-$RANDOM_SUFFIX --nointeraction; echo "CREATING BIG SUR INSTALLER ON 'InstallBigSur-$RANDOM_SUFFIX'" && sudo '/Volumes/Install macOS Big Sur/Install macOS Big Sur.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallBigSur-$RANDOM_SUFFIX --nointeraction
+cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && read "?'Mac Test Boot' Device Name (Probably $(diskutil list | grep "Mac Test Boot" | head -1 | awk '{ print $NF }')): " DEVICE_NAME && echo "$(date +%Y%m%d)" > '/Volumes/Mac Test Boot/private/var/root/.mtbVersion' && diskutil unmountDisk $DEVICE_NAME || diskutil unmountDisk force $DEVICE_NAME; sudo hdiutil create "FreeGeek-MacTestBoot-HighSierra-$(date +%Y%m%d).dmg" -srcdevice $DEVICE_NAME && sudo asr imagescan --source "FreeGeek-MacTestBoot-HighSierra-$(date +%Y%m%d).dmg"
 
 
 
 
 # NO LONGER USED COMMANDS
+# Command to Restore Mac Test Boot
+
+# VOLUMES ARE SUFFIXED WITH RANDOM NUMBER FOR LATER IDENTIFICATION
+# SO MULTIPLE DRIVES CAN GET STARTED AND RUN AT ONCE WITHOUT CONFLICTING
+# BUT, THIS *IS NOT NEEDED ANYMORE* SINCE "update-mac-drives.sh" CAN BE USED INSTEAD
+
+MTB_IMAGE_DATE=20220412; MTB_SOURCE_IMAGE=FreeGeek-MacTestBoot-HighSierra-$MTB_IMAGE_DATE.dmg; RANDOM_SUFFIX=$RANDOM; diskutil rename MTB MTB-$RANDOM_SUFFIX; cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && echo "RESTORING '$MTB_SOURCE_IMAGE' TO 'MTB-$RANDOM_SUFFIX'" && sudo asr restore --source $MTB_SOURCE_IMAGE --target /Volumes/MTB-$RANDOM_SUFFIX --erase --noprompt
+
+
+# Command to Restore Mac Test Boot with High Sierra, Catalina, and Big Sur Installers
+# BUT, THIS *IS NOT NEEDED ANYMORE* SINCE "update-mac-drives.sh" CAN BE USED INSTEAD
+
+MTB_IMAGE_DATE=20210712; MTB_SOURCE_IMAGE=FreeGeek-MacTestBoot-HighSierra-$MTB_IMAGE_DATE.dmg; RANDOM_SUFFIX=$RANDOM; diskutil rename MTB MTB-$RANDOM_SUFFIX; diskutil rename InstallHighSierra InstallHighSierra-$RANDOM_SUFFIX; diskutil rename InstallCatalina InstallCatalina-$RANDOM_SUFFIX; diskutil rename InstallBigSur InstallBigSur-$RANDOM_SUFFIX; cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && echo "RESTORING '$MTB_SOURCE_IMAGE' TO 'MTB-$RANDOM_SUFFIX'" && sudo asr restore --source $MTB_SOURCE_IMAGE --target /Volumes/MTB-$RANDOM_SUFFIX --erase --noprompt; echo "CREATING HIGH SIERRA INSTALLER ON 'InstallHighSierra-$RANDOM_SUFFIX'" && sudo '/Volumes/Install macOS High Sierra/Install macOS High Sierra.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallHighSierra-$RANDOM_SUFFIX --nointeraction; echo "CREATING CATALINA INSTALLER ON 'InstallCatalina-$RANDOM_SUFFIX'" && sudo '/Volumes/Install macOS Catalina/Install macOS Catalina.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallCatalina-$RANDOM_SUFFIX --nointeraction; echo "CREATING BIG SUR INSTALLER ON 'InstallBigSur-$RANDOM_SUFFIX'" && sudo '/Volumes/Install macOS Big Sur/Install macOS Big Sur.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallBigSur-$RANDOM_SUFFIX --nointeraction
+
 
 # Command to Create Production OS Images
 

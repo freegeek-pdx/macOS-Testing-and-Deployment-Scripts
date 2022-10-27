@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.5.9-1
+-- Version: 2022.10.12-1
 
 -- Build Flag: LSUIElement
 
@@ -92,17 +92,28 @@ set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH
 
 set demoUsername to "fg-demo"
 
+
 if (((short user name of (system info)) is equal to demoUsername) and ((POSIX path of (path to me)) is equal to ("/Users/" & demoUsername & "/Applications/" & (name of me) & ".app/"))) then
+	set freeGeekUpdaterAppPath to ("/Users/" & demoUsername & "/Applications/Free Geek Updater.app")
+	try
+		((freeGeekUpdaterAppPath as POSIX file) as alias)
+		
+		if (application freeGeekUpdaterAppPath is running) then -- Quit if Updater is running so that this app can be updated if needed.
+			quit
+			delay 10
+		end if
+	end try
+
 	try
 		(("/Users/Shared/.fg-snapshot-preserver" as POSIX file) as alias)
 		
+		set shouldShutDownAfterError to false
 		try
 			(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
 			
 			set systemVersion to (system version of (system info))
 			considering numeric strings
 				set isBigSurOrNewer to (systemVersion ≥ "11.0")
-				set isMontereyOrNewer to (systemVersion ≥ "12.0")
 			end considering
 			
 			if (isBigSurOrNewer) then
@@ -115,64 +126,57 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 				on error
 					set resetSnapshotName to (do shell script "head -1 /Users/Shared/.fgResetSnapshotCreated")
 					
-					if (resetSnapshotName starts with "com.apple.TimeMachine") then
-						try
-							(("/Users/Shared/.fg-snapshot-preserver/mount" as POSIX file) as alias)
-						on error
+					try
+						if (resetSnapshotName starts with "com.apple.TimeMachine") then
 							try
-								-- Needs admin privileges since root owns ".fg-snapshot-preserver" folder.
-								doShellScriptAsAdmin("mkdir '/Users/Shared/.fg-snapshot-preserver/mount'")
-							end try
-						end try
-						
-						try
-							-- But the mount folder needs to be writeable by demoUsername or mounting the snapshot will fail (even when using administrator privileges).
-							doShellScriptAsAdmin("chown " & demoUsername & " '/Users/Shared/.fg-snapshot-preserver/mount'")
-						end try
-						
-						try
-							-- Mounting the reset Snapshot will prevent macOS from deleting it after 24 hours: https://eclecticlight.co/2021/03/28/last-week-on-my-mac-macos-at-20-apfs-at-4/#comment-59001
-							do shell script ("bash -c " & (quoted form of ("mount_apfs -o rdonly,nobrowse -s " & (quoted form of resetSnapshotName) & " \"$(/usr/libexec/PlistBuddy -c 'Print :DeviceNode' /dev/stdin <<< \"$(diskutil info -plist '/System/Volumes/Data')\")\" '/Users/Shared/.fg-snapshot-preserver/mount'")))
-							try
-								doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: Successfully Mounted Reset Snapshot\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
+								(("/Users/Shared/.fg-snapshot-preserver/mount" as POSIX file) as alias)
+							on error
+								try
+									-- Needs admin privileges since root owns ".fg-snapshot-preserver" folder.
+									doShellScriptAsAdmin("mkdir '/Users/Shared/.fg-snapshot-preserver/mount'")
+								end try
 							end try
 							
-							if (isMontereyOrNewer) then
-								-- In macOS 12 Monterey, the Safari Container is created upon login instead of first Safari launch.
-								-- The preferences within the Safari Container don't exist until launch, but the preferences from the old location (set by "fg-prepare-o.sh") DO NOT getting migrated as they do on older versions of macOS because the Safari Container already exists.
-								-- Modifying the preferences within the Safari Container requires Full Disk Access TCC privileges, so it must be done in this script since it's the only one with FDA.
-								
-								-- SINCE THIS CHECK IS ONLY DONE AFTER A SUCCESSFULLY MOUNTING THE RESET SNAPSHOT,
-								-- that means it will only be run right after FDA has been granted, or on each boot which is fine since it should only need to be run once.
-								
-								set currentSafariAutoFillPasswords to "UNKNOWN"
+							try
+								-- But the mount folder needs to be writeable by demoUsername or mounting the snapshot will fail (even when using administrator privileges).
+								doShellScriptAsAdmin("chown " & demoUsername & " '/Users/Shared/.fg-snapshot-preserver/mount'")
+							end try
+							
+							try
+								-- Mounting the reset Snapshot will prevent macOS from deleting it after 24 hours: https://eclecticlight.co/2021/03/28/last-week-on-my-mac-macos-at-20-apfs-at-4/#comment-59001
+								do shell script ("bash -c " & (quoted form of ("mount_apfs -o rdonly,nobrowse -s " & (quoted form of resetSnapshotName) & " \"$(/usr/libexec/PlistBuddy -c 'Print :DeviceNode' /dev/stdin <<< \"$(diskutil info -plist '/System/Volumes/Data')\")\" '/Users/Shared/.fg-snapshot-preserver/mount'")))
 								try
-									set currentSafariAutoFillPasswords to (do shell script "defaults read '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillPasswords")
+									doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: Successfully Mounted Reset Snapshot\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
+								end try
+							on error mountErrorMessage number mountErrorNumber
+								set snapshotMountError to ("FAILED to Mount Reset Snapshot (Error Code " & (mountErrorNumber as string) & ": " & mountErrorMessage & ")")
+								try
+									doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: " & snapshotMountError & "\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 								end try
 								
-								if (currentSafariAutoFillPasswords is not equal to "0") then
-									try
-										do shell script ("
-killall Safari
-defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillPasswords -bool false
-defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillFromAddressBook -bool false
-defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillCreditCardData -bool false
-defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoFillMiscellaneousForms -bool false
-defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/Data/Library/Preferences/com.apple.Safari' AutoOpenSafeDownloads -bool false
-")
-									end try
-								end if
-							end if
-						on error mountErrorMessage number mountErrorNumber
-							try
-								doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: FAILED to Mount Reset Snapshot (Error Code " & (mountErrorNumber as string) & ": " & mountErrorMessage & ")\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
+								error snapshotMountError
 							end try
-						end try
-					else
+						else
+							set snapshotNameError to ("Invalid Reset Snapshot Name (" & resetSnapshotName & ")")
+							try
+								doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: " & snapshotNameError & "\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
+							end try
+							
+							error snapshotNameError
+						end if
+					on error snapshotErrorMessage
 						try
-							doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: Invalid Reset Snapshot Name\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
+							activate
 						end try
-					end if
+						try
+							do shell script "afplay /System/Library/Sounds/Basso.aiff"
+						end try
+						display alert ("CRITICAL “" & (name of me) & "” ERROR:
+					
+" & snapshotErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Shut Down"} default button 1 as critical
+						
+						set shouldShutDownAfterError to true
+					end try
 				end try
 			else
 				try
@@ -195,7 +199,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 			repeat -- dialogs timeout when screen is asleep or locked (just in case)
 				set isAwake to true
 				try
-					set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+					set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 				end try
 				
 				set isUnlocked to true
@@ -213,21 +217,32 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 			try
 				activate
 			end try
-			display alert "Reset Snapshot Has Been Lost
+			try
+				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+			end try
+			display alert ("CRITICAL “" & (name of me) & "” ERROR:
+
+Reset Snapshot Has Been Lost
 
 " & resetSnapshotLostReason & "
 
-This Mac CANNOT BE SOLD since it cannot be reset." message "
+This Mac CANNOT BE SOLD since it cannot be reset.") message ("
 Reset Snapshot Name: " & resetSnapshotName & "
 
-THIS SHOULD NOT HAVE HAPPENED!
-
-Please inform and deliver this Mac to Free Geek I.T." as critical
+This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research.") buttons {"Shut Down"} default button 1 as critical
+			
+			set shouldShutDownAfterError to true
 		end try
 		
 		try
 			doShellScriptAsAdmin("rm -rf '/Users/Shared/.fg-snapshot-preserver/.launchedSnapshotHelper'")
 		end try
+		
+		if (shouldShutDownAfterError) then
+			tell application "System Events" to shut down with state saving preference
+			quit
+			delay 10
+		end if
 	end try
 else
 	try

@@ -16,9 +16,10 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.5.9-1
+-- Version: 2022.10.26-1
 
 -- Build Flag: LSUIElement
+-- Build Flag: IncludeSignedLauncher
 
 use AppleScript version "2.7"
 use scripting additions
@@ -91,213 +92,68 @@ set adminUsername to "fg-admin"
 set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
 
 set demoUsername to "fg-demo"
+set demoPassword to "freegeek"
 
 
 if (((short user name of (system info)) is equal to demoUsername) and ((POSIX path of (path to me)) is equal to ("/Users/" & demoUsername & "/Applications/" & (name of me) & ".app/"))) then
+	set freeGeekUpdaterAppPath to ("/Users/" & demoUsername & "/Applications/Free Geek Updater.app")
+	try
+		((freeGeekUpdaterAppPath as POSIX file) as alias)
+		
+		if (application freeGeekUpdaterAppPath is running) then -- Quit if Updater is running so that this app can be updated if needed.
+			quit
+			delay 10
+		end if
+	end try
+	
 	set systemVersion to (system version of (system info))
 	considering numeric strings
 		set isMojaveOrNewer to (systemVersion ≥ "10.14")
 		set isCatalinaOrNewer to (systemVersion ≥ "10.15")
 		set isBigSurOrNewer to (systemVersion ≥ "11.0")
+		set isVenturaOrNewer to (systemVersion ≥ "13.0")
 	end considering
 	
-	set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
-	
 	try
-		set automationGuideAppPath to "/Users/" & demoUsername & "/Applications/Automation Guide.app"
-		((automationGuideAppPath as POSIX file) as alias)
+		set globalTCCdbPath to "/Library/Application Support/com.apple.TCC/TCC.db" -- For more info about the TCC.db structure, see "fg-install-os" script and https://www.rainforestqa.com/blog/macos-tcc-db-deep-dive
+		set whereAllowedOrAuthValue to "allowed = 1"
+		if (isBigSurOrNewer) then set whereAllowedOrAuthValue to "auth_value = 2"
+		set globalTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of globalTCCdbPath) & " 'SELECT client,service FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the global TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access.
 		
-		if (application automationGuideAppPath is running) then
-			-- If Automation Guide is currently running, report the Accessibility permissions status and quit since Automation Guide is checking that it's safe to continue.
+		if (globalTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAccessibility")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Accessibility Access")
+		
+		if (isMojaveOrNewer) then
+			-- Full Disk Access was introduced in macOS 10.14 Mojave.
+			if (globalTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceSystemPolicyAllFiles")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access") -- This should not be possible to hit since reading the global TCC.db would have errored if this app didn't have FDA, but check anyways.
 			
-			try
-				do shell script "mkdir " & (quoted form of buildInfoPath)
-			end try
+			set userTCCdbPath to ((POSIX path of (path to library folder from user domain)) & "Application Support/com.apple.TCC/TCC.db")
+			set userTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of userTCCdbPath) & " 'SELECT client,service,indirect_object_identifier FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the user TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access (but that should never happen because we couldn't get this far without FDA).
 			
-			if (isMojaveOrNewer) then
-				try
-					tell application "System Events" to every window -- To prompt for Automation access on Mojave
-				on error automationAccessErrorMessage number automationAccessErrorNumber
-					if (automationAccessErrorNumber is equal to -1743) then
-						try
-							do shell script ("tccutil reset AppleEvents " & currentBundleIdentifier) -- Clear AppleEvents (Automation) for this app in case user denied access in a previous attempt.
-						end try
-					end if
-				end try
-			end if
-			
-			set hasAccessibilityPermissions to false
-			try
-				tell application "System Events" to tell application process "Finder" to (get windows)
-				set hasAccessibilityPermissions to true
-			end try
-			
-			try
-				doShellScriptAsAdmin("echo " & hasAccessibilityPermissions & " > " & (quoted form of (buildInfoPath & ".fgAutomationGuideAccessibilityStatus-" & currentBundleIdentifier)))
-			end try
-		else
-			-- If Automation Guide hasn't been run yet, launch it.
-			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script ("open -n -a " & (quoted form of automationGuideAppPath))
-			end try
+			if (userTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAppleEvents|com.apple.systemevents")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED AppleEvents/Automation Access for “System Events”")
+			if (userTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAppleEvents|com.apple.finder")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED AppleEvents/Automation Access for “Finder”")
 		end if
+	on error tccErrorMessage
+		if (tccErrorMessage starts with "Error: unable to open database") then set tccErrorMessage to ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access (" & tccErrorMessage & ")")
 		
-		quit
-		delay 10
-	end try
-	
-	-- demoUsername will be made an Admin and have it's Full Name changed temporarily during Automation Guide and will be changed back in Automation Guide.
-	-- But still, double check here that it got reset to it's correct state (in case Automation Guide was force quit or something weird/sneaky).
-	set demoUsernameIsAdmin to true
-	try
-		set demoUsernameIsAdmin to ((do shell script ("dsmemberutil checkmembership -U " & (quoted form of demoUsername) & " -G 'admin'")) is equal to "user is a member of the group")
-	end try
-	if (demoUsernameIsAdmin) then
 		try
-			doShellScriptAsAdmin("dseditgroup -o edit -d " & (quoted form of demoUsername) & " -t user admin")
-		end try
-	end if
-	
-	set demoUsernameIsCorrect to false
-	try
-		set demoUsernameIsCorrect to ((do shell script ("id -F " & (quoted form of demoUsername))) is equal to "Free Geek Demo User")
-	end try
-	if (not demoUsernameIsCorrect) then
-		try
-			doShellScriptAsAdmin("dscl . -create " & (quoted form of ("/Users/" & demoUsername)) & " RealName 'Free Geek Demo User'")
-		end try
-	end if
-	
-	set dialogIconName to "applet"
-	try
-		((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-		set dialogIconName to (name of me)
-	end try
-	
-	if (isMojaveOrNewer) then
-		set needsAutomationAccess to false
-		try
-			tell application "System Events" to every window -- To prompt for Automation access on Mojave
-		on error automationAccessErrorMessage number automationAccessErrorNumber
-			if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
-		end try
-		try
-			tell application "Finder" to every window -- To prompt for Automation access on Mojave
-		on error automationAccessErrorMessage number automationAccessErrorNumber
-			if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
-		end try
-		
-		if (needsAutomationAccess) then
-			try
-				tell application "System Preferences"
-					try
-						activate
-					end try
-					reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-				end tell
-			end try
 			try
 				activate
 			end try
 			try
-				display dialog "“" & (name of me) & "” must be allowed to control and perform actions in “System Events” and “Finder” to be able to function.
-
-
-USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
-
-• Open the “System Preferences” application.
-
-• Click the “Security & Privacy” preference pane.
-
-• Select the “Privacy” tab.
-
-• Select “Automation” in the source list on the left.
-
-• Find “" & (name of me) & "” in the list on the right and turn on the “System Events” and “Finder” checkboxes underneath it.
-
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
-				end try
+				do shell script "afplay /System/Library/Sounds/Basso.aiff"
 			end try
-			quit
-			delay 10
-		end if
-	end if
-	
-	try
-		tell application "System Events" to tell application process "Finder" to (get windows)
-	on error (assistiveAccessTestErrorMessage)
-		if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
+			display alert ("CRITICAL “" & (name of me) & "” TCC ERROR:
+
+" & tccErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research if checking again does not work." buttons {"Shut Down", "Check Again"} cancel button 1 default button 2 as critical
 			try
-				tell application "Finder" to reveal (path to me)
-			end try
-			try
-				tell application "System Preferences"
-					try
-						activate
-					end try
-					reveal ((anchor "Privacy_Accessibility") of (pane id "com.apple.preference.security"))
-				end tell
-			end try
-			try
-				activate
-			end try
-			try
-				display dialog "“" & (name of me) & "” must be allowed to control this computer using Accessibility Features to be able to function.
-
-
-USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
-
-• Open the “System Preferences” application.
-
-• Click the “Security & Privacy” preference pane.
-
-• Select the “Privacy” tab.
-
-• Select “Accessibility” in the source list on the left.
-
-• Click the Lock icon at the bottom left of the window, enter the administrator username and password, and then click Unlock.
-
-• Find “" & (name of me) & "” in the list on the right and turn on the checkbox next to it. If “" & (name of me) & "” IS NOT in the list, drag-and-drop the app icon from Finder into the list.
-
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
-				end try
-			end try
-			quit
-			delay 10
-		end if
-	end try
-	
-	
-	try
-		(((buildInfoPath & ".fgAutomationGuideRunning") as POSIX file) as alias)
-		
-		try
-			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideDid-" & currentBundleIdentifier)))
-		end try
-		
-		try
-			(((buildInfoPath & ".fgAutomationGuideDid-org.freegeek.Cleanup-After-QA-Complete") as POSIX file) as alias)
-			
-			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script "open -n -a '/Users/" & demoUsername & "/Applications/Free Geek Setup.app'"
+				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		on error
-			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script "open -n -a " & (quoted form of ("/Users/" & demoUsername & "/Applications/Cleanup After QA Complete.app"))
-			end try
+			tell application "System Events" to shut down with state saving preference
 		end try
-		
 		quit
 		delay 10
 	end try
-	
 	
 	set userLaunchAgentsPath to ((POSIX path of (path to library folder from user domain)) & "LaunchAgents/")
 	set demoHelperLaunchAgentPlistName to "org.freegeek.Free-Geek-Demo-Helper.plist"
@@ -327,9 +183,10 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	
 	set setupLaunchedDemoHelper to false
 	try
+		set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
 		(((buildInfoPath & ".fgSetupLaunchedDemoHelper") as POSIX file) as alias)
 		
-		try -- If did all apps, delete all Automation Guide flags and continue setup
+		try
 			doShellScriptAsAdmin("rm -f " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper")))
 		end try
 		
@@ -351,7 +208,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		end try
 	end if
 	
-	if (upTenMinsOrLess) then
+	if (setupLaunchedDemoHelper or upTenMinsOrLess) then
 		try
 			(("/Users/Shared/.fg-snapshot-preserver" as POSIX file) as alias)
 			
@@ -407,6 +264,13 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			end if
 		end try
 		
+		-- TURN OFF SCREEN LOCK (only do this on Mojave and newer since that is when the "sysadminctl -screenLock off" command was added, on High Sierra Screen Lock will be disabled with GUI scripting during "Free Geek Setup".
+		if (isMojaveOrNewer) then
+			try
+				do shell script "printf '%s' " & (quoted form of demoPassword) & " | sysadminctl -screenLock off -password -"
+			end try
+		end if
+		
 		try
 			doShellScriptAsAdmin("
 # DISABLE SLEEP
@@ -432,10 +296,16 @@ defaults write NSGlobalDomain AppleTemperatureUnit -string 'Fahrenheit'
 defaults write NSGlobalDomain AppleTextDirection -bool false
 "
 		
-		-- DELETE ALL LOCAL SNAPSHOTS (ONLY IF reset Snapshot DOES NOT EXIST)
+		-- DELETING ALL TOUCH ID FINGERPRINTS
+		try
+			doShellScriptAsAdmin("echo 'Y' | bioutil -p -s")
+		end try
+		
+		
 		try
 			(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
 		on error
+			-- DELETE ALL LOCAL SNAPSHOTS (ONLY IF reset Snapshot DOES NOT EXIST)
 			if (isCatalinaOrNewer) then
 				try
 					do shell script "tmutil deletelocalsnapshots /" -- Can delete all Snapshots at mountpoint on Catalina or newer
@@ -451,17 +321,14 @@ defaults write NSGlobalDomain AppleTextDirection -bool false
 					end repeat
 				end try
 			end if
-		end try
-		
-		-- ENABLE NETWORK TIME
-		-- Unless a reset Snapshot exists, in which case "fg-snapshot-preserver" will manage network time.
-		try
-			(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
-		on error
+			
+			-- ENABLE NETWORK TIME
+			-- Unless a reset Snapshot exists, in which case "fg-snapshot-preserver" will manage network time.
 			try
 				doShellScriptAsAdmin("systemsetup -setusingnetworktime on")
 			end try
 		end try
+		
 		
 		-- SET MENUBAR CLOCK FORMAT
 		do shell script "defaults write com.apple.menuextra.clock FlashDateSeparators -bool false; defaults write com.apple.menuextra.clock IsAnalog -bool false"
@@ -766,20 +633,8 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 			do shell script "defaults delete eficheck"
 		end try
 		
-		try
-			(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
-			-- DO NOT reset Full Disk Access if reset Snapshot exists since Snapshot Helper will have been granted Full Disk Access to mount the reset Snapshot.
-		on error
-			try
-				(("/Users/Shared/.fgResetSnapshotLost" as POSIX file) as alias)
-				-- ALSO do not reset Full Disk Access if Snapshot was lost so that we can see that Snapshot Helper not having Full Disk Access wasn't the issue.
-			on error
-				try
-					do shell script "tccutil reset SystemPolicyAllFiles"
-				end try
-			end try
-		end try
-		
+		-- RESET UPDATES & TERMINAL
+		-- AND DELETE DESKTOP FILES WITH RM SINCE THIS APP WILL ALWAYS HAVE FULL DISK ACCESS SO IT WON'T NEED TO PROMPT FOR LOGGED IN USER DESKTOP ACCESS ON ON CATALINA AND NEWER
 		try
 			doShellScriptAsAdmin("rm -rf /private/var/db/softwareupdate/journal.plist " & ¬
 				"'/Users/Shared/Relocated Items' " & ¬
@@ -796,22 +651,11 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 			"/Users/" & demoUsername & "/.bash_history " & ¬
 			"/Users/" & demoUsername & "/.bash_sessions " & ¬
 			"/Users/" & demoUsername & "/.zsh_history " & ¬
-			"/Users/" & demoUsername & "/.zsh_sessions")
+			"/Users/" & demoUsername & "/.zsh_sessions " & ¬
+			"'/Users/" & demoUsername & "/Desktop/QA Helper - Computer Specs.txt' " & ¬
+			"'/Users/" & demoUsername & "/Desktop/Relocated Items'")
 		
-		-- TRASH DESKTOP FILES WITH FINDER INSTEAD OF RM SO FOLDER ACCESS IS NOT NECESSARY ON CATALINA AND NEWER
-		try
-			with timeout of 5 seconds -- Timeout so that we don't wait if Finder prompts for permissions to trash a file/folder
-				tell application "Finder"
-					try
-						delete file ((("/Users/" & demoUsername & "/Desktop/QA Helper - Computer Specs.txt") as POSIX file) as alias)
-					end try
-					try
-						delete folder ((("/Users/" & demoUsername & "/Desktop/Relocated Items") as POSIX file) as alias)
-					end try
-				end tell
-			end timeout
-		end try
-		
+		-- EMPTY THE TRASH (in case it's full)
 		try
 			tell application "Finder"
 				set warns before emptying of trash to false
@@ -1046,10 +890,10 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		try
 			((demoHelperLaunchAgentPlistPath as POSIX file) as alias)
 			
-			try -- Don't quit apps if "TESTING" flag folder exists on desktop
-				((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
-			on error
-				if (qaCompleteHasRun) then -- Only quit apps and if Setup has finished and installed the Demo Helper LaunchAgent and Cleanup After QA Complete has been run to help not interfere with initial setup possibilities.
+			if (qaCompleteHasRun) then -- Only quit apps and if Setup has finished and installed the Demo Helper LaunchAgent and Cleanup After QA Complete has been run to help not interfere with initial setup possibilities.
+				try -- Don't quit apps if "TESTING" flag folder exists on desktop
+					((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
+				on error
 					try
 						tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Setup") and (short name is not "QA Helper") and (short name is not (name of me))))
 						if ((count of listOfRunningApps) > 0) then
@@ -1077,8 +921,8 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 							end try
 						end if
 					end try
-				end if
-			end try
+				end try
+			end if
 			
 			
 			-- Wait for internet before launching QA Helper to ensure that QA Helper can always update itself to the latest version.
@@ -1111,13 +955,17 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			
 			try -- Only launch QA Helper if Setup has finished and installed the Demo Helper LaunchAgent to help not interfere with initial setup possibilities.
 				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script "open -n -a " & (quoted form of ("/Users/" & demoUsername & "/Applications/QA Helper.app"))
+				do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/QA Helper.app"))
 			on error
 				try
-					set aboutThisMacAppPath to "/System/Library/CoreServices/Applications/About This Mac.app"
-					((aboutThisMacAppPath as POSIX file) as alias)
-					-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." In testing, this does not open a new instance of About This Mac even if it's already open.
-					do shell script "open -n -a " & (quoted form of aboutThisMacAppPath)
+					if (isVenturaOrNewer) then -- On Ventura, open the new detailed About section in System Settings instead of the now minimal About window.
+						do shell script "open x-apple.systempreferences:com.apple.SystemProfiler.AboutExtension"
+					else
+						set aboutThisMacAppPath to "/System/Library/CoreServices/Applications/About This Mac.app"
+						((aboutThisMacAppPath as POSIX file) as alias)
+						-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." In testing, this does not open a new instance of About This Mac even if it's already open.
+						do shell script "open -na " & (quoted form of aboutThisMacAppPath)
+					end if
 				on error
 					try
 						tell application "System Events" to click menu item "About This Mac" of menu 1 of menu bar item "Apple" of menu bar 1 of application process "Finder"
@@ -1134,7 +982,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		repeat -- dialogs timeout when screen is asleep or locked (just in case)
 			set isAwake to true
 			try
-				set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+				set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 			end try
 			
 			set isUnlocked to true
@@ -1192,7 +1040,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		
 		try
 			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-			do shell script ("open -n -a '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
+			do shell script ("open -na '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
 		end try
 		
 		quit
@@ -1237,39 +1085,44 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			end repeat
 			
 			set isOnFreeGeekNetwork to false
-			if (isConnectedToInternet) then
-				try
-					tell application "System Events" to tell current location of network preferences
-						repeat with thisActiveNetworkService in (every service whose active is true)
-							if (((name of interface of thisActiveNetworkService) as string) is equal to "Wi-Fi") then
-								try
-									set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & ((id of interface of thisActiveNetworkService) as string))
-									set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
-									if (getWiFiNetworkColonOffset > 0) then
-										set currentWiFiNetwork to (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput)
-										set isOnFreeGeekNetwork to ((currentWiFiNetwork is equal to "Free Geek") or (currentWiFiNetwork is equal to "FG Reuse"))
-										
-										if (isOnFreeGeekNetwork) then exit repeat
-									end if
-								end try
-							end if
-						end repeat
-					end tell
-				end try
-				
-				if (not isOnFreeGeekNetwork) then
+			try -- Don't show NOT RESET alert if "TESTING" flag folder exists on desktop
+				((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
+				set isOnFreeGeekNetwork to true
+			on error
+				if (isConnectedToInternet) then
 					try
-						do shell script "ping -c 1 -t 5 data.fglan" -- Will error if not wired FG network.
-						set isOnFreeGeekNetwork to true
+						tell application "System Events" to tell current location of network preferences
+							repeat with thisActiveNetworkService in (every service whose active is true)
+								if (((name of interface of thisActiveNetworkService) as string) is equal to "Wi-Fi") then
+									try
+										set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & ((id of interface of thisActiveNetworkService) as string))
+										set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
+										if (getWiFiNetworkColonOffset > 0) then
+											set currentWiFiNetwork to (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput)
+											set isOnFreeGeekNetwork to ((currentWiFiNetwork is equal to "Free Geek") or (currentWiFiNetwork is equal to "FG Reuse"))
+											
+											if (isOnFreeGeekNetwork) then exit repeat
+										end if
+									end try
+								end if
+							end repeat
+						end tell
 					end try
+					
+					if (not isOnFreeGeekNetwork) then
+						try
+							do shell script "ping -c 1 -t 5 data.fglan" -- Will error if not wired FG network.
+							set isOnFreeGeekNetwork to true
+						end try
+					end if
 				end if
-			end if
+			end try
 			
 			if (not isOnFreeGeekNetwork) then
 				repeat -- dialogs timeout when screen is asleep or locked (just in case)
 					set isAwake to true
 					try
-						set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+						set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 					end try
 					
 					set isUnlocked to true
@@ -1328,31 +1181,30 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 				try
 					activate
 				end try
+				
 				set contactFreeGeekDialogButton to "                                                 Shut Down                                                 "
 				-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
 				if (isCatalinaOrNewer) then set contactFreeGeekDialogButton to "Shut Down                                                                                                  "
-				display dialog "PLEASE STOP AND CONTACT FREE GEEK TECH SUPPORT!
-THIS MAC IS NOT READY FOR PERSONAL USE!
+				display dialog "THIS MAC IS NOT READY FOR PERSONAL USE!
+PLEASE CONTACT Free Geek THROUGH eBay!
 
-It appears you've purchased (or been granted) a Mac from Free Geek that was not reset to be ready for you to use.
+It appears you've purchased a Mac from Free Geek that was not reset to be ready for you to use.
 
 This was our mistake, we apologize for the inconvenience.
+You WILL NOT need to return this Mac to Free Geek for it to be reset.
 
-This can be fixed over the phone, so you won't need to bring this Mac back to Free Geek.
+Please contact Free Geek through the eBay messaging system so that we can send you the simple instructions to reset this Mac yourself.
 
-	CONTACT FREE GEEK TECH SUPPORT
-	Hours:	Tues - Sat @ 10am - 5:45pm
-	Phone:	(503) 232-9350 extension 6
-	Email:	support@freegeek.org
+If you've recieved this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form.
 
 
-This Mac is currently set up with custom settings that are not ideal for personal use. A reset process must be run to remove these custom settings and prepare the Mac for you to create your own account.
+This Mac is currently set up with custom settings that are not intended for personal use. A reset process must be run to remove these custom settings and prepare this Mac for you to create your own account.
 
-If you save your personal information on this Mac before running the reset process, it will be permanently deleted once the reset is performed.
+IF YOU SAVE YOUR PERSONAL INFORMATION ON THIS MAC BEFORE RUNNING THE RESET PROCESS, IT WILL BE PERMANENTLY DELETED ONCE THE RESET IS PERFORMED.
 
-You should not use this Mac until you've contacted Free Geek so that we can guide you through running the reset process.
+You SHOULD NOT USE this Mac until you've contacted Free Geek so that we can guide you through the reset process.
 
-The reset process is only a few steps and will take less than 10 minutes." buttons {contactFreeGeekDialogButton} default button 1 with title (name of me) with icon dialogIconName
+The reset process is only a few steps and will take less than 10 minutes." buttons {contactFreeGeekDialogButton} default button 1 with title (name of me) with icon caution
 				
 				tell application "System Events" to shut down with state saving preference
 				
@@ -1402,7 +1254,7 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 							set end of photoFolders to (POSIX path of (thisPhotoCollectionFolder as string))
 						end repeat
 					on error (getPhotoCollectionsErrorMessage)
-						log getPhotoCollectionsErrorMessage
+						tell me to log getPhotoCollectionsErrorMessage
 					end try
 				end try
 				try
@@ -1410,7 +1262,7 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 					((desktopPicturesWithoutSolidColorsPath as POSIX file) as alias)
 					set end of photoFolders to desktopPicturesWithoutSolidColorsPath
 				on error (getDesktopPicturesWithoutSolidColorsErrorMessage)
-					log getDesktopPicturesWithoutSolidColorsErrorMessage
+					tell me to log getDesktopPicturesWithoutSolidColorsErrorMessage
 					try
 						set desktopPicturesPath to "/System/Library/Desktop Pictures/" -- Desktop Pictures location changed to this on Catalina and AppleScript fails to return it.
 						try
@@ -1419,7 +1271,7 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 						((desktopPicturesPath as POSIX file) as alias)
 						set end of photoFolders to desktopPicturesPath
 					on error (getDesktopPicturesErrorMessage)
-						log getDesktopPicturesErrorMessage
+						tell me to log getDesktopPicturesErrorMessage
 					end try
 				end try
 				try
@@ -1427,7 +1279,7 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 					((freeGeekPromoPicsPath as POSIX file) as alias)
 					set end of photoFolders to freeGeekPromoPicsPath
 				on error (getFreeGeekPromoPicsErrorMessage)
-					log getFreeGeekPromoPicsErrorMessage
+					tell me to log getFreeGeekPromoPicsErrorMessage
 				end try
 			end tell
 			
@@ -1533,7 +1385,7 @@ defaults -currentHost write com.apple.screensaver moduleDict '<dict>
 										end try
 										try -- Instead of just activating QA Helper, re-launch it in case it was quit, which will also just activate it if it's already running.
 											-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-											do shell script "open -n -a " & (quoted form of ("/Users/" & demoUsername & "/Applications/QA Helper.app"))
+											do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/QA Helper.app"))
 										end try
 									end if
 								end try
@@ -1541,7 +1393,7 @@ defaults -currentHost write com.apple.screensaver moduleDict '<dict>
 						end tell
 						
 						if (screenSaverDescription is equal to "iLifeSlideshows") then set screenSaverDescription to screenSaverDescription & " | " & iLifeSlideShowStyleKey & " | " & photoFolderName
-						if (not isFreeGeekSystem) then
+						if (false) then -- SET TO TRUE FOR DEBUG NOTIFICATIONS
 							display notification with title (name of me) subtitle screenSaverDescription
 						end if
 						return screenSaverDescription

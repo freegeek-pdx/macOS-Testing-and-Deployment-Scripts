@@ -1,7 +1,11 @@
 # THIS IS NOT A SCRIPT.
 # THE FOLLOWING COMMANDS ARE INTENDED TO BE COPIED-AND-PASTED INTO TERMINAL WHEN NEEDED.
+# BUT, THIS *IS NOT NEEDED ANYMORE* SINCE "update-mac-drives.sh" CAN BE USED INSTEAD.
 
-# CREATE Monterey INSTALLER USB (14.5 GB REQUIRED):
+# CREATE Ventura INSTALLER USB (14.4 GB REQUIRED):
+sudo '/Volumes/Install macOS Ventura beta/Install macOS Ventura beta.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallVentura --nointeraction
+
+# CREATE Monterey INSTALLER USB (14.6 GB REQUIRED):
 sudo '/Volumes/Install macOS Monterey/Install macOS Monterey.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallMonterey --nointeraction
 
 # CREATE Big Sur INSTALLER USB (14 GB REQUIRED):

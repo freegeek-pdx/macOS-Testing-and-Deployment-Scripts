@@ -22,11 +22,11 @@
 # NOTICE: This script will only exist on boot to be able to run via LaunchDaemon when booting after restoring from the reset Snapshot.
 # ALSO: fg-prepare-os will have created AppleSetupDone to not show Setup Assistant BEFORE creating the reset Snapshot so that Setup Assistant would also not show during Snapshot reset.
 
-readonly SCRIPT_VERSION='2022.5.13-1'
+readonly SCRIPT_VERSION='2022.10.25-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
-SCRIPT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
 
 launch_daemon_path='/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist'
@@ -39,21 +39,24 @@ launch_login_progress_app() {
 
 	if [[ -d "${SCRIPT_DIR}/Tools/Free Geek Login Progress.app" ]]; then
 		# Cannot open "Free Geek Login Progress" directly when at Login Window, but a LaunchAgent with LimitLoadToSessionType=LoginWindow and "launchctl load -S LoginWindow" can open it.
+		# In my testing I haven't been able to figure out how to do this with any of the modern "launchctl bootstrap" options, but maybe there is some way that I haven't found.
 
+		login_progress_launch_agent_path='/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
+
+		# NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
+		# BUT, this is just done for consistency with other code since this particular script will never run when a user is logged in to even be able to see that list in macOS 13 Ventura.
+		# On macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
 		PlistBuddy \
 			-c 'Add :Label string org.freegeek.Free-Geek-Login-Progress' \
 			-c 'Add :LimitLoadToSessionType string LoginWindow' \
-			-c 'Add :ProgramArguments array' \
-			-c 'Add :ProgramArguments: string /usr/bin/open' \
-			-c 'Add :ProgramArguments: string -n' \
-			-c 'Add :ProgramArguments: string -a' \
-			-c "Add :ProgramArguments: string '${SCRIPT_DIR}/Tools/Free Geek Login Progress.app'" \
+			-c "Add :Program string '${SCRIPT_DIR}/Tools/Free Geek Login Progress.app/Contents/Resources/Launch Free Geek Login Progress'" \
+			-c 'Add :AssociatedBundleIdentifiers string org.freegeek.Free-Geek-Login-Progress' \
 			-c 'Add :RunAtLoad bool true' \
 			-c 'Add :StandardOutPath string /dev/null' \
 			-c 'Add :StandardErrorPath string /dev/null' \
-			'/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist' &> /dev/null
+			"${login_progress_launch_agent_path}" &> /dev/null
 
-		launchctl load -S LoginWindow '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
+		launchctl load -S LoginWindow "${login_progress_launch_agent_path}"
 
 		for (( wait_for_progress_app_seconds = 0; wait_for_progress_app_seconds < 15; wait_for_progress_app_seconds ++ )); do
 			if pgrep -q 'Free Geek Login Progress'; then
@@ -63,8 +66,8 @@ launch_login_progress_app() {
 			fi
 		done
 
-		launchctl unload -S LoginWindow '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
-		rm -f '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
+		launchctl unload -S LoginWindow "${login_progress_launch_agent_path}"
+		rm -f "${login_progress_launch_agent_path}"
 	fi
 }
 
@@ -93,7 +96,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 		# Since LaunchDaemons start so early on boot, always wait for full boot before continuing so that everything is run in a consistent state and all system services have been started.
 		# Through investigation, I found that "coreauthd" is consistently the last, or nearly the last, root process to be started before the login window is displayed.
 
-		while ! pgrep -q 'coreauthd'; do
+		until pgrep -q 'coreauthd'; do
 			sleep 2
 		done
 		
@@ -141,7 +144,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 
 		write_to_log 'Waiting for Full Boot'
 
-		while ! pgrep -q 'coreauthd'; do
+		until pgrep -q 'coreauthd'; do
 			sleep 2
 		done
 		
@@ -194,14 +197,17 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 		fi
 
 
+		update_preboot_failed=false
+
 		if [[ "$(diskutil apfs listCryptoUsers /)" != 'No cryptographic users for disk'* ]]; then
 
 			# DELETE ANY CRYPTO USER REFERENCES (SECURE TOKEN HOLDERS) IF THEY EXIST
 			# Even though these accounts no longer exist, the crypto user references are not removed when restoring the reset Snapshot since it's stored in the APFS Metadata and not the filesystem itself.
-			# This should only happen on macOS 10.15 Catalina (or older) since Secure Tokens can be prevented from being granted to our users on macOS 11 Big Sur.
+			# This should only happen on macOS 10.15 Catalina (or older but older versions don't do a Snapshot reset) since Secure Tokens can be prevented from being granted to our users on macOS 11 Big Sur.
 			# But, there is no harm in always checking in case something unexpected happened.
 
-			# IMPORTANT: This DOES NOT work on SEP-enabled devices, such as T2 Macs and Apple Silicon Macs (not sure about T1 Macs).
+			# IMPORTANT: This DOES NOT work on SEP-enabled (Secure Enclave Processor) devices, such as T2 Macs and Apple Silicon Macs,
+			# but WORKS on T1 Macs whose Secure Enclave is only used for Touch ID (and nothing else like Secure Tokens or disk encryption keys).
 			# Running "diskutil apfs updatePreboot /" does not help this situation since it will fail because the Open Directory user doesn't exist.
 			# So, we will only allow macOS 11 Big Sur to be installed on those since the Secure Token can be prevented rather than needing to be deleted.
 
@@ -228,14 +234,28 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 				# I am not sure if this is necessary, but it seems wise after messing with Secure Tokens.
 				# For info about what this command does, run "diskutil apfs updatePreboot" (with no device or path) in Terminal.
 
-				write_to_log 'Updating Preboot After Deleting Leftover Secure Token References'
+				write_to_log 'Updating Preboot Volume After Deleting Leftover Secure Token References'
 
-				diskutil apfs updatePreboot /
+				is_last_update_preboot_attempt=false
+				for (( update_preboot_attempt = 1; update_preboot_attempt <= 3; update_preboot_attempt ++ )); do # Updating the Preboot Volume *should* work on the first attempt, but try up to 3 times just in case there is a fluke issue.
+					if ! diskutil_apfs_update_preboot_output="$(diskutil apfs updatePreboot / 2>&1)" || [[ "${diskutil_apfs_update_preboot_output}" != *$'UpdatePreboot: Exiting Update Preboot operation with overall error=(ZeroMeansSuccess)=0\nFinished APFS operation' ]]; then
+						write_to_log "$(echo "${diskutil_apfs_update_preboot_output}" | tail -2)" # If there was an error, log the last 2 updatePreboot output lines since it may be informative.
+						if (( update_preboot_attempt == 3 )); then is_last_update_preboot_attempt=true; fi
+						write_to_log "$($is_last_update_preboot_attempt && echo 'ERROR' || echo 'WARNING'): Attempt ${update_preboot_attempt} of 3 Failed to Update Preboot Volume After Deleting Leftover Secure Token References"
+						if $is_last_update_preboot_attempt; then
+							update_preboot_failed=true
+						else
+							sleep "${update_preboot_attempt}" # If there was an error, wait a bit before trying again.
+						fi
+					else
+						break
+					fi
+				done
 			fi
 		fi
 
 
-		if [[ "$(diskutil apfs listCryptoUsers /)" == 'No cryptographic users for disk'* ]]; then
+		if ! $update_preboot_failed && [[ "$(diskutil apfs listCryptoUsers /)" == 'No cryptographic users for disk'* ]]; then
 
 			if [[ "$(tmutil listlocalsnapshots /)" == *'com.apple.TimeMachine'* ]]; then
 
@@ -259,24 +279,48 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 				# Most importantly, even if the xART Touch ID entry exists, there are no Touch ID fingerprints stored when a new user is created after going through Setup Assistant.
 				# I tested this by filling all 5 Touch ID fingerprint slots before restoring the reset Snapshot and was able to create add new Touch ID fingerprints after restoring
 				# the reset Snapshot (without deleting any Touch ID fingerprint entries using "bioutil" or "xartutil") and going through Setup Assistant to create a new user.
-				
+
+
+				# RESET TCC DATABASE
+				# Since global TCC permissions are set within "fg-install-os" (see the "create_custom_global_tcc_database" function in that script for more info),
+				# there will be TCC permissions that exist before the reset Snapshot is created, so we must remove those permissions manually during this reset process.
+
+				write_to_log 'Resetting TCC Database'
+
+				tccutil reset All
+
 
 				# DELETE ALL PREFERENCES, CACHES, AND TEMPORARY FILES
 
 				write_to_log 'Cleaning Up Unnecessary Files'
 
-				find '/Library/Preferences' -name '*.plist' -exec defaults delete {} \;
-				rm -rf '/Library/Preferences/'{,.[^.],..?}*
-				rm -rf '/Library/Caches/'{,.[^.],..?}
-				rm -rf '/System/Library/Caches/'{,.[^.],..?}*
-				rm -rf '/private/var/vm/'{,.[^.],..?}*
-				rm -rf '/private/var/folders/'{,.[^.],..?}*
-				rm -rf '/private/var/tmp/'{,.[^.],..?}*
-				rm -rf '/private/tmp/'{,.[^.],..?}*
-				rm -rf '/.TemporaryItems/'{,.[^.],..?}*
+				while IFS='' read -rd '' this_preferences_file; do
+					defaults delete "${this_preferences_file}" # Properly delete all preferences values through "cfprefsd" before deleting the actual file.
+					rm -f "${this_preferences_file}"
+					rmdir "${this_preferences_file%/*}" # Delete parent folder if it's empty.
+				done < <(find '/Library/Preferences' -type f -name '*.plist' -not -path '*/OpenDirectory/Configurations/Search.plist' -print0)
+				# NOTE: The "/Library/Preferences/OpenDirectory/Configurations/Search.plist" preferences file IS NOT being deleted because starting on macOS 13 Ventura
+				# deleting it causes a Kernel Panic boot loop on the next reboot. I'm not sure what changed since it was never an issue to delete all these preferences before,
+				# but since the default OpenDirectory search path is never changed it doesn't hurt to just keep that file as-is on all versions of macOS.
+				# Through testing, I found that all other OpenDirectory preferences stored within "/Library/Preferences/OpenDirectory" can be deleted and properly
+				# revert to their default values. When this Kernel Panic boot loop happened after this reset script ran and shut the computer, I narrowed the issue down by
+				# enabling Verbose Mode by running "nvram boot-args='-v'" when in Recovery and then saw errors during the hanging period before the Kernel Panic that stated
+				# "AMFI: Denying core dump for pid ### (opendirectoryd)" over and over again with new PIDs. This seemed to indicate some issue with "opendirectoryd" loading.
+				# Then, I commented out sections of these file deletions since it seemed like the most likely culprit until I manually narrowed the issue down to exactly the
+				# "/Library/Preferences/OpenDirectory/Configurations/Search.plist" preferences file needing to be preserved to avoid the Kernel Panic boot loop.
+
+				rm -rf '/Library/Caches/'{,.[^.],..?} \
+					'/System/Library/Caches/'{,.[^.],..?}* \
+					'/private/var/vm/'{,.[^.],..?}* \
+					'/private/var/folders/'{,.[^.],..?}* \
+					'/private/var/tmp/'{,.[^.],..?}* \
+					'/private/tmp/'{,.[^.],..?}* \
+					'/.TemporaryItems/'{,.[^.],..?}*
 
 
-				if ! nvram 'EnableTRIM' && [[ "$(sw_vers -buildVersion)" > '20E' || "$(sysctl -in hw.optional.arm64)" != '1' ]]; then
+				is_apple_silicon="$([[ "$(sysctl -in hw.optional.arm64)" == '1' ]] && echo 'true' || echo 'false')"
+
+				if ! nvram 'EnableTRIM' && { ! $is_apple_silicon || [[ "$(sw_vers -buildVersion)" > '20E' ]]; }; then
 
 					# CLEAR NVRAM
 					# Unless TRIM has been enabled with "trimforce enable" since clearing NVRAM will undo it.
@@ -292,66 +336,85 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 					nvram -c
 				fi
 
+				sip_is_enabled="$([[ "$(csrutil status)" == 'System Integrity Protection status: enabled.' ]] && echo 'true' || echo 'false')"
 
-				# SET LANGUAGE CHOOSER AND SETUP ASSISTANT TO RUN ON NEXT BOOT
+				if ! $sip_is_enabled; then
 
-				write_to_log 'Setting Mac to Run "Setup Assistant" on Next Boot'
+					# ENABLE SYSTEM INTEGRITY PROTECTION (SIP)
+					# "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect (so it will be cleared on next boot to Setup Assistant).
+					# BUT, if running on Apple Silicon, "csrutil clear" requires authentication from a Secure Token admin (which won't have ever existed) to enable or disable it,
+					# so it should be impossible to be enabled during our process, but if somehow it is enabled then this reset process will fail with an error during this step.
 
-				rm -f '/private/var/db/.AppleSetupDone'
-				touch '/private/var/db/.RunLanguageChooserToo'
-				chown 0:0 '/private/var/db/.RunLanguageChooserToo' # Make sure this file is properly owned by root:wheel.
+					write_to_log 'Enabling System Integrity Protection (SIP)'
+
+					if ! $is_apple_silicon && csrutil_clear_output="$(csrutil clear 2>&1)" && [[ "${csrutil_clear_output}" == 'Successfully cleared'* ]]; then
+						sip_is_enabled=true # Even if "csrutil clear" is successful, checking "csrutil status" again will still show it's DISABLED since we haven't rebooted yet, so we just need to update the known SIP status manually instead of checking again.
+					fi
+				fi
+
+				if $sip_is_enabled; then
+
+					# SET LANGUAGE CHOOSER AND SETUP ASSISTANT TO RUN ON NEXT BOOT
+
+					write_to_log 'Setting Mac to Run "Setup Assistant" on Next Boot'
+
+					rm -f '/private/var/db/.AppleSetupDone'
+					touch '/private/var/db/.RunLanguageChooserToo'
+					chown 0:0 '/private/var/db/.RunLanguageChooserToo' # Make sure this file is properly owned by root:wheel.
 
 
-				if [[ ! -f '/private/var/db/.AppleSetupDone' && -f '/private/var/db/.RunLanguageChooserToo' ]]; then
-				
-					# DELETE fg-snapshot-reset LAUNCH DAEMON
-
-					rm -f "${launch_daemon_path}"
-
-
-					# DELETE fg-error-occurred LAUNCH DAEMON
-
-					rm -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist'
-
-
-					if [[ ! -f "${launch_daemon_path}" && ! -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist' ]]; then
-						
-						write_to_log 'Successfully Completed Snapshot Reset'
-
-						sleep 3 # Give the Progress app a few seconds to update it's status after the LaunchDaemon file has been deleted.
-
+					if [[ ! -f '/private/var/db/.AppleSetupDone' && -f '/private/var/db/.RunLanguageChooserToo' ]]; then
 					
-						# ANNOUNCE COMPLETED RESET
+						# DELETE fg-snapshot-reset LAUNCH DAEMON
 
-						osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
-						afplay "${SCRIPT_DIR}/Announcements/fg-completed-reset.aiff"
-						afplay "${SCRIPT_DIR}/Announcements/fg-shutting-down.aiff"
+						rm -f "${launch_daemon_path}"
 
 
-						# DELETE fg-snapshot-reset FOLDER
+						# DELETE fg-error-occurred LAUNCH DAEMON
 
-						rm -rf "${SCRIPT_DIR}"
-
-
-						# DELETE ANYTHING ELSE IN SHARED FOLDER
-						# "Build Info" folder could exist with partial log from fg-prepare-os.
-						# No other files or folder should normally exist at this point, but may exist when I'm debugging.
-
-						rm -rf '/Users/Shared/'{,.[^.],..?}*
+						rm -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist'
 
 
-						if [[ ! -d "${SCRIPT_DIR}" ]]; then
+						if [[ ! -f "${launch_daemon_path}" && ! -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist' ]]; then
+							
+							write_to_log 'Successfully Completed Snapshot Reset'
+
+							sleep 3 # Give the Progress app a few seconds to update it's status after the LaunchDaemon file has been deleted.
+
 						
-							# KILL CAFFEINATE
+							# ANNOUNCE COMPLETED RESET
 
-							kill "${caffeinate_pid}" &> /dev/null
+							osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
+							afplay "${SCRIPT_DIR}/Announcements/fg-completed-reset.aiff"
+							afplay "${SCRIPT_DIR}/Announcements/fg-shutting-down.aiff"
 
 
-							# SHUT DOWN
+							# DELETE fg-snapshot-reset FOLDER
 
-							shutdown -h now &> /dev/null
+							rm -rf "${SCRIPT_DIR}"
 
-							exit 0
+
+							# DELETE ANYTHING ELSE IN SHARED FOLDER
+							# "Build Info" folder will always exist with the installation log and partial prepare log up to the point of
+							# the reset Snapshot being created, but do not save it since it won't contain any useful info for the customer.
+							# No other files or folder should normally exist at this point, but may exist when I'm debugging.
+
+							rm -rf '/Users/Shared/'{,.[^.],..?}*
+
+
+							if [[ ! -d "${SCRIPT_DIR}" ]]; then
+							
+								# KILL CAFFEINATE
+
+								kill "${caffeinate_pid}" &> /dev/null
+
+
+								# SHUT DOWN
+
+								shutdown -h now &> /dev/null
+
+								exit 0
+							fi
 						fi
 					fi
 				fi

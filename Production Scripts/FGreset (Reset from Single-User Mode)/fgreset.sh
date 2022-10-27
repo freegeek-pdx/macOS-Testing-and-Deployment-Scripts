@@ -3,7 +3,7 @@
 #
 # Created by Pico Mitchell on 4/30/17.
 # For MacLand @ Free Geek
-# Version: 2022.5.25-1
+# Version: 2022.9.21-1
 #
 # MIT License
 #
@@ -75,7 +75,7 @@ elif ! $DEBUG_MODE; then
 
 "
         exit 1
-    elif [[ -d "/Users/${DEMO_USERNAME}/Desktop/Cleanup After QA Complete.app" || -d "/Users/${DEMO_USERNAME}/Desktop/Automation Guide.app" ]]; then
+    elif [[ -n "$(find "/Users/${DEMO_USERNAME}/Desktop" -iname '*.app' -maxdepth 1 -print -quit 2> /dev/null)" ]]; then # Check for ANY app existing on the Desktop (whether is a symlink file or an actual app bundle directory).
         echo -e "
 
     ${ANSI_YELLOW}${ANSI_UNDERLINE}N O T   R E A D Y   T O   R U N   F G R E S E T${ANSI_YELLOW}
@@ -103,14 +103,7 @@ fi
 
 debug_log_and_step() {
     if $DEBUG_MODE && [[ -n "$1" ]]; then
-        echo -ne "${ANSI_YELLOW}\n$1"
-
-        if [[ -n "${2+x}" ]]; then
-            echo -ne ":\n$([[ -n "$2" ]] && echo "$2" || echo 'N/A')"
-        fi
-
-        echo -ne "\nDEBUG - Press RETURN to Continue:${CLEAR_ANSI} "
-
+        echo -ne "${ANSI_YELLOW}\n$1$([[ -n "${2+wasPASSED}" ]] && echo -e ":\n${2:-N/A}")\nDEBUG - Press RETURN to Continue:${CLEAR_ANSI} " # Use "+" parameter expantion to check if arg "$2" was passed while still being able to detect if an empty strings being passed (https://tldp.org/LDP/abs/html/parameter-substitution.html#PARAMALTV)
         read -r
     fi
 }
@@ -174,8 +167,8 @@ while [[ -z "${confirm_start}" ]]; do
 
     debug_log_and_step "! ! !   D E B U G   M O D E   E N A B L E D   ! ! !\nDARWIN_MAJOR_VERSION: ${DARWIN_MAJOR_VERSION}"
 
-    # TODO: Add back the leading line break when we no longer need GUI fgreset.
-    echo -ne "    Are you sure you want to prepare the OS for the customer
+    echo -ne "
+    Are you sure you want to prepare the OS for the customer
     and run \"Setup Assistant\" on the next boot?
 
     ${ANSI_UNDERLINE}P L E A S E   N O T E :${CLEAR_ANSI}
@@ -250,17 +243,17 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
     ${ANSI_CYAN}${ANSI_BOLD}2 of 5:${ANSI_CYAN} Deleting User Accounts - PLEASE WAIT, THIS MAY TAKE A MOMENT...${CLEAR_ANSI}"
         display_progress_and_hide_system_log
         
-        launchctl_load_opendirectoryd_output="$(launchctl load /System/Library/LaunchDaemons/com.apple.opendirectoryd.plist 2>&1)"
+        launchctl_bootstrap_opendirectoryd_output="$(launchctl bootstrap system /System/Library/LaunchDaemons/com.apple.opendirectoryd.plist 2>&1)"
         prevent_scrolling_past_progress_display
 
         for dscl_list_users_attempt in {1..30}; do
             if [[ -z "$(dscl . -list /Users 2> /dev/null)" ]]; then
                 prevent_scrolling_past_progress_display
                 if $DEBUG_MODE; then echo "Waiting for Open Directory (Attempt ${dscl_list_users_attempt})..."; fi
-                # Wait and try again to make sure everything is fully loaded and ready after loading opendirectoryd
+                # Wait and try again to make sure everything is fully loaded and ready after loading opendirectoryd.
                 sleep 1
             else
-                debug_log_and_step 'launchctl_load_opendirectoryd_output' "${launchctl_load_opendirectoryd_output}"
+                debug_log_and_step 'launchctl_bootstrap_opendirectoryd_output' "${launchctl_bootstrap_opendirectoryd_output}"
 
                 dscl_list_users_before_output="$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
                 # I tried using "dscl . -list /Users Password 2> /dev/null | awk '($NF != "*" && $1 != "_mbsetupuser") { print $1 }'" but found that users with passwords set (which should show as "********")
@@ -317,10 +310,10 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             # Delete some stray files owned by DEMO_USERNAME
             rm -f '/Library/Application Support/com.apple.icloud.searchpartyd/savedConfiguration.plist'
             if [[ -n "${demo_user_uid}" ]]; then
-                rm -f "/private/var/db/Spotlight/schema.${demo_user_uid}.plist"
-                rm -f "/private/var/db/com.apple.xpc.launchd/disabled.${demo_user_uid}.plist"
-                rm -rf "/private/var/db/mds/messages/${demo_user_uid}"
-                rm -rf "/private/var/db/datadetectors/${demo_user_uid}" 2> /dev/null # Can output "Operation not permitted" errors.
+                rm -rf "/private/var/db/Spotlight/schema.${demo_user_uid}.plist" \
+                    "/private/var/db/com.apple.xpc.launchd/disabled.${demo_user_uid}.plist" \
+                    "/private/var/db/mds/messages/${demo_user_uid}" \
+                    "/private/var/db/datadetectors/${demo_user_uid}" 2> /dev/null # Can output "Operation not permitted" errors.
             fi
             
             admin_user_uid="$(id -u "${ADMIN_USERNAME}" 2> /dev/null)"
@@ -384,10 +377,10 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             
             # Delete some stray files owned by ADMIN_USERNAME
             if [[ -n "${admin_user_uid}" ]]; then
-                rm -f "/private/var/db/Spotlight/schema.${admin_user_uid}.plist"
-                rm -f "/private/var/db/com.apple.xpc.launchd/disabled.${admin_user_uid}.plist"
-                rm -rf "/private/var/db/mds/messages/${admin_user_uid}"
-                rm -rf "/private/var/db/datadetectors/${admin_user_uid}" 2> /dev/null # Can output "Operation not permitted" errors.
+                rm -rf "/private/var/db/Spotlight/schema.${admin_user_uid}.plist" \
+                    "/private/var/db/com.apple.xpc.launchd/disabled.${admin_user_uid}.plist" \
+                    "/private/var/db/mds/messages/${admin_user_uid}" \
+                    "/private/var/db/datadetectors/${admin_user_uid}" 2> /dev/null # Can output "Operation not permitted" errors.
             fi
         fi
 
@@ -467,8 +460,7 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
     ${ANSI_CYAN}${ANSI_BOLD}4 of 5:${ANSI_CYAN} Cleaning Up Unnecessary Files...${CLEAR_ANSI}"
             display_progress_and_hide_system_log
 
-            # NOTES ABOUT NOT NEEDING TO CLEAR TOUCH ID FINGERPRINTS
-
+            # NOTES ABOUT NOT NEEDING TO CLEAR TOUCH ID FINGERPRINTS:
             # Through testing, I found that Touch ID fingerprints are cleared when the users are deleted.
             # I am not sure exactly how this works internally, maybe Touch ID entries for non-existant users are allowed to be overwritten, but I tested this on both T1 and T2 Macs.
             # I tested this by filling all 5 Touch ID fingerprint slots before restoring running "fgreset" and was able to create add new Touch ID fingerprints after running
@@ -476,18 +468,44 @@ if [[ "$(echo "${confirm_start}" | tr '[:upper:]' '[:lower:]')" == "freegeek" ]]
             # It's lucky that Touch ID fingerprints do not need to be cleared in SUM since both "bioutil" and "xartutil" appear to be unusable in SUM.
             # In SUM, "bioutil" always says there are no Touch ID fingerprints and on T1 Macs, "xartutil" fails with error connecting with xART recovery service.
 
+            # Forget the receipt for the "org.freegeek.fg-prepare-os" package that was installed to customize the OS during installation or customization.
+            debug_log_and_step '"pkgutil --pkgs" BEFORE' "$(pkgutil --pkgs)"
+            pkgutil_forget_prepare_pkg_output="$(pkgutil --forget 'org.freegeek.fg-prepare-os' 2>&1)"
+            debug_log_and_step 'pkgutil_forget_prepare_pkg_output' "${pkgutil_forget_prepare_pkg_output}"
+            debug_log_and_step '"pkgutil --pkgs" AFTER' "$(pkgutil --pkgs)"
 
-            rm -f '/private/etc/kcpassword' # Delete any saved auto-login password.
+            # Reset TCC database (requires bootstrapping/loading tccd).
+            launchctl_bootstrap_tccd_output="$(launchctl bootstrap system /System/Library/LaunchDaemons/com.apple.tccd.system.plist 2>&1)"
+            prevent_scrolling_past_progress_display
 
-            # These rm -rf's still need STDERR redirected to /dev/null to not show possible "Operation not permitted" errors.
-            rm -rf '/Library/Preferences/'{,.[^.],..?}* 2> /dev/null
-            rm -rf '/Library/Caches/'{,.[^.],..?}* 2> /dev/null
-            rm -rf '/System/Library/Caches/'{,.[^.],..?}* 2> /dev/null
-            rm -rf '/private/var/vm/'{,.[^.],..?}* 2> /dev/null
-            rm -rf '/private/var/folders/'{,.[^.],..?}* 2> /dev/null
-            rm -rf '/private/var/tmp/'{,.[^.],..?}* 2> /dev/null
-            rm -rf '/private/tmp/'{,.[^.],..?}* 2> /dev/null
-            rm -rf '/.TemporaryItems/'{,.[^.],..?}* 2> /dev/null
+            tccutil_reset_service_name="$( (( DARWIN_MAJOR_VERSION == 17 )) && echo 'Accessibility' || echo 'All' )"
+            # On macOS 10.13 High Sierra, running "tccutil reset All" always fails with the error shown below EVEN WHEN tccd is loaded, but it WORKS when only running "tccutil reset Accessibility"
+            # which is fine since that is all that is granted to our apps on macOS 10.13 High Sierra (since Full Disk Access was only added in macOS 10.14 Mojave).
+            # Interestingly, when in fully booted macOS 10.13 High Sierra, "tccutil reset All" doesn't error but just DOES NOT clear Accessibility TCC permissions, so using "tccutil reset Accessibility" would always be the right thing to do even if not in Single-User Mode.
+            # On macOS 10.14 Mojave, running "tccutil reset All" WORKS properly after tccd is loaded to clear both the Accessibility and Full Disk Access permissions that were granted to our apps.
+            for tcc_reset_attempt in {1..30}; do
+                if tccutil reset "${tccutil_reset_service_name}" &> /dev/null; then # If tccd is not loaded yet, this will fail with "tccutil: Failed to reset database" error with exit code 70.
+                    debug_log_and_step 'launchctl_bootstrap_tccd_output' "${launchctl_bootstrap_tccd_output}"
+                    prevent_scrolling_past_progress_display
+                    break
+                else
+                    prevent_scrolling_past_progress_display
+                    if $DEBUG_MODE; then echo "Waiting for TCC Reset (Attempt ${tcc_reset_attempt})..."; fi
+                    # Wait and try again to make sure everything is fully loaded and ready after loading tccd.
+                    sleep 1
+                fi
+            done
+
+            # This rm -rf still need STDERR redirected to /dev/null to not show possible "Operation not permitted" errors.
+            rm -rf '/private/etc/kcpassword' \
+                '/Library/Preferences/'{,.[^.],..?}* \
+                '/Library/Caches/'{,.[^.],..?}* \
+                '/System/Library/Caches/'{,.[^.],..?}* \
+                '/private/var/vm/'{,.[^.],..?}* \
+                '/private/var/folders/'{,.[^.],..?}* \
+                '/private/var/tmp/'{,.[^.],..?}* \
+                '/private/tmp/'{,.[^.],..?}* \
+                '/.TemporaryItems/'{,.[^.],..?}* 2> /dev/null
 
             if [[ -d '/Users/Shared/Build Info' ]]; then
                 rm -f '/Users/Shared/Build Info/'{.[^.],..?}* # Delete any HIDDEN flag FILES in the Build Info folder.
@@ -555,8 +573,7 @@ ${ANSI_GREEN}
                     read -r completed
                     
                     if  [[ "${completed}" != 'continue' ]]; then
-                        rm -rf '/usr/local/bin' # This folder was only made for fgreset symlink.
-                        rm -f '/Applications/fgreset'
+                        rm -rf '/usr/local/bin' '/Applications/fgreset' # The "/usr/local/bin" folder was only made for fgreset symlink.
 
                         clear
                         echo -ne "

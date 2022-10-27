@@ -34,11 +34,9 @@
 	# This is a much better solution than manipulating the date and time (since internet things can get wonky when the date is wrong).
 	# The issue with this solution is that a Snapshot can only be mounted by an app that has been granted Full Disk Access, and LaunchDaemon scripts cannot be granted Full Disk Access.
 	# To workaround this limitation, I created the "Free Geek Snapshot Helper" AppleScript applet which can be granted Full Disk Access and then mount the reset Snapshot as soon as possible on each boot.
-	# And while I have automated "Free Geek Snapshot Helper" being granted Full Disk Access, that automation can only run after the technician has run "Automation Guide" and manually granted the "Free Geek Setup" Accessibility acccess.
-	# Since it is possible that a technician may perform an installation at the end of the day and let the computer sit overnight before running "Automation Guide",
-	# we cannot only rely on "Free Geek Snapshot Helper" being able to mount the reset Snapshot within the first 24 hours after an installation has been performed.
-	# Therefore, this script will always run "Free Geek Snapshot Helper" first, and check if it was able to mount the reset Snapshot. If it was, Network Time will be left on (or turned on) and that will be all that is done.
-	# Although, if "Free Geek Snapshot Helper" has not been granted Full Disk Access yet (or could not mount the Snapshot very early on boot), this script will fallback to using the date and time manipulation solution.
+	# And, "Free Geek Snapshot Helper" will always be granted Full Disk Access right off the bat during a customized installation by "fg-install-os" (which you can read about in the comments in that script).
+	# This script will always run "Free Geek Snapshot Helper" first, and check whether or not it was able to mount the reset Snapshot. If it was, Network Time will be left on (or turned on) and that will be all that is done.
+	# If "Free Geek Snapshot Helper" could not mount the Snapshot (such as very early on boot or if something went wrong with "Free Geek Snapshot Helper" being granted Full Disk Access), this script will fallback to using the date and time manipulation solution.
 
 # ANOTHER SNAPSHOT NOTE: macOS will also only keep 1 Snapshot per hour. If multiple Snapshots exist within the same hour, only the earliest one for that hour will be kept (unless a newer one has been mounted, then that one will also survive while mounted).
 
@@ -47,11 +45,11 @@
 	# It seems that somehow the "deleted" daemon is maybe marking the reset Snapshot as unusable and preventing it from being able to show up in "Restore from Time Machine Backup" in Recovery. This seems to not be an issue on macOS 11 Big Sur though.
 	# So, ALWAYS manipulate the system date (Solution 1) to keep set to the Snapshot date on macOS 10.15 Catalina and do not bother mounting the Snapshot (since knowing the Snapshot got purged is better user feedback than it just not showing in Recovery).
 
-readonly SCRIPT_VERSION='2022.4.27-1'
+readonly SCRIPT_VERSION='2022.9.27-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
-SCRIPT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
 
 readonly DEMO_USERNAME='fg-demo'
@@ -71,7 +69,7 @@ write_to_log "Running Snapshot Preserver (version ${SCRIPT_VERSION})"
 
 if pgrep -qf "${BASH_SOURCE[0]}"; then
 	# Need to check for an existing instance already running because of how this script could also be executed by a LaunchDaemon as well as
-	# Free Geek Setup or Free Geek Demo Helper which could conflict with eachother and cause multiple instances to be executed at the same time.
+	# "Free Geek Setup" or "Free Geek Demo Helper" which could conflict with eachother and cause multiple instances to be executed at the same time.
 	# But, the LaunchDaemon schedule alone will never execute multiple instances if the previous LaunchDaemon instance is still running.
 
 	write_to_log 'Exiting Snapshot Preserver - Another Instance Is Already Running'
@@ -80,7 +78,7 @@ fi
 
 manually_sync_time() {
 	if [[ "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then
-		actual_date_time_info="$(curl -m 5 -sL 'https://worldtimeapi.org/api/ip.txt' 2> /dev/null)"
+		actual_date_time_info="$(curl -m 5 -sL 'http://worldtimeapi.org/api/ip.txt' 2> /dev/null)" # Always use "http" since this is to set the correct time when we know the date will be in the past and if the date is too far in the past then "https" will fail anyways while "http" never will.
 		actual_timezone="$(echo "${actual_date_time_info}" | awk -F ': ' '($1 == "timezone") { print $NF; exit }')"
 		actual_date_time="$(echo "${actual_date_time_info}" | awk -F ': ' '($1 == "datetime") { print $NF; exit }')"
 		
@@ -122,17 +120,15 @@ attempt_to_mount_reset_snapshot() {
 		if [[ -d "/Users/${DEMO_USERNAME}/Applications/Free Geek Snapshot Helper.app" && ! -d "${SCRIPT_DIR}/mount/Users/Shared/fg-snapshot-reset" ]]; then
 			# This "Free Geek Snapshot Helper" app will attempt to mount the reset Snapshot, which prevents macOS from deleting it.
 			# https://eclecticlight.co/2021/03/28/last-week-on-my-mac-macos-at-20-apfs-at-4/#comment-59001
-			# This is done in an app instead of this script since Full Disk Access is required to be able to mount Snapshots.
-			# This script could mount the Snapshot if "bash" was granted Full Disk Access, but that is overzealous and not easy to automate.
-			# But, "Free Geek Setup" can easily automate granting "Free Geek Snapshot Helper" Full Disk Access since it will automatically
-			# be added to the Full Disk Access list after running once and "Free Geek Setup" simply needs to automate checking the box next to it.
+			# This is done in an app instead of this script since Full Disk Access is required to be able to mount Snapshots. This script could mount the Snapshot if "bash" was granted Full Disk Access, but that is overzealous.
+			# "Free Geek Snapshot Helper" will always be granted Full Disk Access right off the bat during a customized installation by "fg-install-os" (which you can read about in the comments in that script).
 
 			if pgrep -q 'Finder'; then
 				# "Free Geek Snapshot Helper" will not be able to mount the reset Snapshot when this global LaunchDaemon is first run very early on boot, so will not try to launch unless logged in (by checking if Finder is running).
 				# But, "Free Geek Demo Helper" will launch this script when it is run on login via user LaunchAgent which will get the reset Snapshot mounted as soon as possible.
 
 				for (( launch_attempt = 1; launch_attempt <= 30; launch_attempt ++ )); do
-					if launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" open -n -a "/Users/${DEMO_USERNAME}/Applications/Free Geek Snapshot Helper.app"; then
+					if launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" open -na "/Users/${DEMO_USERNAME}/Applications/Free Geek Snapshot Helper.app"; then
 						touch "${SCRIPT_DIR}/.launchedSnapshotHelper"
 						write_to_log 'Launched Free Geek Snapshot Helper'
 
@@ -267,7 +263,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 			# If was not logged in on first attempt to mount reset Snapshot, wait until login to attempt to mount reset Snapshot again before forcing a reboot if necessary.
 			write_to_log 'Waiting for Login to Launch Free Geek Snapshot Helper'
 
-			while ! pgrep -q 'Finder'; do
+			until pgrep -q 'Finder'; do
 				did_wait_for_login=true
 				sleep 2
 
@@ -316,9 +312,9 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 				# I saw similar kinds issues like this when time got set back after launching the "Free Geek Login Progress" app.
 
 				# Therefore, a full computer reboot seems to be the most reliable option to be sure everything works properly after setting the date into the past.
-				# This *should* only happen on boot, right after login, a day or more after installation when "Free Geek Setup" has not been run yet.
+				# This *should* only happen on boot, right after login, a day or more after installation on macOS 10.15 Catalina where the reset Snapshot will not be mounted.
 				# The reboot happens right after login since we'll wait for login to be sure we can't mount the reset Snapshot instead of having to reboot.
-				# Or this could happen at midnight if the computer is left on overnight when "Free Geek Setup" has not been run yet.
+				# Or this could happen at midnight if the computer is left on overnight on macOS 10.15 Catalina where the reset Snapshot will not be mounted.
 				
 				launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" launchctl reboot apps # This is a fast way to kill all running DEMO_USERNAME apps (https://eclecticlight.co/2019/08/27/kickstarting-and-tearing-down-with-launchctl/)
 				# so that the following prompt will be the only thing visible on screen before reboot.
@@ -380,7 +376,7 @@ else
 
 	if pgrep -q 'Finder'; then
 		# Launch "Free Geek Snapshot Helper" (if logged in) since it also serves as a GUI to display an alert about the reset Snapshot being lost.
-		launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" open -n -a "/Users/${DEMO_USERNAME}/Applications/Free Geek Snapshot Helper.app"
+		launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" open -na "/Users/${DEMO_USERNAME}/Applications/Free Geek Snapshot Helper.app"
 	fi
 
 	# DO NOT delete the "fg-snapshot-preserver" LaunchDaemon or this script since we want it to keep running every 5 minutes to keep

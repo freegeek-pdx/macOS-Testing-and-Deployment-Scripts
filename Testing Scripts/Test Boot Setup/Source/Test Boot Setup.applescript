@@ -16,18 +16,19 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.5.9-1
+-- Version: 2022.10.25-1
 
 -- Build Flag: LSUIElement
+-- Build Flag: IncludeSignedLauncher
 
 use AppleScript version "2.7"
 use scripting additions
-use framework "Cocoa"
+use framework "AppKit"
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -100,6 +101,24 @@ on error checkReadOnlyErrorMessage
 	end if
 end try
 
+set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
+
+set freeGeekUpdaterExists to false
+set freeGeekUpdaterAppPath to "/Applications/Free Geek Updater.app"
+try
+	((freeGeekUpdaterAppPath as POSIX file) as alias)
+	set freeGeekUpdaterExists to true
+	
+	if (application freeGeekUpdaterAppPath is running) then -- Quit if Updater is running (and did not just finish) so that this app can be updated if needed.
+		try
+			(((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias) -- If Updater just finished, continue even if it's still running since it launches Setup when it's done.
+		on error
+			quit
+			delay 10
+		end try
+	end if
+end try
+
 
 global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate -- Needs to be accessible in doShellScriptAsAdmin function.
 set lastDoShellScriptAsAdminAuthDate to 0
@@ -109,13 +128,7 @@ set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH
 
 set currentUsername to (short user name of (system info))
 
-if (((currentUsername is equal to "Tester") or (currentUsername is equal to "restorer")) and ((POSIX path of (path to me)) is equal to ("/Applications/" & (name of me) & ".app/"))) then
-	set dialogIconName to "applet"
-	try
-		((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-		set dialogIconName to (name of me)
-	end try
-	
+if ((currentUsername is equal to "Tester") and ((POSIX path of (path to me)) is equal to ("/Applications/" & (name of me) & ".app/"))) then
 	set systemVersion to (system version of (system info))
 	considering numeric strings
 		set isMojaveOrNewer to (systemVersion ≥ "10.14")
@@ -138,12 +151,10 @@ if (((currentUsername is equal to "Tester") or (currentUsername is equal to "res
 		
 		if (needsAutomationAccess) then
 			try
-				tell application "System Preferences"
-					try
-						activate
-					end try
-					reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-				end tell
+				tell application "System Preferences" to activate
+			end try
+			try
+				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 			end try
 			try
 				activate
@@ -164,9 +175,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the “System Events” and “Finder” checkboxes underneath it.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -210,9 +221,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the checkbox next to it. If “" & (name of me) & "” IS NOT in the list, drag-and-drop the app icon from Finder into the list.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -223,24 +234,6 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	
 	set thisDriveName to "Mac Test Boot"
 	
-	
-	set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
-	
-	
-	try
-		-- Quit if Updater is running (and did not just finish), since it will launch Setup when it's done.
-		(("/Applications/Free Geek Updater.app" as POSIX file) as alias)
-		if (application "/Applications/Free Geek Updater.app" is running) then
-			try
-				(((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias)
-			on error
-				quit
-				delay 10
-			end try
-		end if
-	end try
-	
-	
 	-- Always create ".fgSetupSkipped" on launch. It will be deleted when this app has finished a full run.
 	try
 		do shell script "mkdir " & (quoted form of buildInfoPath)
@@ -249,67 +242,85 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgSetupSkipped")))
 	end try
 	
-	-- Check if this is an old Mac Test Boot or Catalina Restore Boot drive an alert if so.
-	
-	set firmwareCheckerAppExists to false
+	set startupDiskCapacity to 0 -- This is for checking if is source drive.
 	try
-		(("/Applications/Firmware Checker.app" as POSIX file) as alias)
-		set firmwareCheckerAppExists to true
-	on error
-		try
-			do shell script "defaults read com.apple.dock persistent-apps | grep -q Firmware-Checker"
-			set firmwareCheckerAppExists to true
-		end try
+		tell application "System Events" to set startupDiskCapacity to ((capacity of startup disk) as number)
+	end try
+	
+	set macScopeAppExists to false
+	try
+		(("/Applications/Mac Scope.app" as POSIX file) as alias) -- This should only error if previously determined MTB was outdated for some reason and Mac Scope was deleted.
+		set macScopeAppExists to true
 	end try
 	
 	try
-		(("/Users/Shared/OS Updates" as POSIX file) as alias)
-		set firmwareCheckerAppExists to true
+		-- Only check if outdated if just updated (to be sure the checks are done with the latest version of this app) and do not offer to skip if just finished running Updater
+		-- (since Setup already offered to skip before launching Updater) or if Mac Scope doesn't exist (which indicates the drive was previously determined to be outdated.
+		if (macScopeAppExists) then (((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias)
 		
-		try -- Delete old OS Updates if they exist.
-			doShellScriptAsAdmin("rm -rf '/Users/Shared/OS Updates'")
-		end try
-	end try
-	
-	set restoreOSappExists to false
-	try
-		(("/Applications/Restore OS.app" as POSIX file) as alias)
-		set restoreOSappExists to true
-	on error
 		try
-			do shell script "defaults read com.apple.dock persistent-apps | grep -q Restore-OS"
-			set restoreOSappExists to true
-		end try
-	end try
-	
-	try
-		(("/Users/Shared/Restore OS Images" as POSIX file) as alias)
-		set restoreOSappExists to true
-		
-		try -- Delete old Restore OS Images if they exist.
-			doShellScriptAsAdmin("rm -rf '/Users/Shared/Restore OS Images'")
-		end try
-	end try
-	
-	if (firmwareCheckerAppExists or restoreOSappExists) then
-		try
-			activate
-		end try
-		try
-			do shell script "afplay /System/Library/Sounds/Basso.aiff"
-		end try
-		display alert ("
+			-- Check if this is an outdated Mac Test Boot (or Catalina Restore Boot) drive and delete all testing apps and alert if so.
+			if (not macScopeAppExists) then error "NO MAC SCOPE"
+			
+			-- The MTB version is NOT stored in a user accessable location so that it cannot be super easily manually edited.
+			set currentMTBversion to doShellScriptAsAdmin("cat '/private/var/root/.mtbVersion'") -- If the file doesn't exist, it's older than 20220726 which was the first version to include this file (version 20220705 stored the file at "/Users/Shared/.mtbVersion" and no MTB version file existed before that).
+			
+			if ((currentMTBversion is not equal to "20220726") and (currentMTBversion is not equal to "20221025")) then error "OUTDATED"
+		on error
+			set serialNumber to ""
+			try
+				set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
+			end try
+			if ((startupDiskCapacity > 3.3E+10) or (serialNumber is not equal to "C02R49Y5G8WP")) then -- Never delete anything on Source drive no matter what.
+				try
+					doShellScriptAsAdmin("
+rm -rf '/Applications/Audio Test.app' '/Applications/Blackmagic Disk Speed Test.app' '/Applications/Breakaway.app' '/Applications/Camera Test.app' '/Applications/coconutBattery.app' '/Applications/coconutID.app' '/Applications/CPU Stress Test.app' '/Applications/CPUTest.app' '/Applications/DriveDx.app' '/Applications/FingerMgmt.app' '/Applications/Firmware Checker.app' '/Applications/Free Geek Updater.app' '/Applications/GPU Stress Test.app' '/Applications/GpuTest_OSX_x64_0.7.0' '/Applications/Internet Test.app' '/Applications/Keyboard Test.app' '/Applications/KeyboardCleanTool.app' '/Applications/Mac Scope.app' '/Applications/Mactracker.app' '/Applications/Microphone Test.app' '/Applications/PiXel Check.app' '/Applications/Restore OS.app' '/Applications/Screen Test.app' '/Applications/SilentKnight.app' '/Applications/Startup Picker.app' '/Applications/Test CD.app' '/Applications/Test DVD.app' '/Applications/Trackpad Test.app' '/Applications/XRG.app' '/Users/Tester/Applications' '/Users/Shared/OS Updates' '/Users/Shared/Restore OS Images'
+if [ -d '/Volumes/fgMIB' ]; then
+	rm -rf '/Volumes/fgMIB/install-packages' '/Volumes/fgMIB/customization-resources'
+	echo '#!/bin/bash
+echo \"
+This " & thisDriveName & " Drive Is Outdated
+
+Deliver this " & thisDriveName & " drive to Free Geek I.T.
+\"' > '/Volumes/fgMIB/fg-install-os'
+	chmod +x '/Volumes/fgMIB/fg-install-os'
+fi
+")
+				end try
+				
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				end try
+				display alert ("
 This " & thisDriveName & " Drive Is Outdated") message ("Deliver this " & thisDriveName & " drive to Free Geek I.T.
-") buttons {"Shut Down"} as critical
-		
-		tell application "System Events" to shut down with state saving preference
-		
-		quit
-		delay 10
-	end if
-	
-	try
-		(((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias) -- Do not offer to skip if just finished running Updater (since Setup already offered to skip before launching Updater.).
+") buttons {"Shut Down"} default button 1 as critical
+				
+				tell application "System Events" to shut down with state saving preference
+				
+				quit
+				delay 10
+			else
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				end try
+				try
+					display alert ("This " & thisDriveName & " Drive Is Outdated") message ("But, this is the SOURCE MTB drive so nothing will be deleted.
+
+If you are seeing this message during production, SHUT DOWN and notify Free Geek I.T. since THIS DRIVE MUST NOT BE USED!") buttons {"Shut Down", "Continue with Setup"} cancel button 1 default button 2 as critical
+				on error
+					tell application "System Events" to shut down with state saving preference
+					
+					quit
+					delay 10
+				end try
+			end if
+		end try
 	on error
 		try
 			activate
@@ -364,7 +375,8 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	
 	set userLaunchAgentsPath to ((POSIX path of (path to library folder from user domain)) & "LaunchAgents/")
 	
-	set testBootSetupLaunchAgentPlistName to "org.freegeek.Test-Boot-Setup.plist"
+	set testBootSetupLaunchAgentLabel to "org.freegeek.Test-Boot-Setup"
+	set testBootSetupLaunchAgentPlistName to (testBootSetupLaunchAgentLabel & ".plist")
 	set testBootSetupUserLaunchAgentPlistPath to (userLaunchAgentsPath & testBootSetupLaunchAgentPlistName)
 	
 	try
@@ -375,19 +387,18 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		end try
 	end try
 	
+	-- NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
+	-- BUT, this is just done for consistency with other code since this particular script will never run on macOS 13 Ventura, but the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
 	set testBootSetupUserLaunchAgentPlistContents to "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
 <plist version=\"1.0\">
 <dict>
 	<key>Label</key>
-	<string>org.freegeek.Test-Boot-Setup</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/usr/bin/open</string>
-		<string>-n</string>
-		<string>-a</string>
-		<string>/Applications/Test Boot Setup.app</string>
-	</array>
+	<string>" & testBootSetupLaunchAgentLabel & "</string>
+	<key>Program</key>
+	<string>/Applications/Test Boot Setup.app/Contents/Resources/Launch Test Boot Setup</string>
+	<key>AssociatedBundleIdentifiers</key>
+	<string>" & testBootSetupLaunchAgentLabel & "</string>
 	<key>StandardOutPath</key>
 	<string>/dev/null</string>
 	<key>StandardErrorPath</key>
@@ -403,7 +414,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		if (currentTestBootSetupUserLaunchAgentPlistContents is not equal to testBootSetupUserLaunchAgentPlistContents) then
 			set needsToWriteTestBootSetupUserLaunchAgentPlistFile to true
 			try
-				do shell script "launchctl unload " & (quoted form of testBootSetupUserLaunchAgentPlistPath)
+				do shell script ("launchctl bootout gui/$(id -u " & demoUsername & ")/" & testBootSetupLaunchAgentLabel)
 			end try
 		end if
 	on error
@@ -424,7 +435,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 			end try
 		end try
 		try
-			do shell script "launchctl load " & (quoted form of testBootSetupUserLaunchAgentPlistPath)
+			do shell script "launchctl bootstrap gui/$(id -u " & demoUsername & ") " & (quoted form of testBootSetupUserLaunchAgentPlistPath)
 		end try
 	end if
 	
@@ -458,10 +469,6 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		do shell script "rm -f " & (quoted form of hardwareInfoPath)
 	end try
 	
-	set startupDiskCapacity to 0
-	try
-		tell application "System Events" to set startupDiskCapacity to ((capacity of startup disk) as number)
-	end try
 	if ((startupDiskCapacity ≤ 3.3E+10) and (serialNumber is equal to "C02R49Y5G8WP")) then
 		set serialNumber to "Source" -- Don't include any computer serial number for the source drive.
 		
@@ -546,6 +553,11 @@ defaults write NSGlobalDomain AppleMetricUnits -bool false
 defaults write NSGlobalDomain AppleTemperatureUnit -string 'Fahrenheit'
 defaults write NSGlobalDomain AppleTextDirection -bool false
 "
+	
+	-- DELETING ALL TOUCH ID FINGERPRINTS
+	try
+		doShellScriptAsAdmin("echo 'Y' | bioutil -p -s")
+	end try
 	
 	-- DELETE ALL LOCAL SNAPSHOTS
 	if (isCatalinaOrNewer) then
@@ -732,7 +744,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 	end if
 	
 	try
-		tell current application to set volume output volume 0 with output muted -- Must "tell current application to set volume" when using Cocoa framework to avoid a bug.
+		tell current application to set volume output volume 0 with output muted -- Must "tell current application to set volume" when using AppKit framework to avoid a bug.
 	end try
 	try
 		tell current application to set volume alert volume 0
@@ -936,7 +948,7 @@ killall usernoted
 	end try
 	
 	try -- Mute volume again before key codes to be sure it's silent.
-		tell current application to set volume output volume 0 with output muted -- Must "tell current application to set volume" when using Cocoa framework to avoid a bug.
+		tell current application to set volume output volume 0 with output muted -- Must "tell current application to set volume" when using AppKit framework to avoid a bug.
 	end try
 	try
 		tell current application to set volume alert volume 0
@@ -953,7 +965,7 @@ killall usernoted
 	end try
 	
 	try -- Mute volume again before key codes to be sure it's silent.
-		tell current application to set volume output volume 0 with output muted -- Must "tell current application to set volume" when using Cocoa framework to avoid a bug.
+		tell current application to set volume output volume 0 with output muted -- Must "tell current application to set volume" when using AppKit framework to avoid a bug.
 	end try
 	try
 		tell current application to set volume alert volume 0
@@ -1082,7 +1094,7 @@ killall usernoted
 	end try
 	
 	try
-		tell current application to set volume output volume 75 without output muted -- Must "tell current application to set volume" when using Cocoa framework to avoid a bug.
+		tell current application to set volume output volume 75 without output muted -- Must "tell current application to set volume" when using AppKit framework to avoid a bug.
 	end try
 	try
 		tell current application to set volume alert volume 100
@@ -1091,101 +1103,71 @@ killall usernoted
 	try
 		if ((do shell script "csrutil status") is not equal to "System Integrity Protection status: enabled.") then
 			try
-				try
-					repeat with thisWindow in (current application's NSApp's |windows|())
-						if (thisWindow's isVisible() is true) then
-							if (((thisWindow's title()) as string) is equal to (name of me)) then
-								repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-									if (((thisProgressWindowSubView's className()) as string) is equal to "NSProgressIndicator") then
-										(thisWindow's setIsVisible:false)
-										
-										exit repeat
-									end if
-								end repeat
-							end if
-						end if
-					end repeat
-				end try
-				try
-					activate
-				end try
-				try
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
-				end try
-				set rebootDialogButton to "        Reboot Now        "
-				-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
-				if (isCatalinaOrNewer) then set rebootDialogButton to "Reboot Now                "
-				display dialog "⚠️	System Integrity Protection IS NOT Enabled
+				activate
+			end try
+			display dialog "⚠️	System Integrity Protection (SIP) IS NOT enabled.   ⚠️
 
 
-‼️	System Integrity Protection (SIP) MUST be re-enabled.
-
-❌	This Mac will not be sellable until SIP is enabled.
-
-👉	The SIP setting is stored in NVRAM.
-
-🔄	To re-enable it, all you need to do is
-	reset the NVRAM by holding the
-	“Option+Command+P+R” key combo
-	while rebooting this Mac." buttons {"Continue without Enabling SIP", rebootDialogButton} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-				
-				try
-					activate
-				end try
-				display dialog "‼️	Remember to hold the
-	“Option+Command+P+R” key combo
-	while this Mac reboots
-	until you hear at least 2 startup sounds.
+👉  System Integrity Protection (SIP) MUST be re-enabled.
 
 
-🔄	This Mac will reboot in 15 seconds…" buttons "Reboot Now" default button 1 with title (name of me) with icon dialogIconName giving up after 15
-				
-				-- Quit all apps before rebooting
-				try
-					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-					if ((count of listOfRunningApps) > 0) then
-						try
-							repeat with thisAppName in listOfRunningApps
+🚫  DON'T TOUCH ANYTHING WHILE ENABLING SIP!  🚫
+
+
+🔄  This Mac will reboot itself after SIP has been enabled." with title "SIP Must Be Enabled" buttons {"OK, Enable SIP"} default button 1 giving up after 15
+			
+			set progress description to "🚧	SIP is being enabled on this Mac…"
+			set progress additional description to "
+🚫  DON'T TOUCH ANYTHING WHILE ENABLING SIP!
+
+
+🔄  This Mac will reboot itself after SIP has been enabled."
+			
+			delay 0.2 -- Delay to make sure progress gets updated.
+			
+			try
+				doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect.
+			end try
+			
+			-- Quit all apps before rebooting
+			try
+				tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
+				if ((count of listOfRunningApps) > 0) then
+					try
+						repeat with thisAppName in listOfRunningApps
+							try
+								if (application thisAppName is running) then
+									with timeout of 1 second
+										tell application thisAppName to quit
+									end timeout
+								end if
+							end try
+						end repeat
+					end try
+					delay 3
+					try
+						tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
+						repeat with thisAppName in listOfRunningApps
+							repeat 2 times
 								try
-									if (application thisAppName is running) then
-										with timeout of 1 second
-											tell application thisAppName to quit
-										end timeout
-									end if
+									do shell script "pkill -f " & (quoted form of thisAppName)
 								end try
 							end repeat
-						end try
-						delay 3
-						try
-							tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-							repeat with thisAppName in listOfRunningApps
-								repeat 2 times
-									try
-										do shell script "pkill -f " & (quoted form of thisAppName)
-									end try
-								end repeat
-							end repeat
-						end try
-					end if
-				end try
-				
-				tell application "System Events" to restart with state saving preference
-				
-				quit
-				delay 10
+						end repeat
+					end try
+				end if
 			end try
+			
+			tell application "System Events" to restart with state saving preference
+			
+			quit
+			delay 10
 		end if
 	end try
 	
 	try
 		(("/Applications/Breakaway.app" as POSIX file) as alias)
 		if (application ("Break" & "away") is not running) then do shell script "open -a '/Applications/Breakaway.app'"
-	end try
-	
-	set freeGeekUpdaterExists to false
-	try
-		(("/Applications/Free Geek Updater.app" as POSIX file) as alias)
-		set freeGeekUpdaterExists to true
 	end try
 	
 	try
@@ -1214,9 +1196,9 @@ killall usernoted
 						try
 							if (thisLauncherFlagBundleId starts with "org.freegeek.") then
 								set AppleScript's text item delimiters to space
-								do shell script "open -n -a " & (quoted form of ("/Applications/" & ((words of (text 14 thru -1 of thisLauncherFlagBundleId)) as string) & ".app"))
+								do shell script "open -na " & (quoted form of ("/Applications/" & ((words of (text 14 thru -1 of thisLauncherFlagBundleId)) as string) & ".app"))
 							else
-								do shell script "open -n -b " & thisLauncherFlagBundleId
+								do shell script "open -nb " & thisLauncherFlagBundleId
 							end if
 							set launchedFlagSpecifiedApp to true
 						end try
@@ -1239,15 +1221,7 @@ killall usernoted
 		
 		if (not launchedFlagSpecifiedApp) then
 			try
-				do shell script "open -n -a '/Applications/Mac Scope.app'"
-			on error
-				try
-					do shell script "open -n -a '/Applications/Firmware Checker.app'"
-				on error
-					try
-						do shell script "open -n -a '/Applications/Restore OS.app'"
-					end try
-				end try
+				do shell script "open -na '/Applications/Mac Scope.app'"
 			end try
 		end if
 	on error
@@ -1265,14 +1239,14 @@ killall usernoted
 					end try
 				end repeat
 				
-				do shell script "open -n -a '/Applications/Free Geek Updater.app'"
+				do shell script ("open -na " & (quoted form of freeGeekUpdaterAppPath))
 			end if
 		end try
 	end try
 else
 	activate
 	display alert "Cannot Run “" & (name of me) & "”" message "“" & (name of me) & "” must be installed at
-“/Applications/” and run from the “Tester” or “restorer” user accounts." buttons {"Quit"} default button 1 as critical
+“/Applications/” and run from the “Tester” user account." buttons {"Quit"} default button 1 as critical
 end if
 
 on doShellScriptAsAdmin(command)

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.5.19-1
+-- Version: 2022.10.26-1
 
 -- App Icon is “Broom” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -27,7 +27,7 @@ use scripting additions
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -114,6 +114,32 @@ set demoPassword to "freegeek"
 
 
 if (((short user name of (system info)) is equal to demoUsername) and ((POSIX path of (path to me)) is equal to ("/Users/" & demoUsername & "/Applications/" & (name of me) & ".app/"))) then
+	set freeGeekUpdaterAppPath to ("/Users/" & demoUsername & "/Applications/Free Geek Updater.app")
+	try
+		((freeGeekUpdaterAppPath as POSIX file) as alias)
+		
+		if (application freeGeekUpdaterAppPath is running) then -- Quit if Updater is running so that this app can be updated if needed.
+			quit
+			delay 10
+		end if
+	end try
+	
+	try
+		set fgSetupName to "Free Geek Setup"
+		
+		((("/Users/" & demoUsername & "/Applications/" & fgSetupName & ".app") as POSIX file) as alias)
+		try
+			activate
+		end try
+		display alert "“" & fgSetupName & "” Hasn't Finished Running" message "Please wait for “" & fgSetupName & "” to finish and then try running “" & (name of me) & "” again." buttons {"Quit"} default button 1 as critical giving up after 15
+		try
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/" & fgSetupName & ".app"))
+		end try
+		quit
+		delay 10
+	end try
+	
 	set systemVersion to (system version of (system info))
 	considering numeric strings
 		set isMojaveOrNewer to (systemVersion ≥ "10.14")
@@ -125,230 +151,42 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
 	
 	try
-		set automationGuideAppPath to "/Users/" & demoUsername & "/Applications/Automation Guide.app"
-		((automationGuideAppPath as POSIX file) as alias)
+		set globalTCCdbPath to "/Library/Application Support/com.apple.TCC/TCC.db" -- For more info about the TCC.db structure, see "fg-install-os" script and https://www.rainforestqa.com/blog/macos-tcc-db-deep-dive
+		set whereAllowedOrAuthValue to "allowed = 1"
+		if (isBigSurOrNewer) then set whereAllowedOrAuthValue to "auth_value = 2"
+		set globalTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of globalTCCdbPath) & " 'SELECT client,service FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the global TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access.
 		
-		if (application automationGuideAppPath is running) then
-			-- If Automation Guide is currently running, report the Accessibility permissions status and quit since Automation Guide is checking that it's safe to continue.
+		if (globalTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAccessibility")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Accessibility Access")
+		
+		if (isMojaveOrNewer) then
+			-- Full Disk Access was introduced in macOS 10.14 Mojave.
+			if (globalTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceSystemPolicyAllFiles")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access") -- This should not be possible to hit since reading the global TCC.db would have errored if this app didn't have FDA, but check anyways.
 			
-			try
-				do shell script "mkdir " & (quoted form of buildInfoPath)
-			end try
+			set userTCCdbPath to ((POSIX path of (path to library folder from user domain)) & "Application Support/com.apple.TCC/TCC.db")
+			set userTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of userTCCdbPath) & " 'SELECT client,service,indirect_object_identifier FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the user TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access (but that should never happen because we couldn't get this far without FDA).
 			
-			if (isMojaveOrNewer) then
-				try
-					tell application "System Events" to every window -- To prompt for Automation access on Mojave
-				on error automationAccessErrorMessage number automationAccessErrorNumber
-					if (automationAccessErrorNumber is equal to -1743) then
-						try
-							do shell script ("tccutil reset AppleEvents " & currentBundleIdentifier) -- Clear AppleEvents (Automation) for this app in case user denied access in a previous attempt.
-						end try
-					end if
-				end try
-			end if
-			
-			set hasAccessibilityPermissions to false
-			try
-				tell application "System Events" to tell application process "Finder" to (get windows)
-				set hasAccessibilityPermissions to true
-			end try
-			
-			try
-				doShellScriptAsAdmin("echo " & hasAccessibilityPermissions & " > " & (quoted form of (buildInfoPath & ".fgAutomationGuideAccessibilityStatus-" & currentBundleIdentifier)))
-			end try
-		else
-			-- If Automation Guide hasn't been run yet, launch it.
-			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script ("open -n -a " & (quoted form of automationGuideAppPath))
-			end try
+			if (userTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAppleEvents|com.apple.systemevents")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED AppleEvents/Automation Access for “System Events”")
+			if (userTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAppleEvents|com.apple.finder")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED AppleEvents/Automation Access for “Finder”")
 		end if
+	on error tccErrorMessage
+		if (tccErrorMessage starts with "Error: unable to open database") then set tccErrorMessage to ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access (" & tccErrorMessage & ")")
 		
-		quit
-		delay 10
-	end try
-	
-	set dialogIconName to "applet"
-	try
-		((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-		set dialogIconName to (name of me)
-	end try
-	
-	if (isMojaveOrNewer) then
-		set needsAutomationAccess to false
 		try
-			tell application "System Events" to every window -- To prompt for Automation access on Mojave
-		on error automationAccessErrorMessage number automationAccessErrorNumber
-			if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
-		end try
-		try
-			tell application "Finder" to every window -- To prompt for Automation access on Mojave
-		on error automationAccessErrorMessage number automationAccessErrorNumber
-			if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
-		end try
-		
-		if (needsAutomationAccess) then
-			try
-				tell application "System Preferences"
-					try
-						activate
-					end try
-					reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-				end tell
-			end try
 			try
 				activate
 			end try
 			try
-				display dialog "“" & (name of me) & "” must be allowed to control and perform actions in “System Events” and “Finder” to be able to function.
-
-
-USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
-
-• Open the “System Preferences” application.
-
-• Click the “Security & Privacy” preference pane.
-
-• Select the “Privacy” tab.
-
-• Select “Automation” in the source list on the left.
-
-• Find “" & (name of me) & "” in the list on the right and turn on the “System Events” and “Finder” checkboxes underneath it.
-
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
-				end try
+				do shell script "afplay /System/Library/Sounds/Basso.aiff"
 			end try
-			quit
-			delay 10
-		end if
-	end if
-	
-	try
-		tell application "System Events" to tell application process "Finder" to (get windows)
-		
-		-- If launched by Automation Guide, Accessibility permissions should already be granted, but we still want to check for System Preferences Automation permission.
-		(((buildInfoPath & ".fgAutomationGuideRunning") as POSIX file) as alias)
-		error "fgAutomationGuideRunning" -- throw this error if file DOES exist.
-	on error (assistiveAccessTestErrorMessage)
-		if (((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) or (assistiveAccessTestErrorMessage is equal to "fgAutomationGuideRunning")) then
-			if (isMojaveOrNewer) then
-				try
-					tell application "System Preferences" to every window -- To prompt for Automation access on Mojave
-				on error automationAccessErrorMessage number automationAccessErrorNumber
-					if (automationAccessErrorNumber is equal to -1743) then
-						try
-							tell application "System Preferences"
-								try
-									activate
-								end try
-								reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-							end tell
-						end try
-						try
-							activate
-						end try
-						try
-							display dialog "“" & (name of me) & "” must be allowed to control and perform actions in “System Preferences” to be able to function.
+			display alert ("CRITICAL “" & (name of me) & "” TCC ERROR:
 
-
-USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
-
-• Open the “System Preferences” application.
-
-• Click the “Security & Privacy” preference pane.
-
-• Select the “Privacy” tab.
-
-• Select “Automation” in the source list on the left.
-
-• Find “" & (name of me) & "” in the list on the right and turn on the “System Preferences” checkbox underneath it.
-
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-							try
-								do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
-							end try
-						end try
-						quit
-						delay 10
-					end if
-				end try
-				try
-					with timeout of 1 second
-						tell application "System Preferences" to quit
-					end timeout
-				end try
-			end if
-			
-			if (assistiveAccessTestErrorMessage is not equal to "fgAutomationGuideRunning") then
-				try
-					tell application "Finder" to reveal (path to me)
-				end try
-				try
-					tell application "System Preferences"
-						try
-							activate
-						end try
-						reveal ((anchor "Privacy_Accessibility") of (pane id "com.apple.preference.security"))
-					end tell
-				end try
-				try
-					activate
-				end try
-				try
-					display dialog "“" & (name of me) & "” must be allowed to control this computer using Accessibility Features to be able to function.
-
-
-USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
-
-• Open the “System Preferences” application.
-
-• Click the “Security & Privacy” preference pane.
-
-• Select the “Privacy” tab.
-
-• Select “Accessibility” in the source list on the left.
-
-• Click the Lock icon at the bottom left of the window, enter the administrator username and password, and then click Unlock.
-
-• Find “" & (name of me) & "” in the list on the right and turn on the checkbox next to it. If “" & (name of me) & "” IS NOT in the list, drag-and-drop the app icon from Finder into the list.
-
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
-					try
-						do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
-					end try
-				end try
-				quit
-				delay 10
-			end if
-		end if
-	end try
-	
-	
-	set fgSetupName to "Free Geek Setup"
-	
-	try
-		(((buildInfoPath & ".fgAutomationGuideRunning") as POSIX file) as alias)
-		
-		try
-			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgAutomationGuideDid-" & currentBundleIdentifier)))
-		end try
-		
-		try
-			(((buildInfoPath & ".fgAutomationGuideDid-org.freegeek.Free-Geek-Demo-Helper") as POSIX file) as alias)
-			
+" & tccErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research if checking again does not work." buttons {"Shut Down", "Check Again"} cancel button 1 default button 2 as critical
 			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script "open -n -a " & (quoted form of ("/Users/" & demoUsername & "/Applications/" & fgSetupName & ".app"))
+				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		on error
-			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script "open -n -a " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app"))
-			end try
+			tell application "System Events" to shut down with state saving preference
 		end try
-		
 		quit
 		delay 10
 	end try
@@ -359,23 +197,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 		
 		try
 			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-			do shell script ("open -n -a '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
+			do shell script ("open -na '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
 		end try
 		
-		quit
-		delay 10
-	end try
-	
-	try
-		((("/Users/" & demoUsername & "/Applications/" & fgSetupName & ".app") as POSIX file) as alias)
-		try
-			activate
-		end try
-		display alert "“" & fgSetupName & "” Hasn't Finished Running" message "Please wait for “" & fgSetupName & "” to finish and then try running “" & (name of me) & "” again." buttons {"Quit"} default button 1 as critical giving up after 15
-		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-			do shell script "open -n -a " & (quoted form of ("/Users/" & demoUsername & "/Applications/" & fgSetupName & ".app"))
-		end try
 		quit
 		delay 10
 	end try
@@ -387,12 +211,12 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	set driveInfoPath to tmpPath & "driveInfo.plist"
 	repeat 30 times
 		try
-			do shell script "system_profiler -xml SPSerialATADataType SPNVMeDataType > " & (quoted form of driveInfoPath)
+			do shell script "system_profiler -xml SPNVMeDataType SPSerialATADataType > " & (quoted form of driveInfoPath)
 			tell application "System Events" to tell property list file driveInfoPath
 				repeat with i from 1 to (number of property list items)
 					set thisDataTypeProperties to (item i of property list items)
 					set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as string)
-					if ((thisDataType is equal to "SPSerialATADataType") or (thisDataType is equal to "SPNVMeDataType")) then
+					if ((thisDataType is equal to "SPNVMeDataType") or (thisDataType is equal to "SPSerialATADataType")) then
 						set sataItems to (property list item "_items" of thisDataTypeProperties)
 						repeat with j from 1 to (number of property list items in sataItems)
 							set thisSataController to (property list item j of sataItems)
@@ -432,6 +256,12 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	do shell script "rm -f " & (quoted form of driveInfoPath)
 	
 	if (needsTrimEnabled) then
+		try
+			activate
+		end try
+		try
+			do shell script "afplay /System/Library/Sounds/Basso.aiff"
+		end try
 		display alert "This Mac has an SSD installed,
 but TRIM is not enabled." message "
 This SHOULD NOT have happened and may indicate that there was an issue with the first boot automation.
@@ -441,9 +271,26 @@ This Mac CANNOT BE SOLD in its current state, please set this Mac aside and info
 		delay 10
 	end if
 	
+	
 	set cleanupDialogButton to "   Cleanup & Shut Down   "
 	-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
 	if (isCatalinaOrNewer) then set cleanupDialogButton to "Cleanup & Shut Down      "
+	
+	set deleteTouchIDnote to ""
+	try
+		if ((length of (paragraphs of doShellScriptAsAdmin("bioutil -sr"))) > 2) then -- If Touch ID exists, this output will be more than 2 lines regardless of the Touch ID config or number of fingerprints enrolled.
+			set deleteTouchIDnote to "
+	⁃ Delete all Touch ID fingerprints."
+		end if
+	end try
+	
+	set renameInternalDriveNote to ""
+	set nameOfCurrentStartupDisk to "UNKNOWN"
+	try
+		tell application "System Events" to set nameOfCurrentStartupDisk to (name of startup disk)
+	end try
+	if (nameOfCurrentStartupDisk is not equal to "Macintosh HD") then set renameInternalDriveNote to "
+	⁃ Rename internal drive to “Macintosh HD”."
 	
 	try
 		activate
@@ -463,43 +310,37 @@ The following actions will be peformed:
 	⁃ Reset Safari to factory settings.
 	⁃ Erase Terminal history.
 	⁃ Remove all printers.
-	⁃ Remove all shared folders.
-	⁃ Delete all Touch ID fingerprints.
-	⁃ Empty the trash.
-	⁃ Rename internal drive to “Macintosh HD”.
+	⁃ Remove all shared folders." & deleteTouchIDnote & "
+	⁃ Empty the trash." & renameInternalDriveNote & "
 	⁃ Remove “FG Reuse” from preferred Wi-Fi networks.
 	⁃ Turn on Wi-Fi.
 	⁃ Set Power On and Shutdown schedules.
 	⁃ Remove “QA Helper” alias from Desktop.
-	⁃ Delete “Cleanup After QA Complete” app.
-	⁃ Turn off “Screen Lock” setting in “System Preferences”.
-	⁃ Set startup disk to internal disk in “System Preferences”.
+	⁃ Delete “" & (name of me) & "” app.
 	
 This process cannot be undone.
 
-THIS MAC WILL BE SHUT DOWN AFTER THE PROCESS IS COMPLETE." buttons {"Don't Cleanup After QA Complete Yet", cleanupDialogButton} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+THIS MAC WILL BE SHUT DOWN AFTER THE PROCESS IS COMPLETE." buttons {"Don't Cleanup After QA Complete Yet", cleanupDialogButton} cancel button 1 default button 2 with title (name of me) with icon note
 	
-	try
-		activate
-	end try
-	display alert "It is very important that you do not click anything or disturb this Mac during this cleanup process." message "Towards the end of the cleanup process, “Screen Lock” will be disabled and the startup disk will be set to the internal disk by launching “System Preferences” and automatically clicking buttons and entering passwords." buttons {"OK, I will not disturb this Mac during Cleanup After QA Complete!"} default button 1 as critical giving up after 45
-	
-	set serialNumber to ""
-	try
-		set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
-	end try
-	
-	if (serialNumber is not equal to "") then
+	try -- Don't check Remote Management if "TESTING" flag folder exists on desktop
+		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
+	on error
+		set serialNumber to ""
 		try
-			repeat
-				try
-					do shell script "ping -t 5 -c 1 www.apple.com" -- Require that internet is connected DEP status to get checked.
-					exit repeat
-				on error
+			set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
+		end try
+		
+		if (serialNumber is not equal to "") then
+			try
+				repeat
 					try
-						display dialog "You must be connected to the internet to be able to check for Remote Management.
+						do shell script "ping -t 5 -c 1 www.apple.com" -- Require that internet is connected DEP status to get checked.
+						exit repeat
+					on error
+						try
+							display dialog "You must be connected to the internet to be able to check for Remote Management.
 
-The rest of “Cleanup After QA Complete” cannot be run and this Mac CANNOT BE SOLD until it has been confirmed that Remote Management is not enabled on this Mac.
+The rest of “" & (name of me) & "” cannot be run and this Mac CANNOT BE SOLD until it has been confirmed that Remote Management is not enabled on this Mac.
 
 
 Make sure you're connected to either the “Free Geek” or “FG Reuse” Wi-Fi network or plugged in with an Ethernet cable.
@@ -508,121 +349,131 @@ If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet
 
 Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
 
-If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Quit", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName giving up after 30
-					on error
-						quit
-						delay 10
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Quit", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
+						on error
+							quit
+							delay 10
+						end try
+					end try
+				end repeat
+				
+				set progress total steps to -1
+				set progress description to "
+🔒	Checking for Remote Management"
+				delay 0.5
+				
+				set remoteManagementOutput to ""
+				try
+					try
+						set remoteManagementOutput to doShellScriptAsAdmin("profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0")
+					on error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
+						if (profilesShowDefaultUserErrorNumber is not equal to -60007) then error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
+						try
+							activate
+						end try
+						display alert "Would you like to check for
+Remote Management (ADE/DEP/MDM)?" message "Remote Management check will be skipped in 10 seconds." buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 10
+						if (gave up of result) then error number -128
+						set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" with prompt "Administrator Permission is required
+to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
 					end try
 				end try
-			end repeat
-			
-			set progress total steps to -1
-			set progress description to "
-🔒	Checking for Remote Management"
-			delay 0.5
-			
-			set remoteManagementOutput to ""
-			try
-				try
-					set remoteManagementOutput to doShellScriptAsAdmin("profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0")
-				on error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
-					if (profilesShowDefaultUserErrorNumber is not equal to -60007) then error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
+				
+				if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
+					try
+						set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
+					end try
+				else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
+					try
+						do shell script ("mkdir " & (quoted form of buildInfoPath))
+					end try
+					try
+						do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
+					end try
+				end if
+				
+				if (remoteManagementOutput contains " - Request too soon.") then -- Don't allow completion if rate limited and there was no previous cached output to use.
+					set progress description to "
+❌	UNABLE to Check for Remote Management"
 					try
 						activate
 					end try
-					display alert "Would you like to check for
-Remote Management (DEP/MDM)?" message "Remote Management check will be skipped in 10 seconds." buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 10
-					if (gave up of result) then error number -128
-					set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" with prompt "Administrator Permission is required
-to check for Remote Management (DEP/MDM)." with administrator privileges)
-				end try
-			end try
-			
-			if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
-				try
-					set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
-				end try
-			else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
-				try
-					do shell script ("mkdir " & (quoted form of buildInfoPath))
-				end try
-				try
-					do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
-				end try
-			end if
-			
-			if (remoteManagementOutput contains " - Request too soon.") then -- Don't allow completion if rate limited and there was no previous cached output to use.
-				set progress description to "
-❌	UNABLE to Check for Remote Management"
-				try
-					activate
-				end try
-				try
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
-				end try
-				set nextAllowedProfilesShowTime to "23 hours after last successful check"
-				try
-					set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
-				end try
-				display alert ("Cannot Cleanup After QA Complete
+					try
+						do shell script "afplay /System/Library/Sounds/Basso.aiff"
+					end try
+					set nextAllowedProfilesShowTime to "23 hours after last successful check"
+					try
+						set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
+					end try
+					display alert ("Cannot Cleanup After QA Complete
 
 Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
 
 Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform Free Geek I.T." buttons {"Shut Down"} as critical
-				tell application "System Events" to shut down with state saving preference
-				
-				quit
-				delay 10
-			else if (remoteManagementOutput is not equal to "") then
-				try
-					set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
+					tell application "System Events" to shut down with state saving preference
 					
-					if ((count of remoteManagementOutputParts) > 3) then
-						set progress description to "
+					quit
+					delay 10
+				else if (remoteManagementOutput is not equal to "") then
+					try
+						set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
+						
+						if ((count of remoteManagementOutputParts) > 3) then
+							set progress description to "
 ⚠️	Remote Management IS Enabled"
-						set remoteManagementOrganizationName to "\"Unknown Organization\""
-						set remoteManagementOrganizationContactInfo to {}
-						
-						repeat with thisRemoteManagementOutputPart in remoteManagementOutputParts
-							set organizationNameOffset to (offset of "OrganizationName = \"" in thisRemoteManagementOutputPart)
-							set organizationDepartmentOffset to (offset of "OrganizationDepartment = \"" in thisRemoteManagementOutputPart)
-							set organizationEmailOffset to (offset of "OrganizationEmail = \"" in thisRemoteManagementOutputPart)
-							set organizationPhoneOffset to (offset of "OrganizationPhone = \"" in thisRemoteManagementOutputPart)
-							set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = \"" in thisRemoteManagementOutputPart)
+							set remoteManagementOrganizationName to "\"Unknown Organization\""
+							set remoteManagementOrganizationContactInfo to {}
 							
-							if (organizationNameOffset > 0) then
-								set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart)
-							else if (organizationDepartmentOffset > 0) then
-								set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 26) thru -3 of thisRemoteManagementOutputPart)
-								if ((remoteManagementOrganizationDepartment is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationDepartment)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationDepartment
-							else if (organizationEmailOffset > 0) then
-								set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 21) thru -3 of thisRemoteManagementOutputPart)
-								if ((remoteManagementOrganizationEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationEmail
-							else if (organizationPhoneOffset > 0) then
-								set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 21) thru -3 of thisRemoteManagementOutputPart)
-								if ((remoteManagementOrganizationPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationPhone
-							else if (organizationSupportPhoneOffset > 0) then
-								set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 28) thru -3 of thisRemoteManagementOutputPart)
-								if ((remoteManagementOrganizationSupportPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportPhone
+							repeat with thisRemoteManagementOutputPart in remoteManagementOutputParts
+								set organizationNameOffset to (offset of "OrganizationName = " in thisRemoteManagementOutputPart)
+								set organizationDepartmentOffset to (offset of "OrganizationDepartment = " in thisRemoteManagementOutputPart)
+								set organizationEmailOffset to (offset of "OrganizationEmail = " in thisRemoteManagementOutputPart)
+								set organizationSupportEmailOffset to (offset of "OrganizationSupportEmail = " in thisRemoteManagementOutputPart)
+								set organizationPhoneOffset to (offset of "OrganizationPhone = " in thisRemoteManagementOutputPart)
+								set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = " in thisRemoteManagementOutputPart)
+								
+								if (organizationNameOffset > 0) then
+									set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart) -- Leave quotes around Organization Name.
+									if ((remoteManagementOrganizationName does not start with "\"") or (remoteManagementOrganizationName does not end with "\"")) then set remoteManagementOrganizationName to ("\"" & remoteManagementOrganizationName & "\"") -- Or add quotes if somehow they don't exist.
+								else if (organizationDepartmentOffset > 0) then
+									set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 25) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationDepartment starts with "\"") and (remoteManagementOrganizationDepartment ends with "\"")) then set remoteManagementOrganizationDepartment to (text 2 thru -2 of remoteManagementOrganizationDepartment) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationDepartment is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationDepartment)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationDepartment
+								else if (organizationEmailOffset > 0) then
+									set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 20) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationEmail starts with "\"") and (remoteManagementOrganizationEmail ends with "\"")) then set remoteManagementOrganizationEmail to (text 2 thru -2 of remoteManagementOrganizationEmail) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationEmail
+								else if (organizationSupportEmailOffset > 0) then
+									set remoteManagementOrganizationSupportEmail to (text (organizationSupportEmailOffset + 27) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationSupportEmail starts with "\"") and (remoteManagementOrganizationSupportEmail ends with "\"")) then set remoteManagementOrganizationSupportEmail to (text 2 thru -2 of remoteManagementOrganizationSupportEmail) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationSupportEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportEmail
+								else if (organizationPhoneOffset > 0) then
+									set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 20) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationPhone starts with "\"") and (remoteManagementOrganizationPhone ends with "\"")) then set remoteManagementOrganizationPhone to (text 2 thru -2 of remoteManagementOrganizationPhone) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationPhone
+								else if (organizationSupportPhoneOffset > 0) then
+									set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 27) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationSupportPhone starts with "\"") and (remoteManagementOrganizationSupportPhone ends with "\"")) then set remoteManagementOrganizationSupportPhone to (text 2 thru -2 of remoteManagementOrganizationSupportPhone) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationSupportPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportPhone
+								end if
+							end repeat
+							
+							set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
+							if ((count of remoteManagementOrganizationContactInfo) > 0) then
+								set AppleScript's text item delimiters to (linefeed & tab & tab)
+								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as string)
 							end if
-						end repeat
-						
-						set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
-						if ((count of remoteManagementOrganizationContactInfo) > 0) then
-							set AppleScript's text item delimiters to (linefeed & tab & tab)
-							set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as string)
-						end if
-						
-						try
-							activate
-						end try
-						try
-							do shell script "afplay /System/Library/Sounds/Basso.aiff"
-						end try
-						set remoteManagementDialogButton to "                                                       Shut Down                                                       "
-						-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
-						if (isCatalinaOrNewer) then set remoteManagementDialogButton to "Shut Down                                                                                                              "
-						display dialog "	     ⚠️     REMOTE MANAGEMENT IS ENABLED ON THIS MAC     ⚠️
+							
+							try
+								activate
+							end try
+							try
+								do shell script "afplay /System/Library/Sounds/Basso.aiff"
+							end try
+							set remoteManagementDialogButton to "                                                       Shut Down                                                       "
+							-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
+							if (isCatalinaOrNewer) then set remoteManagementDialogButton to "Shut Down                                                                                                              "
+							display dialog "	     ⚠️     REMOTE MANAGEMENT IS ENABLED ON THIS MAC     ⚠️
 
 ❌     MACS WITH REMOTE MANAGEMENT ENABLED CANNOT BE SOLD     ❌
 
@@ -640,23 +491,24 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 
 
 		    👉 ‼️ INFORM AN INSTRUCTOR OR MANAGER ‼️ 👈" buttons {remoteManagementDialogButton} with title "Remote Management Enabled"
-						tell application "System Events" to shut down with state saving preference
-						
-						quit
-						delay 10
-					else
-						set progress description to "
+							tell application "System Events" to shut down with state saving preference
+							
+							quit
+							delay 10
+						else
+							set progress description to "
 👍	Remote Management IS NOT Enabled"
-						delay 2
-					end if
-				end try
-			else
-				set progress description to "
+							delay 2
+						end if
+					end try
+				else
+					set progress description to "
 ❌	FAILED to Check for Remote Management"
-				delay 2
-			end if
-		end try
-	end if
+					delay 2
+				end if
+			end try
+		end if
+	end try
 	
 	set progress total steps to -1
 	set progress description to "
@@ -664,32 +516,36 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	set progress additional description to ""
 	
 	-- QUIT ALL APPS
-	try
-		tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Demo Helper") and (short name is not (name of me))))
-		if ((count of listOfRunningApps) > 0) then
-			try
-				repeat with thisAppName in listOfRunningApps
-					try
-						if (application thisAppName is running) then
-							with timeout of 1 second
-								tell application thisAppName to quit
-							end timeout
-						end if
-					end try
-				end repeat
-			end try
-			delay 3
-			try
-				tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Demo Helper") and (short name is not (name of me))))
-				repeat with thisAppName in listOfRunningApps
-					repeat 2 times
+	try -- Don't quit apps if "TESTING" flag folder exists on desktop
+		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
+	on error
+		try
+			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Demo Helper") and (short name is not (name of me))))
+			if ((count of listOfRunningApps) > 0) then
+				try
+					repeat with thisAppName in listOfRunningApps
 						try
-							do shell script "pkill -f " & (quoted form of thisAppName)
+							if (application thisAppName is running) then
+								with timeout of 1 second
+									tell application thisAppName to quit
+								end timeout
+							end if
 						end try
 					end repeat
-				end repeat
-			end try
-		end if
+				end try
+				delay 3
+				try
+					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Demo Helper") and (short name is not (name of me))))
+					repeat with thisAppName in listOfRunningApps
+						repeat 2 times
+							try
+								do shell script "pkill -f " & (quoted form of thisAppName)
+							end try
+						end repeat
+					end repeat
+				end try
+			end if
+		end try
 	end try
 	
 	-- CLEAR THE CLIPBOARD CONTENTS
@@ -698,6 +554,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	end try
 	
 	-- RESET SAFARI & TERMINAL
+	-- AND DELETE DESKTOP FILES WITH RM SINCE THIS APP WILL ALWAYS HAVE FULL DISK ACCESS SO IT WON'T NEED TO PROMPT FOR LOGGED IN USER DESKTOP ACCESS ON ON CATALINA AND NEWER
 	try
 		doShellScriptAsAdmin("rm -rf /Users/" & adminUsername & "/Library/Safari " & ¬
 			"'/Users/" & adminUsername & "/Library/Caches/Apple - Safari - Safari Extensions Gallery' " & ¬
@@ -749,7 +606,9 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 			"/Users/" & demoUsername & "/.bash_history " & ¬
 			"/Users/" & demoUsername & "/.bash_sessions " & ¬
 			"/Users/" & demoUsername & "/.zsh_history " & ¬
-			"/Users/" & demoUsername & "/.zsh_sessions")
+			"/Users/" & demoUsername & "/.zsh_sessions " & ¬
+			"'/Users/" & demoUsername & "/Desktop/QA Helper - Computer Specs.txt' " & ¬
+			"'/Users/" & demoUsername & "/Desktop/Relocated Items'")
 	end try
 	
 	-- DELETE ALL PRINTERS
@@ -785,7 +644,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		doShellScriptAsAdmin("echo 'Y' | bioutil -p -s")
 	end try
 	
-	-- MUTE VOLUME WHILE FILES ARE MOVED AND TRASH IS EMPTIED
+	-- MUTE VOLUME WHILE TRASH IS EMPTIED
 	try
 		set volume output volume 0 with output muted
 	end try
@@ -793,19 +652,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		set volume alert volume 0
 	end try
 	
-	-- TRASH DESKTOP FILES WITH FINDER INSTEAD OF RM SO FOLDER ACCESS IS NOT NECESSARY ON CATALINA AND NEWER
-	try
-		tell application "Finder"
-			try
-				delete file ((("/Users/" & demoUsername & "/Desktop/QA Helper - Computer Specs.txt") as POSIX file) as alias)
-			end try
-			try
-				delete folder ((("/Users/" & demoUsername & "/Desktop/Relocated Items") as POSIX file) as alias)
-			end try
-		end tell
-	end try
-	
-	-- EMPTY THE TRASH
+	-- EMPTY THE TRASH (in case it's full)
 	try
 		tell application "Finder"
 			set warns before emptying of trash to false
@@ -814,6 +661,14 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 			end try
 			set warns before emptying of trash to true
 		end tell
+	end try
+	
+	-- RESET DEFAULT VOLUME
+	try
+		set volume output volume 50 without output muted
+	end try
+	try
+		set volume alert volume 100
 	end try
 	
 	-- RENAME HARD DRIVE
@@ -888,289 +743,9 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		doShellScriptAsAdmin("pmset repeat poweron TWRFSU 9:45:00 shutdown TWRFSU 18:10:00")
 	end try
 	
-	-- IF ON MOJAVE, CATALINA UPDATE WAS HIDDEN. UN-HIDE IT SO CUSTOMER CAN UPDATE
-	if (isMojaveOrNewer) then
-		try
-			doShellScriptAsAdmin("softwareupdate --reset-ignored")
-		end try
-	end if
-	
-	-- TURN OFF SCREEN LOCK
+	-- DELETE DESKTOP APP SYMLINKS WITH RM SINCE THIS APP WILL ALWAYS HAVE FULL DISK ACCESS SO IT WON'T NEED TO PROMPT FOR DESKTOP ACCESS ON ON CATALINA AND NEWER
 	try
-		activate
-	end try
-	repeat 15 times
-		try
-			tell application "System Preferences"
-				repeat 180 times -- Wait for Security pane to load
-					try
-						activate
-					end try
-					reveal ((anchor "General") of (pane id "com.apple.preference.security"))
-					delay 1
-					if ((name of window 1) is "Security & Privacy") then exit repeat
-				end repeat
-			end tell
-			tell application "System Events" to tell application process "System Preferences"
-				set screenLockCheckbox to (checkbox 1 of tab group 1 of window 1)
-				if ((screenLockCheckbox's value as boolean) is true) then
-					set frontmost to true
-					click screenLockCheckbox
-					repeat 180 times -- Wait for password prompt
-						delay 0.5
-						if ((number of sheets of window (number of windows)) is 1) then exit repeat
-						delay 0.5
-					end repeat
-					set frontmost to true
-					delay 0.5
-					keystroke demoPassword & return
-					repeat 180 times -- Wait for confirmation prompt
-						delay 0.5
-						if ((number of sheets of window (number of windows)) is 1) then exit repeat
-						delay 0.5
-					end repeat
-					set frontmost to true
-					
-					repeat with thisSheetButton in (buttons of sheet 1 of window (number of windows))
-						if ((name of thisSheetButton) is equal to "Turn Off Screen Lock") then
-							set frontmost to true
-							click thisSheetButton
-						end if
-					end repeat
-					
-					delay 1
-				end if
-				set screenLockCheckboxValue to (screenLockCheckbox's value as boolean)
-			end tell
-			if (screenLockCheckboxValue is false) then
-				exit repeat
-			end if
-		end try
-	end repeat
-	
-	-- SET STARTUP DISK
-	set nameOfCurrentStartupDisk to "UNKNOWN"
-	tell application "System Events" to set nameOfCurrentStartupDisk to (name of startup disk)
-	
-	if (nameOfCurrentStartupDisk is not equal to "UNKNOWN") then
-		set didSetStartUpDisk to false
-		
-		repeat 15 times
-			try
-				tell application "System Preferences"
-					repeat 180 times -- Wait for Security pane to load
-						try
-							activate
-						end try
-						reveal (pane id "com.apple.preference.startupdisk")
-						delay 1
-						if ((name of window 1) is "Startup Disk") then exit repeat
-					end repeat
-				end tell
-				if (isCatalinaOrNewer) then
-					-- On Catalina, a SecurityAgent alert with "System Preferences wants to make changes." will appear IF an Encrypted Disk is present.
-					-- OR if Big Sur is installed on some drive, whose Sealed System Volume is unable to be mounted (ERROR -69808) and makes System Preferences think it needs to try again with admin privileges.
-					-- In this case, we can just cancel out of that alert to continue on without displaying the Encrypted Disk or the Big Sur installation in the Startup Disk options.
-					
-					try
-						do shell script "diskutil apfs list | grep 'Yes (Locked)\\|ERROR -69808'" -- Grep will error if not found.
-						
-						try -- Mute volume before key codes so it's silent if the window isn't open
-							set volume output volume 0 with output muted
-						end try
-						try
-							set volume alert volume 0
-						end try
-						
-						set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
-						repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch since it can take a moment, but the script will stall if we go past this before it launches. 
-							delay 1
-							try
-								if (application securityAgentPath is running) then
-									exit repeat
-								end if
-							end try
-						end repeat
-						repeat 60 times
-							delay 1
-							try
-								if (application securityAgentPath is running) then
-									with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-										tell application "System Events" to tell application process "SecurityAgent"
-											set frontmost to true
-											key code 53 -- Cannot reliably get SecurityAgent windows, so if it's running (for decryption prompts) just hit escape until it quits (or until 60 seconds passes)
-										end tell
-									end timeout
-								else
-									exit repeat
-								end if
-							end try
-						end repeat
-						
-						try
-							set volume output volume 75 without output muted
-						end try
-						try
-							set volume alert volume 100
-						end try
-					end try
-				end if
-				tell application "System Events" to tell application process "System Preferences"
-					repeat 30 times -- Wait for startup disk list to populate
-						delay 1
-						try
-							if (isBigSurOrNewer) then
-								if ((number of groups of list 1 of scroll area 1 of window 1) is not 0) then exit repeat
-							else
-								if ((number of (radio buttons of (radio group 1 of scroll area 1 of group 1 of splitter group 1 of window 1))) is not 0) then exit repeat
-							end if
-						end try
-					end repeat
-					repeat with thisButton in (buttons of window 1)
-						if (((name of thisButton) is equal to "Click the lock to make changes.") or ((name of thisButton) is equal to "Authenticating…")) then
-							set frontmost to true
-							click thisButton
-							
-							repeat 60 times -- Wait for password prompt
-								delay 0.5
-								set frontmost to true
-								if ((number of sheets of window (number of windows)) is equal to 1) then exit repeat
-								delay 0.5
-							end repeat
-							
-							if ((number of sheets of window (number of windows)) is equal to 1) then
-								set frontmost to true
-								if (isMontereyOrNewer) then
-									-- This sheet has been redesigned on Monterey and the username is now "text field 1"
-									set value of (text field 1 of sheet 1 of window (number of windows)) to adminUsername
-									-- As of beta 1, for some reason this sheet on Monterey will only show that it has 1 text field until the 2nd password text field has been focused, so focus it by tabbing.
-									set frontmost to true
-									keystroke tab
-									set value of (text field 2 of sheet 1 of window (number of windows)) to adminPassword
-								else
-									set value of (text field 2 of sheet 1 of window (number of windows)) to adminUsername
-									
-									set frontmost to true
-									set focused of (text field 1 of sheet 1 of window (number of windows)) to true -- Seems to not accept the password if the field is never focused.
-									set frontmost to true
-									set value of (text field 1 of sheet 1 of window (number of windows)) to adminPassword
-								end if
-								repeat with thisSheetButton in (buttons of sheet 1 of window (number of windows))
-									if ((name of thisSheetButton) is equal to "Unlock") then
-										set frontmost to true
-										click thisSheetButton
-									end if
-								end repeat
-								
-								repeat 10 times -- Wait for password prompt to close
-									delay 0.5
-									if ((number of sheets of window (number of windows)) is equal to 0) then exit repeat
-									delay 0.5
-								end repeat
-								
-								if ((number of sheets of window (number of windows)) is equal to 1) then
-									set frontmost to true
-									key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
-								end if
-							end if
-							
-							exit repeat
-						else if ((name of thisButton) is equal to "Click the lock to prevent further changes.") then
-							exit repeat
-						end if
-					end repeat
-					
-					repeat with thisButton in (buttons of window 1)
-						if ((name of thisButton) is equal to "Click the lock to prevent further changes.") then
-							if (isBigSurOrNewer) then
-								repeat (number of groups of list 1 of scroll area 1 of window 1) times
-									-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
-									set frontmost to true
-									set focused of (scroll area 1 of window 1) to true
-									set frontmost to true
-									key code 124 -- Press RIGHT ARROW Key
-									
-									if (value of static text 1 of window 1) ends with ("“" & nameOfCurrentStartupDisk & ".”") then
-										set didSetStartUpDisk to true
-										
-										exit repeat
-									end if
-									
-									delay 0.5
-								end repeat
-							else
-								repeat with thisStartUpDiskRadioButton in (radio buttons of (radio group 1 of scroll area 1 of group 1 of splitter group 1 of window 1))
-									if ((name of thisStartUpDiskRadioButton) is equal to nameOfCurrentStartupDisk) then
-										set frontmost to true
-										click thisStartUpDiskRadioButton
-										
-										set didSetStartUpDisk to true
-										
-										exit repeat
-									end if
-								end repeat
-							end if
-							
-							exit repeat
-						end if
-					end repeat
-				end tell
-				
-				if (didSetStartUpDisk) then
-					exit repeat
-				end if
-			end try
-		end repeat
-	end if
-	
-	try
-		with timeout of 1 second
-			tell application "System Preferences" to quit
-		end timeout
-	end try
-	
-	-- DELETE DESKTOP APP SYMLINKS
-	-- TRASH DESKTOP FILES WITH FINDER INSTEAD OF RM SO FOLDER ACCESS IS NOT NECESSARY ON CATALINA AND NEWER
-	try
-		tell application "Finder" to delete (every file of (folder (path to desktop folder from user domain)) whose name extension is "app")
-	on error deleteFilesWithFinderErrorMessage number deleteFilesWithFinderErrorNumber
-		-- GET RID OF THIS ALERT AND CATCH IF IT WORKS NOW!
-		try
-			activate
-		end try
-		try
-			display alert "STILL Failed to Trash Desktop Apps with Finder" message ("Will try another delete method after you click OK.
-On Catalina, you will have to allow Desktop access.
-
-Please send the following error message to Free Geek I.T.:
-" & deleteFilesWithFinderErrorMessage & "
-Error Number: " & deleteFilesWithFinderErrorNumber) as critical
-		end try
-		try
-			-- This would prompt for Desktop Folder access on Catalina (but hopefully this won't happen) and would fail completely without prompting on Big Sur, but should work if Finder failed to delete the files on High Sierra.
-			-- Had one report of a MacBook8,1 that was repeatedly failing to delete the Cleanup symlink on Desktop in High Sierra.
-			-- Hopefully this will fix that case, not sure why it only happened on one computer, and was even repeatable on that computer.
-			do shell script "rm -rf /Users/" & demoUsername & "/Desktop/*.app"
-		end try
-	end try
-	
-	-- EMPTY THE TRASH
-	try
-		tell application "Finder"
-			set warns before emptying of trash to false
-			try
-				empty the trash
-			end try
-			set warns before emptying of trash to true
-		end tell
-	end try
-	
-	-- RESET DEFAULT VOLUME
-	try
-		set volume output volume 50 without output muted
-	end try
-	try
-		set volume alert volume 100
+		do shell script "rm -rf /Users/" & demoUsername & "/Desktop/*.app"
 	end try
 	
 	try
@@ -1225,7 +800,12 @@ This Mac will Shut Down in 15 Seconds…" buttons {"Don't Shut Down", "Shut Down
 		tell application "System Events" to shut down with state saving preference
 	end try
 	
-	do shell script "rm -rf '/Users/" & demoUsername & "/Applications/Cleanup After QA Complete.app'"
+	try
+		set pathToMe to (POSIX path of (path to me))
+		if ((offset of ".app" in pathToMe) > 0) then
+			do shell script ("tccutil reset All " & currentBundleIdentifier & "; rm -rf " & (quoted form of pathToMe)) -- Resetting TCC for specific bundle IDs should work on Mojave and newer, but does not actually work on Mojave because of a bug (http://www.openradar.me/6813106), but that's ok since we don't install Mojave and all TCC permissions will get reset by "fgreset" on High Sierra (or Mojave).
+		end if
+	end try
 else
 	try
 		activate

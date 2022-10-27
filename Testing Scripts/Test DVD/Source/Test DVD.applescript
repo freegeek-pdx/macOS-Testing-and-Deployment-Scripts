@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.2.22-1
+-- Version: 2022.10.6-1
 
 -- App Icon is “DVD” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -29,7 +29,7 @@ use scripting additions
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -101,18 +101,18 @@ on error checkReadOnlyErrorMessage
 end try
 
 
-set systemVersion to (system version of (system info))
-considering numeric strings
-	set isMojaveOrNewer to (systemVersion ≥ "10.14")
-	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
-end considering
-
+set freeGeekUpdaterAppPath to "/Applications/Free Geek Updater.app"
+set freeGeekUpdaterIsRunning to false
+try
+	((freeGeekUpdaterAppPath as POSIX file) as alias)
+	set freeGeekUpdaterIsRunning to (application freeGeekUpdaterAppPath is running)
+end try
 
 set adminUsername to "Staff"
-if (isCatalinaOrNewer) then set adminUsername to "staff"
 set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
 
 set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
+
 try
 	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
 	
@@ -124,14 +124,28 @@ try
 		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
-	try
-		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-		do shell script "open -n -a '/Applications/Test Boot Setup.app'"
-	end try
+	if (not freeGeekUpdaterIsRunning) then
+		try
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			do shell script "open -na '/Applications/Test Boot Setup.app'"
+		end try
+	end if
 	
 	quit
 	delay 10
 end try
+
+if (freeGeekUpdaterIsRunning) then -- Quit if Updater is running so that this app can be updated if needed.
+	quit
+	delay 10
+end if
+
+
+set systemVersion to (system version of (system info))
+considering numeric strings
+	set isMojaveOrNewer to (systemVersion ≥ "10.14")
+	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
+end considering
 
 
 set iTunesOrMusic to "iTunes"

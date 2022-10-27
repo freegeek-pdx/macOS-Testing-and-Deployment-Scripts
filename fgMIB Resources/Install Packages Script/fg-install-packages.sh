@@ -21,11 +21,11 @@
 
 # NOTICE: This script will only be installed and run via LaunchDaemon when customizing an existing clean install, such as on Apple Silicon Macs.
 
-readonly SCRIPT_VERSION='2022.5.13-1'
+readonly SCRIPT_VERSION='2022.10.17-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
-SCRIPT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
+SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
 
 DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc.
@@ -41,21 +41,24 @@ launch_login_progress_app() {
 
 	if [[ -d "${SCRIPT_DIR}/Tools/Free Geek Login Progress.app" ]]; then
 		# Cannot open "Free Geek Login Progress" directly when at Login Window, but a LaunchAgent with LimitLoadToSessionType=LoginWindow and "launchctl load -S LoginWindow" can open it.
-		
+		# In my testing I haven't been able to figure out how to do this with any of the modern "launchctl bootstrap" options, but maybe there is some way that I haven't found.
+
+		login_progress_launch_agent_path='/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
+
+		# NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
+		# BUT, this is just done for consistency with other code since this particular script will never run when a user is logged in to even be able to see that list in macOS 13 Ventura.
+		# On macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
 		PlistBuddy \
 			-c 'Add :Label string org.freegeek.Free-Geek-Login-Progress' \
 			-c 'Add :LimitLoadToSessionType string LoginWindow' \
-			-c 'Add :ProgramArguments array' \
-			-c 'Add :ProgramArguments: string /usr/bin/open' \
-			-c 'Add :ProgramArguments: string -n' \
-			-c 'Add :ProgramArguments: string -a' \
-			-c "Add :ProgramArguments: string '${SCRIPT_DIR}/Tools/Free Geek Login Progress.app'" \
+			-c "Add :Program string '${SCRIPT_DIR}/Tools/Free Geek Login Progress.app/Contents/Resources/Launch Free Geek Login Progress'" \
+			-c 'Add :AssociatedBundleIdentifiers string org.freegeek.Free-Geek-Login-Progress' \
 			-c 'Add :RunAtLoad bool true' \
 			-c 'Add :StandardOutPath string /dev/null' \
 			-c 'Add :StandardErrorPath string /dev/null' \
-			'/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist' &> /dev/null
+			"${login_progress_launch_agent_path}" &> /dev/null
 
-		launchctl load -S LoginWindow '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
+		launchctl load -S LoginWindow "${login_progress_launch_agent_path}"
 
 		for (( wait_for_progress_app_seconds = 0; wait_for_progress_app_seconds < 15; wait_for_progress_app_seconds ++ )); do
 			if pgrep -q 'Free Geek Login Progress'; then
@@ -65,12 +68,12 @@ launch_login_progress_app() {
 			fi
 		done
 
-		launchctl unload -S LoginWindow '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
-		rm -f '/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
+		launchctl unload -S LoginWindow "${login_progress_launch_agent_path}"
+		rm -f "${login_progress_launch_agent_path}"
 	fi
 }
 
-if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-install-packages' && -f "${launch_daemon_path}" ]]; then
+if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-customization-resources' && -f "${launch_daemon_path}" ]]; then
 	if [[ -f '/Users/Shared/Build Info/Prepare OS Log.txt' ]] && grep -qF $'\tERROR:' '/Users/Shared/Build Info/Prepare OS Log.txt'; then
 		# If rebooted after previous error, just re-display error and do not proceed.
 
@@ -92,7 +95,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 		# Since LaunchDaemons start so early on boot, always wait for full boot before continuing so that everything is run in a consistent state and all system services have been started.
 		# Through investigation, I found that "coreauthd" is consistently the last, or nearly the last, root process to be started before the login window is displayed.
 
-		while ! pgrep -q 'coreauthd'; do
+		until pgrep -q 'coreauthd'; do
 			sleep 2
 		done
 		
@@ -123,10 +126,11 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 		# IMPORTANT: fg-install-os will create AppleSetupDone to not show Setup Assistant while this script runs.
 
 		log_path='/Users/Shared/Build Info/Prepare OS Log.txt'
-		rm -rf '/Users/Shared/Build Info' # "Build Info" folder should not exist yet, but delete it to be sure.
-		mkdir -p '/Users/Shared/Build Info'
-		chown -R 502:20 '/Users/Shared/Build Info' # Want fg-demo to own the "Build Info" folder, but keep log owned by root.
-		
+		if [[ ! -d '/Users/Shared/Build Info' ]]; then # "Build Info" folder should already exist from the install log, but double-check and create it if needed.
+			mkdir -p '/Users/Shared/Build Info'
+			chown -R 502:20 '/Users/Shared/Build Info' # Want fg-demo to own the "Build Info" folder, but keep log owned by root.
+		fi
+
 		write_to_log() {
 			echo -e "$(date '+%D %T')\t$1" >> "${log_path}"
 		}
@@ -152,7 +156,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 
 		write_to_log 'Waiting for Full Boot'
 
-		while ! pgrep -q 'coreauthd'; do
+		until pgrep -q 'coreauthd'; do
 			sleep 2
 		done
 		
@@ -241,9 +245,10 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 
 		for this_install_package_path in "${SCRIPT_DIR}/"*'.pkg'; do
 			if [[ -f "${this_install_package_path}" ]]; then
-				this_install_package_basename="$(basename "${this_install_package_path}" .pkg)"
+				this_install_package_name="${this_install_package_path##*/}"
+				this_install_package_name="${this_install_package_name%.*}"
 				
-				write_to_log "Installing Package \"${this_install_package_basename}\""
+				write_to_log "Installing Package \"${this_install_package_name}\""
 
 				if ! installer -pkg "${this_install_package_path}" -target '/'; then
 					error_installing_package=true
@@ -257,7 +262,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-i
 
 			# DELETE LAUNCH DAEMON
 			
-			rm -f "${launch_daemon_path}" # Do NOT "launchctl unload launch_daemon_path" or this script will be terminated. It will be unloaded because it will no longer exist on next boot.
+			rm -f "${launch_daemon_path}" # Do NOT bootout/unload the LaunchDaemon or this script will be terminated immediately. It won't be loaded anyway because it will no longer exist on next boot.
 
 
 			if [[ ! -f "${launch_daemon_path}" ]]; then

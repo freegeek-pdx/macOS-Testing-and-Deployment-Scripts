@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.2.22-1
+-- Version: 2022.10.24-1
 
 -- App Icon is “Brain” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -27,7 +27,7 @@ use scripting additions
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
 	try
-		set isAwake to ((do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPowerManagement:CurrentPowerState' /dev/stdin <<< \"$(ioreg -arc IODisplayWrangler -k IOPowerManagement -d 1)\""))) is equal to "4")
+		set isAwake to ((run script "ObjC.import('CoreGraphics'); $.CGDisplayIsActive($.CGMainDisplayID())" in "JavaScript") is equal to 1)
 	end try
 	
 	set isUnlocked to true
@@ -98,6 +98,47 @@ on error checkReadOnlyErrorMessage
 	end if
 end try
 
+
+set freeGeekUpdaterAppPath to "/Applications/Free Geek Updater.app"
+set freeGeekUpdaterIsRunning to false
+try
+	((freeGeekUpdaterAppPath as POSIX file) as alias)
+	set freeGeekUpdaterIsRunning to (application freeGeekUpdaterAppPath is running)
+end try
+
+set adminUsername to "Staff"
+set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
+
+set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
+
+try
+	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
+	
+	try
+		do shell script ("mkdir " & (quoted form of buildInfoPath))
+	end try
+	try
+		set AppleScript's text item delimiters to "-"
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+	end try
+	
+	if (not freeGeekUpdaterIsRunning) then
+		try
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			do shell script "open -na '/Applications/Test Boot Setup.app'"
+		end try
+	end if
+	
+	quit
+	delay 10
+end try
+
+if (freeGeekUpdaterIsRunning) then -- Quit if Updater is running so that this app can be updated if needed.
+	quit
+	delay 10
+end if
+
+
 try
 	(("/Applications/CPUTest.app" as POSIX file) as alias)
 on error
@@ -111,12 +152,6 @@ on error
 end try
 
 
-set dialogIconName to "applet"
-try
-	((((POSIX path of (path to me)) & "Contents/Resources/" & (name of me) & ".icns") as POSIX file) as alias)
-	set dialogIconName to (name of me)
-end try
-
 set systemVersion to (system version of (system info))
 considering numeric strings
 	set isMojaveOrNewer to (systemVersion ≥ "10.14")
@@ -129,12 +164,10 @@ if (isMojaveOrNewer) then
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences"
-					try
-						activate
-					end try
-					reveal ((anchor "Privacy") of (pane id "com.apple.preference.security"))
-				end tell
+				tell application "System Preferences" to activate
+			end try
+			try
+				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 			end try
 			try
 				activate
@@ -155,9 +188,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the “System Events” checkbox underneath it.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 				try
-					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+					do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 				end try
 			end try
 			quit
@@ -202,9 +235,9 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 
 • Find “" & (name of me) & "” in the list on the right and turn on the checkbox next to it. If “" & (name of me) & "” IS NOT in the list, drag-and-drop the app icon from Finder into the list.
 
-• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon dialogIconName
+• Relaunch “" & (name of me) & "” (using the button below)." buttons {"Quit", "Relaunch “" & (name of me) & "”"} cancel button 1 default button 2 with title (name of me) with icon caution
 			try
-				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -n -a \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		end try
 		quit
@@ -213,32 +246,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 end try
 
 
-set adminUsername to "Staff"
-if (isCatalinaOrNewer) then set adminUsername to "staff"
-set adminPassword to "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]"
-
-set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
-try
-	(((buildInfoPath & ".fgSetupSkipped") as POSIX file) as alias)
-	
-	try
-		do shell script ("mkdir " & (quoted form of buildInfoPath))
-	end try
-	try
-		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
-	end try
-	
-	try
-		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-		do shell script "open -n -a '/Applications/Test Boot Setup.app'"
-	end try
-	
-	quit
-	delay 10
-end try
-
-
+set waitForCpuTestLaunchSeconds to 3
 repeat
 	set cpuTestStatus to "Setting Up"
 	set finishedTests to "0"
@@ -338,7 +346,7 @@ repeat
 			try
 				activate
 			end try
-			delay 2
+			delay waitForCpuTestLaunchSeconds
 			try
 				activate
 			end try
@@ -551,6 +559,7 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 					activate
 				end try
 				display alert "Failed to Setup “CPUTest”" message setupCPUTestErrorMessage buttons {"Quit", "Try Again"} cancel button 1 default button 2 as critical
+				set waitForCpuTestLaunchSeconds to (waitForCpuTestLaunchSeconds + 2)
 			else
 				set cpuTestStatus to "Canceled"
 			end if
@@ -670,7 +679,7 @@ if (cpuTestStatus is equal to "Passed") then
 			end try
 			display alert "
 Would you like to launch “GPU Stress Test”?" buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 15
-			do shell script "open -n -a '/Applications/GPU Stress Test.app'"
+			do shell script "open -na '/Applications/GPU Stress Test.app'"
 		end if
 	end try
 end if

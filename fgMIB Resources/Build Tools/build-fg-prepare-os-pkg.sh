@@ -18,8 +18,10 @@
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
-PROJECT_DIR="$(cd "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)/../Prepare OS Package"
+PROJECT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)/../Prepare OS Package"
 readonly PROJECT_DIR
+
+TMPDIR="$([[ -d "${TMPDIR}" && -w "${TMPDIR}" ]] && echo "${TMPDIR%/}/" || echo '/private/tmp/')" # Make sure "TMPDIR" is always set and that it always has a trailing slash for consistency regardless of the current environment.
 
 if ! ADMIN_PASSWORD="$(PlistBuddy -c 'Print :admin_password' "${PROJECT_DIR}/../../Build Tools/Free Geek Passwords.plist")" || [[ -z "${ADMIN_PASSWORD}" ]]; then
 	echo 'FAILED TO GET ADMIN PASSWORD'
@@ -44,6 +46,27 @@ if [[ -n "${latest_firefox_version}" ]]; then
 		curl --connect-timeout 5 --progress-bar -L 'https://download.mozilla.org/?product=firefox-latest-ssl&os=osx&lang=en-US' -o "${latest_firefox_dmg_path}"
 	fi
 fi
+
+# NOTE: KeyboardCleanTool (https://folivora.ai/keyboardcleantool) is also installed into user apps,
+# but not sure how to check for latest version since the download link is always just "https://folivora.ai/releases/KeyboardCleanTool.zip".
+# So, will just check/update it manually peridically instead of automating re-downloading the latest version (which may be the same as we already have) for every build.
+
+latest_drivedx_version="$(curl -m 5 -si 'https://binaryfruit.com/download/drivedx/mac/1/' | awk -F '/' '($1 == "location: https:") { print substr($9,9); exit }')"
+latest_drivedx_version="${latest_drivedx_version%.*}"
+if [[ -n "${latest_drivedx_version}" ]]; then
+	latest_drivedx_zip_path="${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/DriveDx ${latest_drivedx_version}.zip"
+	if [[ -f "${latest_drivedx_zip_path}" ]]; then
+		echo "DriveDx ${latest_drivedx_version} ZIP Is Up-to-Date"
+	else
+		rm -f "${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/DriveDx"*'.zip'
+		echo "Downloading DriveDx ${latest_drivedx_version}..."
+		curl --connect-timeout 5 --progress-bar -L 'https://binaryfruit.com/download/drivedx/mac/1/' -o "${latest_drivedx_zip_path}"
+	fi
+fi
+
+# Sign "fg-snapshot-preserver.sh" so that it can be displayed nicely in macOS 13 Ventura using "AssociatedBundleIdentifiers" in the LaunchDaemon.
+# See "Setting Up Snapshot Preserver LaunchDaemon" section in "fg-prepare-os.sh" for more information.
+codesign -fs 'Developer ID Application' --strict "${PROJECT_DIR}/Package Resources/fg-snapshot-reset/fg-snapshot-preserver.sh"
 
 package_name='fg-prepare-os'
 package_id="org.freegeek.${package_name}"

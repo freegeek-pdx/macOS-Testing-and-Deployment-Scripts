@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # Created by Pico Mitchell on 3/2/21.
@@ -19,7 +20,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-readonly SCRIPT_VERSION='2022.10.26-1'
+readonly SCRIPT_VERSION='2023.1.10-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -42,12 +43,12 @@ fi
 
 current_process_list="$(ps -ax)" # Must use "ps -ax" output to check for running processes since "pgrep" is not available in recoveryOS.
 
-if (( $(echo "${current_process_list}" | grep -v grep | grep -ci 'fg-install-os') > 1 )); then
+if (( $(echo "${current_process_list}" | grep -v 'grep' | grep -ci 'fg-install-os') > 1 )); then
 	>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Another \"fg-install-os\" process is already running.${CLEAR_ANSI}\n\n"
 	exit 1
 fi
 
-if echo "${current_process_list}" | grep -v grep | grep -qi 'startosinstall\|InstallAssistant'; then
+if echo "${current_process_list}" | grep -v 'grep' | grep -qi 'startosinstall\|InstallAssistant'; then
 	>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Another macOS installation process is already running.${CLEAR_ANSI}\n\n"
 	exit 1
 fi
@@ -78,7 +79,7 @@ os_specific_extra_bins="${SCRIPT_DIR}/extra-bins/darwin-${BOOTED_DARWIN_MAJOR_VE
 if [[ ! -d "${os_specific_extra_bins}" ]]; then
 	# If the exact OS specific extra-bins folder doesn't exist, use the oldest or newest one available depending on if the running OS is older or newer than those.
 	os_specific_extra_bins=''
-	all_os_specific_extra_bins="$(find "${SCRIPT_DIR}/extra-bins" -type d -maxdepth 1 -name 'darwin-*' 2> /dev/null | sort)"
+	all_os_specific_extra_bins="$(find "${SCRIPT_DIR}/extra-bins" -maxdepth 1 -type d -name 'darwin-*' 2> /dev/null | sort)"
 	if [[ -n "${all_os_specific_extra_bins}" ]]; then
 		os_specific_extra_bins="$(echo "${all_os_specific_extra_bins}" | tail -1)"
 		oldest_os_specific_extra_bins="$(echo "${all_os_specific_extra_bins}" | head -1)"
@@ -102,29 +103,28 @@ ansi_clear_screen() {
 	# "clear" command is not available in recoveryOS, so instead of including it in extra-bins, use ANSI escape codes to clear the screen.
 	# H = reset cursor to 0,0
 	# 2J = clear screen (some documentation says this should also set to 0,0 but it does not in macOS)
-	echo -ne '\033[H\033[2J'
+	printf '%b' '\033[H\033[2J'
 }
 
-trim_like_xargs() {
-	# "xargs" command is not available in recoveryOS, so instead of including it in extra-bins, use "tr" and bash to get the job done.
-	local delimiter
-	delimiter="$2"
-	if [[ -z "${delimiter}" ]]; then delimiter=' '; fi
-	local trimmed
-	trimmed="$(echo -ne "$1" | tr -s '[:space:]' "${delimiter}")"
-	# Now there could only be a single leading or trailing space.
-	trimmed="${trimmed#"${delimiter}"}"
-	echo -ne "${trimmed%"${delimiter}"}"
+trim_and_squeeze_whitespace() {
+	{ [[ "$#" -eq 0 && ! -t 0 ]] && cat - || printf '%s ' "$@"; } | tr -s '[:space:]' ' ' | sed -E 's/^ | $//g'
+	# NOTE 1: Must only read stdin when NO arguments are passed because if this function is called with arguments but is within a block that
+	# has another stdin piped or redirected to it, (such as a "while read" loop) the function will detect the stdin from the block and read
+	# it instead of the arguments being passed which results in the function reading the wrong input as well as ending the loop prematurely.
+	# NOTE 2: When multiple arguments are passed, DO NOT use "$*" since that would join on current "IFS" which may not be default which means
+	# space may not be the first character and could instead be some non-whitespace character that would not be properly trimmed and squeezed.
+	# Instead, use "printf" to manually join all arguments with a space (which will leave a trailing space, but that will get trimmed anyways).
+	# NOTE 3: After "tr -s" there could still be a single leading and/or trailing space, so use "sed" to remove them.
 }
 
 strip_ansi_styles() {
 	# The ANSI styles mess up grepping, comparing, and getting string length, so strip them when needed.
 	# From: https://superuser.com/questions/380772/removing-ansi-color-codes-from-text-stream#comment2323889_380778
-	echo -ne "$1" | sed -e $'s/\x1b\[[0-9;]*m//g'
+	printf '%b' "$1" | sed $'s/\x1b\[[0-9;]*m//g'
 }
 
 # Use "sysctl" instead of "system_profiler" because "system_profiler" is not available in recoveryOS.
-MODEL_ID="$(trim_like_xargs "$(sysctl -n hw.model 2> /dev/null)")"
+MODEL_ID="$(sysctl -n hw.model 2> /dev/null)"
 if [[ -z "${MODEL_ID}" ]]; then MODEL_ID='UNKNOWN Model Identifier'; fi
 readonly MODEL_ID
 
@@ -147,7 +147,7 @@ readonly MODEL_PART_NUMBER
 
 APPLE_SILICON_MARKETING_MODEL_NAME=''
 if $IS_APPLE_SILICON; then # This local Marketing Model Name within "ioreg" only exists on Apple Silicon Macs.
-	APPLE_SILICON_MARKETING_MODEL_NAME="$(PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< "$(ioreg -arc IOPlatformDevice -k product-name)" 2> /dev/null | tr -dc '[:print:]')" # Remove non-printable characters because this decoded value could end with a null char.
+	APPLE_SILICON_MARKETING_MODEL_NAME="$(PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< "$(ioreg -arc IOPlatformDevice -k product-name)" 2> /dev/null | tr -d '[:cntrl:]')" # Remove control characters because this decoded value could end with a NUL char.
 fi
 readonly APPLE_SILICON_MARKETING_MODEL_NAME
 
@@ -156,7 +156,7 @@ if [[ "${MODEL_ID_NAME}" == 'Mac' && -n "${APPLE_SILICON_MARKETING_MODEL_NAME}" 
 	# Starting with the Mac Studio, all new models now only have a "MacXX,Y" style Model Identifier (with only "Mac" and without the specific model as part of the Model Identifier such as "MacBookProXX,Y").
 	# References: https://twitter.com/khronokernel/status/1501315940260016133 & https://mobile.twitter.com/khronokernel/status/1501411685482958853 & https://twitter.com/ClassicII_MrMac/status/1506146498198835206 & https://twitter.com/ClassicII_MrMac/status/1534296010020855808
 	# So, to get the short model name, we must extract it from the full Marketing Model Name (retreived from "ioreg" since this only affects Apple Silicon Macs) by extracting the first part up to " (".
-	SHORT_MODEL_NAME="$(echo "${APPLE_SILICON_MARKETING_MODEL_NAME}" | awk -F ' \\(' '{ print $1; exit }')"
+	SHORT_MODEL_NAME="$(echo "${APPLE_SILICON_MARKETING_MODEL_NAME}" | awk -F ' [(]' '{ print $1; exit }')"
 else # When the specific model is part of the Model Identifier (on Intel and early Apple Silicon Macs), we can create it by just separating one of these suffixes in the textual part of the Model Identifier with a space.
 	declare -a short_model_name_end_components=( 'Pro' 'Air' 'mini' )
 	for this_short_model_name_end_component in "${short_model_name_end_components[@]}"; do
@@ -170,7 +170,7 @@ readonly SHORT_MODEL_NAME
 
 model_name="${SHORT_MODEL_NAME} ${MODEL_ID_NUMBER}"
 
-SERIAL="$(trim_like_xargs "$(PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< "$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)" 2> /dev/null)")"
+SERIAL="$(PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< "$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)" 2> /dev/null | trim_and_squeeze_whitespace)"
 readonly SERIAL
 readonly SPECS_SERIAL="${ANSI_BOLD}Serial:${CLEAR_ANSI} ${SERIAL}"
 
@@ -187,7 +187,7 @@ else
 	cpu_model="${cpu_model//GHz/ GHz}"
 fi
 
-cpu_model="$(trim_like_xargs "${cpu_model}")"
+cpu_model="$(trim_and_squeeze_whitespace "${cpu_model}")"
 
 cpu_core_count="$(sysctl -n hw.physicalcpu_max 2> /dev/null)"
 if [[ -n "${cpu_core_count}" ]]; then
@@ -202,7 +202,7 @@ readonly SPECS_CPU="${ANSI_BOLD}CPU:${CLEAR_ANSI} ${cpu_model}"
 SPECS_CPU_NO_ANSI="$(strip_ansi_styles "${SPECS_CPU}")"
 readonly SPECS_CPU_NO_ANSI
 
-readonly SPECS_RAM="${ANSI_BOLD}RAM:${CLEAR_ANSI} $(( $(trim_like_xargs "$(sysctl -n hw.memsize 2> /dev/null)") / 1024 / 1024 / 1024 )) GB"
+readonly SPECS_RAM="${ANSI_BOLD}RAM:${CLEAR_ANSI} $(( $(sysctl -n hw.memsize 2> /dev/null) / 1024 / 1024 / 1024 )) GB"
 
 specs_overview=''
 did_load_marketing_model_name=false
@@ -214,13 +214,15 @@ load_specs_overview() {
 		if $IS_APPLE_SILICON; then
 			marketing_model_name="${APPLE_SILICON_MARKETING_MODEL_NAME}"
 		elif (( ${#SERIAL} >= 11 )); then
-			# The model part of the Serial Number is the last 4 characters for 12 character serials and the last 3 characters for 11 character serials (which are very old and shouldn't actually be encountered: https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/).
-			# Starting with the 2021 MacBook Pro models, randomized 10 character Serial Numbers are now used which do not have any model specific characters, but those Macs will never get here or need to load the Marketing Model Name over the internet since they are Apple Silicon and the local Marketing Model Name will have been retrieved above.
+			# The model part of the Serial Number is the last 4 characters for 12 character serials and the last 3 characters for 11 character serials
+			# (which are very old and shouldn't actually be encountered: https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/).
+			# Starting with the 2021 MacBook Pro models, randomized 10 character Serial Numbers are now used which do not have any model specific characters, but those Macs will
+			# never get here or need to load the Marketing Model Name over the internet since they are Apple Silicon and the local Marketing Model Name will have been retrieved above.
 			local model_characters_of_serial_number="${SERIAL:8}"
 
 			if [[ -z "${marketing_model_name}" ]]; then
 				local marketing_model_name_xml
-				marketing_model_name_xml="$(curl -m 5 -sL "https://support-sp.apple.com/sp/product?cc=${model_characters_of_serial_number}" 2> /dev/null)"
+				marketing_model_name_xml="$(curl -m 5 -sfL "https://support-sp.apple.com/sp/product?cc=${model_characters_of_serial_number}" 2> /dev/null)"
 
 				if [[ -n "${marketing_model_name_xml}" ]]; then
 					possible_marketing_model_name="$(echo "${marketing_model_name_xml}" | awk -F '<configCode>|</configCode>' '/<configCode>/ { print $2; exit }')" # "xmllint" doesn't exist in recoveryOS, so just use "awk" instead.
@@ -231,13 +233,13 @@ load_specs_overview() {
 				fi
 			fi
 		else
-			model_name+=' (Invalid Serial Number for Marketing Model Name)';
+			model_name+=' (Invalid Serial Number for Marketing Model Name)'
 			did_load_marketing_model_name=true # Do not keep trying for an invalid Serial Number.
 		fi
 
 		if [[ -n "${marketing_model_name}" ]]; then
 			if [[ "${marketing_model_name}" == "${SHORT_MODEL_NAME}" ]]; then
-				model_name+=' (No Marketing Model Name Specified)';
+				model_name+=' (No Marketing Model Name Specified)'
 			else
 				model_name="${marketing_model_name/${SHORT_MODEL_NAME}/${model_name}}"
 
@@ -281,16 +283,19 @@ load_specs_overview() {
 		local specs_overview_line_two_no_ansi
 		specs_overview_line_two_no_ansi="$(strip_ansi_styles "${specs_overview_line_two}")"
 
-		local terminal_width='80' # "tput" doesn't exist in recoveryOS, so just always use the default window width.
-		if (( ${#specs_overview_line_one_no_ansi} > terminal_width )); then
+		local window_width="${COLUMNS:-80}" # "COLUMNS" seems to be set in the Terminal, but is NOT set when retrieved in this script.
+		# Seems like maybe "shopt -s checkwinsize" needs to set for the script to be able to read "COLUMNS", but I couldn't get that to work.
+		# Also, "tput" doesn't exist in recoveryOS, so can't use that instead. So, the default of "80" will just always be used as the window width.
+
+		if (( ${#specs_overview_line_one_no_ansi} > window_width )); then
 			specs_overview_line_one="    ${specs_model}"
 			specs_overview_line_two="      ${SPECS_CPU}  ${SPECS_RAM}  ${SPECS_SERIAL}"
 			specs_overview_line_two_no_ansi="$(strip_ansi_styles "${specs_overview_line_two}")"
-			if (( ${#specs_overview_line_two_no_ansi} > terminal_width )); then
+			if (( ${#specs_overview_line_two_no_ansi} > window_width )); then
 				specs_overview_line_two="      ${SPECS_CPU}
       ${SPECS_RAM}  ${SPECS_SERIAL}"
 			fi
-		elif (( ${#specs_overview_line_two_no_ansi} > terminal_width )); then
+		elif (( ${#specs_overview_line_two_no_ansi} > window_width )); then
 			specs_overview_line_one="    ${specs_model}"
 			specs_overview_line_two="      ${SPECS_CPU}
       ${SPECS_RAM}  ${SPECS_SERIAL}"
@@ -330,7 +335,7 @@ check_and_prompt_for_power_adapter_for_laptops() {
 set_date_time_from_internet() {
 	# Have to manually retrieve correct date/time and use the "date" command to set time in recoveryOS: https://www.alansiu.net/2020/08/05/setting-the-date-time-in-macos-10-14-recovery-mode/
 	local actual_date_time
-	actual_date_time="$(curl -m 5 -sL 'http://worldtimeapi.org/api/ip.txt' 2> /dev/null | awk -F ': ' '($1 == "utc_datetime") { print $NF; exit }')" # Time gets set as UTC when using "date" command in recoveryOS.
+	actual_date_time="$(curl -m 5 -sfL 'http://worldtimeapi.org/api/ip.txt' 2> /dev/null | awk -F ': ' '($1 == "utc_datetime") { print $NF; exit }')" # Time gets set as UTC when using "date" command in recoveryOS.
 	# Always use "http" even though "https" could be used on macOS 10.12 Sierra and older or macOS 10.15 Catalina and newer since "libcurl" supports "https" on those versions,
 	# while "libcurl" doesn't support "https" macOS 10.13 High Sierra and macOS 10.14 Mojave for some reason (it's odd that older versions do support it though).
 	# Regardless, "http" is always used since this is to set the correct date and time and if the date is too far in the past "https" will fail anyways while "http" never will.
@@ -354,7 +359,7 @@ set_date_time_and_prompt_for_internet_if_year_not_correct() {
 
   ${ANSI_UNDERLINE}Internet Required to Set Date:${CLEAR_ANSI}
 
-    ${ANSI_YELLOW}${ANSI_BOLD}The system date is incorrectly set to $(trim_like_xargs "$(date)").${CLEAR_ANSI}
+    ${ANSI_YELLOW}${ANSI_BOLD}The system date is incorrectly set to $(date | trim_and_squeeze_whitespace).${CLEAR_ANSI}
 
     Connect to a ${ANSI_BOLD}Wi-Fi${CLEAR_ANSI} network or plug in an ${ANSI_BOLD}Ethernet${CLEAR_ANSI} cable.
     If this Mac does not have Ethernet, use a Thunderbolt or USB adapter.
@@ -511,8 +516,8 @@ create_custom_global_tcc_database() {
 			footer_fields="NULL,0,'UNUSED',NULL,0,$(date '+%s')"
 		fi
 
-		# The following csreq (Code Signing Requirement) hex strings were generated by the "generate-csreq-hex-for-tcc-db.jxa" script in the "Other Scripts" folder.
-		# See comments in the "generate-csreq-hex-for-tcc-db.jxa" script for some important detailed information about these csreq hex strings (and https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+		# The following csreq (Code Signing Requirement) hex strings were generated by the "generate_csreq_hex_for_tcc_db.jxa" script in the "Other Scripts" folder.
+		# See comments in the "generate_csreq_hex_for_tcc_db.jxa" script for some important detailed information about these csreq hex strings (and https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
 		# Including the csreq for the client seems to NOT actually be required when initially setting the TCC permissions and macOS will fill them out when the app launches for the first time.
 		# But, that would reduce security by allowing any app that's first to launch with the specified Bundle Identifier to be granted the specified TCC permissions (even though fraudulent apps spoofing our Bundle IDs isn't a risk in our environment).
 		local csreq_for_free_geek_setup_app='fade0c00000000a80000000100000006000000020000001c6f72672e667265656765656b2e467265652d4765656b2d5365747570000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000'
@@ -531,7 +536,9 @@ create_custom_global_tcc_database() {
 			create_global_tcc_db_commands+="INSERT INTO access VALUES('kTCCServiceSystemPolicyAllFiles','org.freegeek.Free-Geek-Demo-Helper',0,${allowed_or_authorized_fields},1,X'${csreq_for_free_geek_demo_helper_app}',${footer_fields});" # Free Geek Demo Helper just has FDA so that it can explicitly confirm all it's own TCC permissions are correct instead of needing to do implicit checks/prompts.
 			create_global_tcc_db_commands+="INSERT INTO access VALUES('kTCCServiceSystemPolicyAllFiles','org.freegeek.Cleanup-After-QA-Complete',0,${allowed_or_authorized_fields},1,X'${csreq_for_cleanup_after_qa_complete_app}',${footer_fields});" # Cleanup After QA Complete just has FDA so that it can explicitly confirm all it's own TCC permissions are correct instead of needing to do implicit checks/prompts.
 
-			if (( installed_os_darwin_major_version >= 20 )); then # "Free Geek Snapshot Helper" IS NOT used on macOS 10.15 Catalina and older (it's only used on macOS 11 Big Sur and newer), since mounting the Snapshot on macOS 10.15 Catalina does not help (see CAVEAT notes in "fg-snapshot-preserver" script) and no reset Snapshot is created on macOS 10.14 Mojave and older (where the "fgreset" script is used instead).
+			if (( installed_os_darwin_major_version >= 20 )); then
+				# "Free Geek Snapshot Helper" is only used to mount the reset Snapshot (which requires Full Disk Access) on macOS 11 Big Sur and newer, since mounting the Snapshot on macOS 10.15 Catalina does not help (see CAVEAT notes in "fg-snapshot-preserver" script).
+				# But, it is still installed on macOS 10.15 Catalina to be used as an alert GUI if the reset Snapshot is lost, and no reset Snapshot is created on macOS 10.14 Mojave and older (where the "fgreset" script is used instead) so it is not installed at all on those versions.
 				create_global_tcc_db_commands+="INSERT INTO access VALUES('kTCCServiceSystemPolicyAllFiles','org.freegeek.Free-Geek-Snapshot-Helper',0,${allowed_or_authorized_fields},1,X'${csreq_for_free_geek_snapshot_helper_app}',${footer_fields});"
 			fi
 		fi
@@ -572,17 +579,14 @@ fi
 wifi_ssid='FG Reuse'
 wifi_password='[COPY RESOURCES SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]'
 
-network_interfaces="$(networksetup -listallhardwareports 2> /dev/null | awk -F ': ' '($1 == "Device") { print $NF }')"
-IFS=$'\n'
-for this_network_interface in ${network_interfaces}; do
-	if getairportnetwork_output="$(networksetup -getairportnetwork "${this_network_interface}" 2> /dev/null)" && [[ "${getairportnetwork_output}" != *'disabled.' ]]; then
-		if networksetup -getairportpower "${this_network_interface}" 2> /dev/null | grep -q '): Off$'; then
-			networksetup -setairportpower "${this_network_interface}" on &> /dev/null
+while read -ra this_network_hardware_ports_line_elements; do
+	if [[ "${this_network_hardware_ports_line_elements[0]}" == 'Device:' ]] && getairportnetwork_output="$(networksetup -getairportnetwork "${this_network_hardware_ports_line_elements[1]}" 2> /dev/null)" && [[ "${getairportnetwork_output}" != *'disabled.' ]]; then
+		if networksetup -getairportpower "${this_network_hardware_ports_line_elements[1]}" 2> /dev/null | grep -q '): Off$'; then
+			networksetup -setairportpower "${this_network_hardware_ports_line_elements[1]}" on &> /dev/null
 		fi
-		networksetup -setairportnetwork "${this_network_interface}" "${wifi_ssid}" "${wifi_password}" &> /dev/null &
+		networksetup -setairportnetwork "${this_network_hardware_ports_line_elements[1]}" "${wifi_ssid}" "${wifi_password}" &> /dev/null &
 	fi
-done
-unset IFS
+done < <(networksetup -listallhardwareports 2> /dev/null)
 
 set_date_time_from_internet # Try to set correct date before doing anything else. If it fails, it will be re-attempted later and user will be prompted and required to connect to the internet if needed.
 
@@ -646,21 +650,20 @@ install_drive_choices_display=''
 
 declare -a install_drive_device_tree_paths=()
 
-IFS=$'\n'
-for this_disk_id in ${possible_disk_ids}; do
+while IFS='' read -r this_disk_id; do
 	this_disk_info_plist_path="$(mktemp -t 'fg_install_os-this_disk_info')"
 	diskutil info -plist "${this_disk_id}" > "${this_disk_info_plist_path}"
 
 	this_disk_is_valid_for_installation=true
 
-	if [[ "$(PlistBuddy -c 'Print :Internal' "${this_disk_info_plist_path}" 2> /dev/null)" == 'false' || \
+	if [[ "$(PlistBuddy -c 'Print :Internal' "${this_disk_info_plist_path}" 2> /dev/null)" == 'false' ||
 		"$(PlistBuddy -c 'Print :RemovableMediaOrExternalDevice' "${this_disk_info_plist_path}" 2> /dev/null)" == 'true' ]]; then # SD Cards will show as Internal=true and RemovableMediaOrExternalDevice=true unlike actual internal drives.
 		this_disk_is_valid_for_installation=false
 	fi
 
-	if $this_disk_is_valid_for_installation && \
-		[[ "$(PlistBuddy -c 'Print :ParentWholeDisk' "${this_disk_info_plist_path}" 2> /dev/null)" != "${this_disk_id}" || \
-		"$(PlistBuddy -c 'Print :WholeDisk' "${this_disk_info_plist_path}" 2> /dev/null)" == 'false' || \
+	if $this_disk_is_valid_for_installation &&
+		[[ "$(PlistBuddy -c 'Print :ParentWholeDisk' "${this_disk_info_plist_path}" 2> /dev/null)" != "${this_disk_id}" ||
+		"$(PlistBuddy -c 'Print :WholeDisk' "${this_disk_info_plist_path}" 2> /dev/null)" == 'false' ||
 		"$(PlistBuddy -c 'Print :VirtualOrPhysical' "${this_disk_info_plist_path}" 2> /dev/null)" == 'Virtual' ]]; then # T2 lists "Unknown" for VirtualOrPhysical.
 		this_disk_is_valid_for_installation=false
 	fi
@@ -675,29 +678,13 @@ for this_disk_id in ${possible_disk_ids}; do
 	fi
 
 	if $this_disk_is_valid_for_installation; then
+		this_disk_size_bytes="$(PlistBuddy -c 'Print :TotalSize' "${this_disk_info_plist_path}" 2> /dev/null)"
 		this_disk_bus="$(PlistBuddy -c 'Print :BusProtocol' "${this_disk_info_plist_path}" 2> /dev/null)"
-		if [[ -z "${this_disk_bus}" ]]; then this_disk_bus='UNKNOWN Bus'; fi
 
 		this_disk_model="$(PlistBuddy -c 'Print :MediaName' "${this_disk_info_plist_path}" 2> /dev/null)"
-		if [[ -z "${this_disk_model}" ]]; then
-			this_disk_model='UNKNOWN Model';
-		else
-			this_disk_model="$(trim_like_xargs "${this_disk_model//:/ }")" # Make sure Models never contain ':' since it is used as a splitting character.
-		fi
+		this_disk_model="$(trim_and_squeeze_whitespace "${this_disk_model//:/ }")" # Make sure Models never contain ':' since it's used as a delimiter and the model is only for display.
 
-		this_disk_smart_status="$(PlistBuddy -c 'Print :SMARTStatus' "${this_disk_info_plist_path}" 2> /dev/null)"
-		if [[ -z "${this_disk_smart_status}" ]]; then this_disk_smart_status='UNKNOWN'; fi
-
-		ssd_or_hhd="$([[ "$(PlistBuddy -c 'Print :SolidState' "${this_disk_info_plist_path}" 2> /dev/null)" == 'true' ]] && echo 'SSD' || echo 'HDD')"
-
-		this_disk_size_bytes="$(PlistBuddy -c 'Print :TotalSize' "${this_disk_info_plist_path}" 2> /dev/null)"
-		if [[ -z "${this_disk_size_bytes}" ]]; then
-			this_disk_size='UNKNOWN Size'
-		else
-			this_disk_size="$(( this_disk_size_bytes / 1000 / 1000 / 1000 )) GB"
-		fi
-
-		this_drive_name="${this_disk_size} ${this_disk_bus} ${ssd_or_hhd} \"${this_disk_model}\""
+		this_drive_name="$([[ -z "${this_disk_size_bytes}" ]] && echo 'UNKNOWN Size' || echo "$(( this_disk_size_bytes / 1000 / 1000 / 1000 )) GB") ${this_disk_bus:-UNKNOWN Bus} $([[ "$(PlistBuddy -c 'Print :SolidState' "${this_disk_info_plist_path}" 2> /dev/null)" == 'true' ]] && echo 'SSD' || echo 'HDD') \"${this_disk_model:-UNKNOWN Model}\""
 
 		install_drive_choices_display+="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}${this_disk_id}:${ANSI_PURPLE} ${this_drive_name}${CLEAR_ANSI}"
 
@@ -716,17 +703,17 @@ for this_disk_id in ${possible_disk_ids}; do
 			install_drive_choices_display+="\n      ${ANSI_YELLOW}${ANSI_BOLD}WARNING:${ANSI_YELLOW} Smaller Than 60 GB Minimum (But Can Be Used in Fusion Drive)${CLEAR_ANSI}"
 		fi
 
+		this_disk_smart_status="$(PlistBuddy -c 'Print :SMARTStatus' "${this_disk_info_plist_path}" 2> /dev/null)"
 		if [[ "${this_disk_smart_status}" != 'Verified' ]]; then
-			install_drive_choices_display+="\n      ${ANSI_YELLOW}${ANSI_BOLD}WARNING:${ANSI_YELLOW} SMART Status = ${ANSI_UNDERLINE}${this_disk_smart_status}${CLEAR_ANSI}"
+			install_drive_choices_display+="\n      ${ANSI_YELLOW}${ANSI_BOLD}WARNING:${ANSI_YELLOW} SMART Status = ${ANSI_UNDERLINE}${this_disk_smart_status:-UNKNOWN}${CLEAR_ANSI}"
 		fi
 	fi
 
 	rm -f "${this_disk_info_plist_path}"
-done
-unset IFS
+done <<< "${possible_disk_ids}"
 
 
-if [[ -z "${install_drive_choices[*]}" || -z "${install_drive_choices_display}" ]]; then
+if (( ${#install_drive_choices[@]} == 0 )) || [[ -z "${install_drive_choices_display}" ]]; then
 	>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} No Installable Drives Detected${CLEAR_ANSI}\n\n"
 	write_to_log 'ERROR: No Installable Drives Detected'
 	exit 1
@@ -764,14 +751,14 @@ if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f
 			diskutil mountDisk "${this_disk_id}" &> /dev/null
 
 			# Mounting parent disk IDs appears to not mount the child APFS Container disk IDs, so check for those and mount them too.
-			apfs_container_disk_ids="$(diskutil list "${this_disk_id}" | awk '(($3 ~ /Container$/) && ($4 ~ /^disk/)) { gsub(/[^0-9]/, "", $4); print "disk" $4 }')"
-			# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop, so just "awk" the human readable output of a single "diskutil list" command instead since it's right there.
-			# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID, so they must be removed from the disk IDs for them to be usable.
-			# When using gsub(/[^[:print:]]/, "", $4), I was seeing an extraneous "?" get outputted after the disk ID on one computer but not another (which is odd), but removing all non-digits and then adding "disk" back solved that for all computers.
-
-			for this_apfs_container_disk_id in ${apfs_container_disk_ids}; do
-				diskutil mountDisk "${this_apfs_container_disk_id}" &> /dev/null
-			done
+			while read -ra this_disk_info_line_elements; do
+				if [[ "${this_disk_info_line_elements[2]#[^[:alpha:]]}" == 'Container' && "${this_disk_info_line_elements[3]}" == 'disk'* ]]; then
+					diskutil mountDisk "${this_disk_info_line_elements[3]%[^[:digit:]]}" &> /dev/null
+					# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop,
+					# so just parse the human readable output of a single "diskutil list" command instead since it's right there even though it's not necessarily future-proof to parse the human readable output.
+					# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID as of macOS 11 Big Sur and newer, so they must be removed.
+				fi
+			done < <(diskutil list "${this_disk_id}")
 		fi
 	done
 
@@ -800,9 +787,9 @@ if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f
 				elif $this_volume_is_apfs && [[ "$(diskutil apfs listCryptoUsers "${this_volume}")" != 'No cryptographic users for disk'* ]]; then
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Secure Token User Exists${CLEAR_ANSI}"
 				else
-					existing_user_names="$(trim_like_xargs "$(find "${this_volume}/private/var/db/dslocal/nodes/Default/users" \( -name '*.plist' -and ! -name '_*.plist' \) | awk -F '/|[.]plist' '{ print $(NF-1) }' | sort)")" # "-exec basename {} '.plist'" would be nicer than "awk", but "basename" doesn't exist in recoveryOS.
+					existing_user_names="$(find "${this_volume}/private/var/db/dslocal/nodes/Default/users" \( -name '*.plist' -and ! -name 'daemon.plist' -and ! -name 'nobody.plist' -and ! -name 'root.plist' -and ! -name '_*.plist' \) | awk -F '/|[.]plist' '{ print $(NF-1) }' | sort)" # "-exec basename {} '.plist'" would be nicer than "awk", but "basename" doesn't exist in recoveryOS.
 
-					if [[ "${existing_user_names}" == 'daemon nobody root' ]]; then
+					if [[ -z "${existing_user_names}" ]]; then
 						this_volume_os_version="$(PlistBuddy -c 'Print :ProductUserVisibleVersion' "${this_volume_system_version_plist_path}" 2> /dev/null)"
 						if [[ -z "${this_volume_os_version}" ]]; then
 							this_volume_os_version="$(PlistBuddy -c 'Print :ProductVersion' "${this_volume_system_version_plist_path}" 2> /dev/null)"
@@ -871,7 +858,7 @@ if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f
 									done
 
 									clean_install_choices_display+="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}${clean_install_choice_index}:${ANSI_PURPLE} ${this_volume_os_name} at \"${this_volume}\"\n${next_line_indent_spaces}on ${this_volume_drive_name}${CLEAR_ANSI}"
-									clean_install_choices+=( "${this_volume}:${this_volume_os_name}:${this_volume_drive_name}" )
+									clean_install_choices+=( "${this_volume_os_name}:${this_volume_drive_name}:${this_volume}" )
 								else
 									echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} ${this_volume_disk_id} Is Not an Internal Drive${CLEAR_ANSI}"
 								fi
@@ -884,17 +871,7 @@ if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f
 							echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Unable to Extract macOS Version${CLEAR_ANSI}"
 						fi
 					else
-						existing_user_names_display=''
-						IFS=' '
-						for this_existing_username in ${existing_user_names}; do
-							if [[ "${this_existing_username}" != 'daemon' && "${this_existing_username}" != 'nobody' && "${this_existing_username}" != 'root' ]]; then
-								if [[ -n "${existing_user_names_display}" ]]; then existing_user_names_display+=', '; fi
-								existing_user_names_display+="${this_existing_username}"
-							fi
-						done
-						unset IFS
-
-						echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Users Already Exist (${existing_user_names_display})${CLEAR_ANSI}"
+						echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Users Already Exist (${existing_user_names//$'\n'/, })${CLEAR_ANSI}"
 					fi
 				fi
 
@@ -904,14 +881,15 @@ if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f
 	done
 fi
 
+clean_install_to_customize_volume=''
+clean_install_to_customize_os_name=''
+clean_install_to_customize_drive_name=''
+
 if (( ${#clean_install_choices[@]} > 0 )); then
 	clean_install_choices_display+="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}C:${ANSI_PURPLE} Continue Without Customizing Clean Installation${CLEAR_ANSI}"
 
-	clean_install_to_customize_path=''
-	clean_install_to_customize_info=''
-
 	last_choose_clean_install_error=''
-	while [[ -z "${clean_install_to_customize_path}" ]]; do
+	until [[ -n "${clean_install_to_customize_volume}" ]]; do
 		load_specs_overview
 		ansi_clear_screen
 		echo -e "${FG_MIB_HEADER}${specs_overview}"
@@ -921,9 +899,6 @@ if (( ${#clean_install_choices[@]} > 0 )); then
 		read -r chosen_clean_install_index
 
 		if [[ "${chosen_clean_install_index}" =~ ^[Cc] ]]; then # Do not confirm continuing, just continue.
-			clean_install_to_customize_path=''
-			clean_install_to_customize_info=''
-
 			break
 		else
 			chosen_clean_install_index="${chosen_clean_install_index//[^0-9]/}" # Remove all non-digits
@@ -934,13 +909,9 @@ if (( ${#clean_install_choices[@]} > 0 )); then
 		fi
 
 		if [[ -n "${chosen_clean_install_index}" ]] && (( chosen_clean_install_index < ${#clean_install_choices[@]} )); then
-			clean_install_to_customize_info="${clean_install_choices[$chosen_clean_install_index]}"
+			IFS=':' read -rd '' possible_clean_install_os_name possible_clean_install_drive_name possible_clean_install_to_customize_volume < <(echo -n "${clean_install_choices[chosen_clean_install_index]}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
 
-			possible_clean_install_to_customize_path="$(echo "${clean_install_to_customize_info}" | cut -d ':' -f 1)"
-			possible_clean_install_os_name="$(echo "${clean_install_to_customize_info}" | cut -d ':' -f 2)"
-			possible_clean_install_drive_name="$(echo "${clean_install_to_customize_info}" | cut -d ':' -f 3)"
-
-			echo -en "\n  Enter ${ANSI_BOLD}${chosen_clean_install_index}${CLEAR_ANSI} Again to Confirm Customizing ${ANSI_BOLD}${possible_clean_install_os_name}${CLEAR_ANSI}\n  at ${ANSI_BOLD}\"${possible_clean_install_to_customize_path}\"${CLEAR_ANSI} on ${ANSI_BOLD}${possible_clean_install_drive_name}${CLEAR_ANSI}: "
+			echo -en "\n  Enter ${ANSI_BOLD}${chosen_clean_install_index}${CLEAR_ANSI} Again to Confirm Customizing ${ANSI_BOLD}${possible_clean_install_os_name}${CLEAR_ANSI}\n  at ${ANSI_BOLD}\"${possible_clean_install_to_customize_volume}\"${CLEAR_ANSI} on ${ANSI_BOLD}${possible_clean_install_drive_name}${CLEAR_ANSI}: "
 			read -r confirmed_clean_install_index
 
 			confirmed_clean_install_index="${confirmed_clean_install_index//[^0-9]/}" # Remove all non-digits
@@ -950,18 +921,15 @@ if (( ${#clean_install_choices[@]} > 0 )); then
 			fi
 
 			if [[ "${chosen_clean_install_index}" == "${confirmed_clean_install_index}" ]]; then
-				clean_install_to_customize_path="${possible_clean_install_to_customize_path}"
-
-				if [[ ! -d "${clean_install_to_customize_path}" ]]; then
-					last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Selected Clean Installation No Longer Exists ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${ANSI_RED}\n     ${ANSI_BOLD}PATH:${ANSI_RED} ${os_installer_path}${CLEAR_ANSI}"
-					write_to_log "ERROR: Selected Clean Installation (${os_installer_path}) No Longer Exists"
-
-					clean_install_to_customize_path=''
-					clean_install_to_customize_info=''
+				if [[ -d "${possible_clean_install_to_customize_volume}" ]]; then
+					clean_install_to_customize_volume="${possible_clean_install_to_customize_volume}"
+					clean_install_to_customize_os_name="${possible_clean_install_os_name}"
+					clean_install_to_customize_drive_name="${possible_clean_install_drive_name}"
+				else
+					last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Selected Clean Installation No Longer Exists ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${ANSI_RED}\n     ${ANSI_BOLD}PATH:${ANSI_RED} ${possible_clean_install_to_customize_volume}${CLEAR_ANSI}"
+					write_to_log "ERROR: Selected Clean Installation (${possible_clean_install_to_customize_volume}) No Longer Exists"
 				fi
 			else
-				clean_install_to_customize_info=''
-
 				last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Did Not Confirm Index ${ANSI_BOLD}${chosen_clean_install_index}${ANSI_PURPLE} ${ANSI_BOLD}(CHOOSE AGAIN)${CLEAR_ANSI}"
 			fi
 		elif [[ -n "${chosen_clean_install_index}" ]]; then
@@ -972,17 +940,14 @@ if (( ${#clean_install_choices[@]} > 0 )); then
 	done
 fi
 
-if [[ -n "${clean_install_to_customize_path}" ]]; then
-	if [[ ! -d "${clean_install_to_customize_path}" || -z "${clean_install_to_customize_info}" ]]; then
+if [[ -n "${clean_install_to_customize_volume}" ]]; then
+	if [[ ! -d "${clean_install_to_customize_volume}" || -z "${clean_install_to_customize_os_name}" || -z "${clean_install_to_customize_drive_name}" ]]; then
 		>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Unknown Error During Clean Installation Selection${CLEAR_ANSI}\n\n"
 		write_to_log 'ERROR: Unknown Error During Clean Installation Selection'
 		exit 1
 	fi
 
-	clean_install_os_name="$(echo "${clean_install_to_customize_info}" | cut -d ':' -f 2)"
-	clean_install_drive_name="$(echo "${clean_install_to_customize_info}" | cut -d ':' -f 3)"
-
-	write_to_log "Chose to Customize Clean Installation of ${clean_install_os_name} on ${clean_install_drive_name}"
+	write_to_log "Chose to Customize Clean Installation of ${clean_install_to_customize_os_name} on ${clean_install_to_customize_drive_name}"
 
 
 	# MAKE SURE POWER ADAPTER IS PLUGGED IN AND DATE IS CORRECT BEFORE ALLOWING OS CUSTOMIZATION TO BEGIN
@@ -1004,29 +969,29 @@ if [[ -n "${clean_install_to_customize_path}" ]]; then
 
 	# START OS CUSTOMIZATION
 
-	echo -e "\n\n  ${ANSI_CYAN}${ANSI_BOLD}Copying Customization Resources\n  Into ${ANSI_UNDERLINE}${clean_install_os_name}${ANSI_CYAN}${ANSI_BOLD} at ${ANSI_UNDERLINE}\"${clean_install_to_customize_path}\"${ANSI_CYAN}${ANSI_BOLD}\n  on ${ANSI_UNDERLINE}${clean_install_drive_name}${ANSI_CYAN}${ANSI_BOLD}...${CLEAR_ANSI}"
+	echo -e "\n\n  ${ANSI_CYAN}${ANSI_BOLD}Copying Customization Resources\n  Into ${ANSI_UNDERLINE}${clean_install_to_customize_os_name}${ANSI_CYAN}${ANSI_BOLD} at ${ANSI_UNDERLINE}\"${clean_install_to_customize_volume}\"${ANSI_CYAN}${ANSI_BOLD}\n  on ${ANSI_UNDERLINE}${clean_install_to_customize_drive_name}${ANSI_CYAN}${ANSI_BOLD}...${CLEAR_ANSI}"
 
-	if copy_customization_resources "${clean_install_to_customize_path}" && create_custom_global_tcc_database "${clean_install_to_customize_path}/Library/Application Support/com.apple.TCC" "$(PlistBuddy -c 'Print :ProductBuildVersion' "${clean_install_to_customize_path}/System/Library/CoreServices/SystemVersion.plist" 2> /dev/null | cut -c -2 | tr -dc '[:digit:]')"; then
+	if copy_customization_resources "${clean_install_to_customize_volume}" && create_custom_global_tcc_database "${clean_install_to_customize_volume}/Library/Application Support/com.apple.TCC" "$(PlistBuddy -c 'Print :ProductBuildVersion' "${clean_install_to_customize_volume}/System/Library/CoreServices/SystemVersion.plist" 2> /dev/null | cut -c -2 | tr -dc '[:digit:]')"; then
 
 		# Delete any existing Preferences, Caches, and Temporary Files (in case any Setup Assistant screens had been clicked through).
-		rm -rf "${clean_install_to_customize_path}/Library/Preferences/"{,.[^.],..?}* \
-			"${clean_install_to_customize_path}/Library/Caches/"{,.[^.],..?}* \
-			"${clean_install_to_customize_path}/System/Library/Caches/"{,.[^.],..?}* \
-			"${clean_install_to_customize_path}/private/var/vm/"{,.[^.],..?}* \
-			"${clean_install_to_customize_path}/private/var/folders/"{,.[^.],..?}* \
-			"${clean_install_to_customize_path}/private/var/tmp/"{,.[^.],..?}* \
-			"${clean_install_to_customize_path}/private/tmp/"{,.[^.],..?}* \
-			"${clean_install_to_customize_path}/.TemporaryItems/"{,.[^.],..?}* &> /dev/null
+		rm -rf "${clean_install_to_customize_volume}/Library/Preferences/"{,.[^.],..?}* \
+			"${clean_install_to_customize_volume}/Library/Caches/"{,.[^.],..?}* \
+			"${clean_install_to_customize_volume}/System/Library/Caches/"{,.[^.],..?}* \
+			"${clean_install_to_customize_volume}/private/var/vm/"{,.[^.],..?}* \
+			"${clean_install_to_customize_volume}/private/var/folders/"{,.[^.],..?}* \
+			"${clean_install_to_customize_volume}/private/var/tmp/"{,.[^.],..?}* \
+			"${clean_install_to_customize_volume}/private/tmp/"{,.[^.],..?}* \
+			"${clean_install_to_customize_volume}/.TemporaryItems/"{,.[^.],..?}* &> /dev/null
 
 		write_to_log 'Successfully Copied Customization Resources and Prepared Customization'
 
 		# Copy installation log onto install drive to save the record of the customization choices.
-		if [[ -e "${clean_install_to_customize_path}/Users/Shared/Build Info" ]]; then # If a previous "Build Info" folder exists from being preserved after running "fgreset" (but would not be preserved from Snapshot Reset), save it with a new name so that a new logs can be created.
-			mv "${clean_install_to_customize_path}/Users/Shared/Build Info" "${clean_install_to_customize_path}/Users/Shared/Build Info - BEFORE $(date '+%s')"
+		if [[ -e "${clean_install_to_customize_volume}/Users/Shared/Build Info" ]]; then # If a previous "Build Info" folder exists from being preserved after running "fgreset" (but would not be preserved from Snapshot Reset), save it with a new name so that a new logs can be created.
+			mv "${clean_install_to_customize_volume}/Users/Shared/Build Info" "${clean_install_to_customize_volume}/Users/Shared/Build Info - BEFORE $(date '+%s')"
 		fi
-		mkdir -p "${clean_install_to_customize_path}/Users/Shared/Build Info"
-		chown -R 502:20 "${clean_install_to_customize_path}/Users/Shared/Build Info" # Want fg-demo to own the "Build Info" folder, but keep log owned by root.
-		ditto "${install_log_path}" "${clean_install_to_customize_path}/Users/Shared/Build Info/"
+		mkdir -p "${clean_install_to_customize_volume}/Users/Shared/Build Info"
+		chown -R 502:20 "${clean_install_to_customize_volume}/Users/Shared/Build Info" # Want fg-demo to own the "Build Info" folder, but keep log owned by root.
+		ditto "${install_log_path}" "${clean_install_to_customize_volume}/Users/Shared/Build Info/"
 
 		echo -e "\n\n  ${ANSI_GREEN}${ANSI_BOLD}Successfully Copied Customization Resources and Prepared Customization\n\n  ${ANSI_GREY}${ANSI_BOLD}This Mac Will Reboot and Start Customizing in 10 Seconds...${CLEAR_ANSI}\n"
 
@@ -1057,7 +1022,7 @@ readonly MODEL_ID_MAJOR_NUMBER="${MODEL_ID_NUMBER%%,*}"
 SUPPORTS_HIGH_SIERRA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '10' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '3' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '4' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '5' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
 readonly SUPPORTS_HIGH_SIERRA
 SUPPORTS_CATALINA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '13' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '5' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
-readonly SUPPORTS_CATALINA # Catalina supports same as Mojave
+readonly SUPPORTS_CATALINA # macOS 10.15 Catalina supports the same models as macOS 10.14 Mojave (except for the MacPro5,1 with a Metal-capable GPU which maxes out at Mojave and is not included in the "SUPPORTS_CATALINA" conditions and is only included in the "SUPPORTS_HIGH_SIERRA" conditions since MacPro5,1 and Mojave installations are handled specially when they are done).
 SUPPORTS_BIG_SUR="$([[ ( "${MODEL_ID}" == 'iMac14,4' ) || ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '15' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '11' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
 readonly SUPPORTS_BIG_SUR
 SUPPORTS_MONTEREY="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '16' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID}" == 'MacBookPro11,4' ) || ( "${MODEL_ID}" == 'MacBookPro11,5' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '12' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
@@ -1084,12 +1049,12 @@ for this_os_installer_search_group_prefixes in "${os_installer_search_group_pref
 		this_os_installer_search_group_paths=( "${this_os_installer_search_group_prefixes}Install "*'.app/Contents/Resources/startosinstall' )
 	fi
 
-	these_sorted_os_installer_paths=''
+	declare -a these_os_versions_and_installer_paths=()
 	for this_os_installer_path in "${this_os_installer_search_group_paths[@]}"; do
 		if [[ -f "${this_os_installer_path}" ]]; then
 			this_os_installer_app_path="${this_os_installer_path%.app/*}.app"
 			this_os_installer_darwin_major_version="$(PlistBuddy -c 'Print :DTSDKBuild' "${this_os_installer_app_path}/Contents/Info.plist" 2> /dev/null | cut -c -2 | tr -dc '[:digit:]')"
-			if (( this_os_installer_darwin_major_version >= 10 )); then
+			if [[ -n "${this_os_installer_darwin_major_version}" ]] && (( this_os_installer_darwin_major_version >= 10 )); then
 				if $IS_APPLE_SILICON && (( this_os_installer_darwin_major_version < 20 )); then
 					# Do not allow Apple Silicon Mac to install macOS 10.15 Catalina and older since Apple Silicon support was introduced with macOS 11 Big Sur.
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} This macOS Version Is Not Supported on Apple Silicon Macs${CLEAR_ANSI}"
@@ -1100,8 +1065,7 @@ for this_os_installer_search_group_prefixes in "${os_installer_search_group_pref
 				elif ! $IS_APPLE_SILICON && (( this_os_installer_darwin_major_version < BOOTED_DARWIN_MAJOR_VERSION )); then # Do NOT disallow installing older versions of macOS when on Apple Silicon, since as of macOS 13 Ventura the latest Local recoveryOS still allows installing macOS 11 Big Sur and it is not possible to actually boot to older recoveryOS versions via USB.
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Older Than Running OS${CLEAR_ANSI}"
 				else
-					if [[ -n "${these_sorted_os_installer_paths}" ]]; then these_sorted_os_installer_paths+=$'\n'; fi
-					these_sorted_os_installer_paths+="${this_os_installer_darwin_major_version}:${this_os_installer_path}"
+					these_os_versions_and_installer_paths+=( "${this_os_installer_darwin_major_version}:${this_os_installer_path}" )
 				fi
 			else
 				echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Invalid Darwin Version${CLEAR_ANSI}"
@@ -1109,88 +1073,87 @@ for this_os_installer_search_group_prefixes in "${os_installer_search_group_pref
 		fi
 	done
 
-	these_sorted_os_installer_paths="$(echo "${these_sorted_os_installer_paths}" | sort -rV)" # Sort by OS versions in reverse order (newest to oldest).
+	if (( ${#these_os_versions_and_installer_paths[@]} > 0 )); then
+		is_first_os_installer_of_search_group=true
 
-	is_first_os_installer_of_search_group=true
+		while IFS=':' read -rd '' this_os_installer_darwin_major_version this_os_installer_path; do
+			this_os_installer_usage_notes=''
 
-	IFS=$'\n'
-	for this_os_installer_path in ${these_sorted_os_installer_paths}; do
-		this_os_installer_darwin_major_version="$(echo "${this_os_installer_path}" | cut -d ':' -f 1)"
-		this_os_installer_path="$(echo "${this_os_installer_path}" | cut -d ':' -f 2)"
+			# NOTICE: For info about grepping the "startosinstall" binary contents to check for supported arguments
+			# as well as OS support for each argument, refer to the "os_installer_options" code near the end of this script.
 
-		this_os_installer_usage_notes=''
-
-		# NOTICE: For info about grepping the "startosinstall" binary contents to check for supported arguments
-		# as well as OS support for each argument, refer to the "os_installer_options" code near the end of this script.
-
-		if ! grep -qU -e '--installpackage, ' "${this_os_installer_path}"; then
-			if [[ -n "${this_os_installer_usage_notes}" ]]; then this_os_installer_usage_notes+=' & '; fi
-			this_os_installer_usage_notes+='Clean Install Only'
-		fi
-
-		this_os_installer_name="${this_os_installer_path%.app/*}"
-		this_os_installer_app_path="${this_os_installer_name}.app"
-		this_os_installer_name="${this_os_installer_name##*/Install }"
-
-		if (( this_os_installer_darwin_major_version >= 10 )); then
-			this_os_installer_version="10.$(( this_os_installer_darwin_major_version - 4 ))"
-			if (( this_os_installer_darwin_major_version >= 20 )); then # Darwin 20 and newer are macOS 11 and newer.
-				this_os_installer_version="$(( this_os_installer_darwin_major_version - 9 ))"
+			if ! grep -qU -e '--installpackage, ' "${this_os_installer_path}"; then
+				this_os_installer_usage_notes='Clean Install Only'
 			fi
 
-			if [[ "${this_os_installer_name}" == *'macOS'* ]]; then
-				this_os_installer_name="${this_os_installer_name/macOS/macOS ${this_os_installer_version}}"
-			elif [[ "${this_os_installer_name}" == *'OS X'* ]]; then
-				this_os_installer_name="${this_os_installer_name/OS X/OS X ${this_os_installer_version}}"
-			fi
-		fi
+			this_os_installer_name="${this_os_installer_path%.app/*}"
+			this_os_installer_app_path="${this_os_installer_name}.app"
+			this_os_installer_name="${this_os_installer_name##*/Install }"
+			this_os_installer_name="$(trim_and_squeeze_whitespace "${this_os_installer_name//:/ }")" # Make sure installer name never contain ':' since it's used as a delimiter and the installer name is only for display (this should never happen, but better safe than sorry).
 
-		if [[ -f "${this_os_installer_app_path}/Contents/SharedSupport/SharedSupport.dmg" || -f "${this_os_installer_app_path}/Contents/SharedSupport/InstallESD.dmg" ]]; then
-			# Full installer apps will contain "SharedSupport.dmg" (on macOS 11 Big Sur and newer) or "InstallESD.dmg" (on macOS 10.15 Catalina or older).
-
-			if { ! $SUPPORTS_HIGH_SIERRA && [[ "${this_os_installer_name}" == *' High Sierra'* ]]; } || \
-				{ ! $SUPPORTS_CATALINA && [[ "${this_os_installer_name}" == *' Mojave'* || "${this_os_installer_name}" == *' Catalina'* ]]; } || \
-				{ ! $SUPPORTS_BIG_SUR && [[ "${this_os_installer_name}" == *' Big Sur'* ]]; } || \
-				{ ! $SUPPORTS_MONTEREY && [[ "${this_os_installer_name}" == *' Monterey'* ]]; } || \
-				{ ! $SUPPORTS_VENTURA && [[ "${this_os_installer_name}" == *' Ventura'* ]]; }; then # Catalina supports same as Mojave
-				echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Model Does Not Support ${this_os_installer_name}${CLEAR_ANSI}"
-			elif [[ "$(strip_ansi_styles "${os_installer_choices_display}")" == *": ${this_os_installer_name}"* ]]; then
-				echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"
-			else
-				if [[ -n "${this_os_installer_usage_notes}" ]]; then this_os_installer_usage_notes=" (${this_os_installer_usage_notes})"; fi
-
-				if $is_first_os_installer_of_search_group; then
-					os_installer_choices_display+=$'\n';
-					is_first_os_installer_of_search_group=false
+			if (( this_os_installer_darwin_major_version >= 10 )); then
+				this_os_installer_version="10.$(( this_os_installer_darwin_major_version - 4 ))"
+				if (( this_os_installer_darwin_major_version >= 20 )); then # Darwin 20 and newer are macOS 11 and newer.
+					this_os_installer_version="$(( this_os_installer_darwin_major_version - 9 ))"
 				fi
 
-				os_installer_choices_display+="\n    ${ANSI_PURPLE}${ANSI_BOLD}${#os_installer_choices[@]}:${ANSI_PURPLE} ${this_os_installer_name}${CLEAR_ANSI}${this_os_installer_usage_notes}"
-				os_installer_choices+=( "${this_os_installer_path}" )
+				if [[ "${this_os_installer_name}" == *'macOS'* ]]; then
+					this_os_installer_name="${this_os_installer_name/macOS/macOS ${this_os_installer_version}}"
+				elif [[ "${this_os_installer_name}" == *'OS X'* ]]; then
+					this_os_installer_name="${this_os_installer_name/OS X/OS X ${this_os_installer_version}}"
+				fi
 			fi
-		else
-			# Stub installers (which will download the full installer from the internet) will not have "SharedSupport.dmg" or "InstallESD.dmg" but WILL HAVE "startosinstall".
 
-			if [[ -n "${this_os_installer_usage_notes}" ]]; then this_os_installer_usage_notes+=' & '; fi
-			this_os_installer_usage_notes+='Internet Required'
+			if [[ -f "${this_os_installer_app_path}/Contents/SharedSupport/SharedSupport.dmg" || -f "${this_os_installer_app_path}/Contents/SharedSupport/InstallESD.dmg" ]]; then
+				# Full installer apps will contain "SharedSupport.dmg" (on macOS 11 Big Sur and newer) or "InstallESD.dmg" (on macOS 10.15 Catalina or older).
 
-			stub_os_installers_info+=( "${this_os_installer_path}:${this_os_installer_name}:${this_os_installer_usage_notes}" )
-		fi
-	done
-	unset IFS
+				if { ! $SUPPORTS_HIGH_SIERRA && [[ "${this_os_installer_name}" == *' High Sierra'* ]]; } ||
+					{ ! $SUPPORTS_CATALINA && [[ "${this_os_installer_name}" == *' Mojave'* || "${this_os_installer_name}" == *' Catalina'* ]]; } || # See comments when "SUPPORTS_CATALINA" is set for Catalina/Mojave support information.
+					{ ! $SUPPORTS_BIG_SUR && [[ "${this_os_installer_name}" == *' Big Sur'* ]]; } ||
+					{ ! $SUPPORTS_MONTEREY && [[ "${this_os_installer_name}" == *' Monterey'* ]]; } ||
+					{ ! $SUPPORTS_VENTURA && [[ "${this_os_installer_name}" == *' Ventura'* ]]; }; then
+					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Model Does Not Support ${this_os_installer_name}${CLEAR_ANSI}"
+				elif [[ "$(strip_ansi_styles "${os_installer_choices_display}")" == *": ${this_os_installer_name}"* ]]; then
+					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"
+				else
+					if $is_first_os_installer_of_search_group; then
+						os_installer_choices_display+=$'\n'
+						is_first_os_installer_of_search_group=false
+					fi
+
+					os_installer_choices_display+="\n    ${ANSI_PURPLE}${ANSI_BOLD}${#os_installer_choices[@]}:${ANSI_PURPLE} ${this_os_installer_name}${CLEAR_ANSI}"
+
+					if [[ -n "${this_os_installer_usage_notes}" ]]; then
+						os_installer_choices_display+=" (${this_os_installer_usage_notes})"
+					fi
+
+					os_installer_choices+=( "${this_os_installer_path}" )
+				fi
+			else
+				# Stub installers (which will download the full installer from the internet) will not have "SharedSupport.dmg" or "InstallESD.dmg" but WILL HAVE "startosinstall".
+
+				if [[ -n "${this_os_installer_usage_notes}" ]]; then this_os_installer_usage_notes+=' & '; fi
+				this_os_installer_usage_notes+='Internet Required'
+				this_os_installer_usage_notes="$(trim_and_squeeze_whitespace "${this_os_installer_usage_notes//:/ }")" # Make sure usage notes never contain ':' since it's used as a delimiter and the usage notes are only for display (this should never happen, but better safe than sorry).
+
+				stub_os_installers_info+=( "${this_os_installer_name}:${this_os_installer_usage_notes}:${this_os_installer_path}" )
+			fi
+		done < <(printf '%s\0' "${these_os_versions_and_installer_paths[@]}" | sort -zr"$( (( BOOTED_DARWIN_MAJOR_VERSION >= 17 )) && echo 'V' || echo 'n' )") # Sort by OS versions in reverse order (newest to oldest), which must be done by converting the array to a string since arrays cannot be easily sorted natively.
+		# NOTE: The "-V" ("--version-sort") option is only available in "sort" on macOS 10.13 High Sierra and newer, but since we could be booted into an older version of Internet Recovery, fallback on using "-n" ("--numeric-sort") instead when on macOS 10.12 Sierra or older.
+		# ALSO NOTE: The "these_os_versions_and_installer_paths" array is being joined with NUL characters using "printf" and "sort -z" is being used to use NUL as record separator instead of newline, all of which allows line breaks to exist and be preserved within the array values, even though that is unlikely.
+	fi
 done
 
 # Include any stub installers (one will always be in recoveryOS root filesystem) as choices if a full installer for the same version has not already been found.
 is_first_stub_os_installer=true
 for this_stub_installer_info in "${stub_os_installers_info[@]}"; do
-	this_os_installer_path="$(echo "${this_stub_installer_info}" | cut -d ':' -f 1)"
-	this_os_installer_name="$(echo "${this_stub_installer_info}" | cut -d ':' -f 2)"
-	this_os_installer_usage_notes="$(echo "${this_stub_installer_info}" | cut -d ':' -f 3)" # This will always at least contain "Internet Required".
+	IFS=':' read -rd '' this_os_installer_name this_os_installer_usage_notes this_os_installer_path < <(echo -n "${this_stub_installer_info}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
 
 	# Do not need to check if model supports stub installer version since stubs should only be for an already booted version.
-	if [[ -n "${this_os_installer_path}" && -n "${this_os_installer_name}" && -n "${this_os_installer_usage_notes}" ]]; then
+	if [[ -n "${this_os_installer_name}" && -n "${this_os_installer_usage_notes}" && -n "${this_os_installer_path}" ]]; then # "this_os_installer_usage_notes" will always at least contain "Internet Required".
 		if [[ "$(strip_ansi_styles "${os_installer_choices_display}")" != *": ${this_os_installer_name}"* ]]; then
 			if $is_first_stub_os_installer; then
-				os_installer_choices_display+=$'\n';
+				os_installer_choices_display+=$'\n'
 				is_first_stub_os_installer=false
 			fi
 
@@ -1215,12 +1178,12 @@ if (( os_installer_choices_count > 0 )); then
 		os_installer_path="${os_installer_choices[0]}"
 		os_installer_line="$(strip_ansi_styles "${os_installer_choices_display}" | grep '^    0:')"
 		os_installer_name="$(echo "${os_installer_line}" | awk -F ': | [(]' '{ print $2; exit }')"
-		if [[ "${os_installer_line}" == *')' ]]; then os_installer_usage_notes="$(echo "${os_installer_line}" | awk -F '[(]|[)]' '{ print $2; exit }')"; fi
+		if [[ "${os_installer_line}" == *')' ]]; then os_installer_usage_notes="$(echo "${os_installer_line}" | awk -F '[()]' '{ print $2; exit }')"; fi
 		write_to_log "Defaulted to Installing ${os_installer_name}"
 	fi
 
 	last_choose_os_error=''
-	while [[ -z "${os_installer_path}" ]]; do
+	until [[ -n "${os_installer_path}" ]]; do
 		load_specs_overview
 		ansi_clear_screen
 		echo -e "${FG_MIB_HEADER}${specs_overview}"
@@ -1237,10 +1200,10 @@ if (( os_installer_choices_count > 0 )); then
 		fi
 
 		if [[ -n "${chosen_os_installer_index}" ]] && (( chosen_os_installer_index < os_installer_choices_count )); then
-			possible_os_installer_path="${os_installer_choices[$chosen_os_installer_index]}"
+			possible_os_installer_path="${os_installer_choices[chosen_os_installer_index]}"
 			os_installer_line="$(strip_ansi_styles "${os_installer_choices_display}" | grep "^    ${chosen_os_installer_index}:")"
 			os_installer_name="$(echo "${os_installer_line}" | awk -F ': | [(]' '{ print $2; exit }')"
-			if [[ "${os_installer_line}" == *')' ]]; then os_installer_usage_notes="$(echo "${os_installer_line}" | awk -F '[(]|[)]' '{ print $2; exit }')"; fi
+			if [[ "${os_installer_line}" == *')' ]]; then os_installer_usage_notes="$(echo "${os_installer_line}" | awk -F '[()]' '{ print $2; exit }')"; fi
 
 			echo -en "\n  Enter ${ANSI_BOLD}${chosen_os_installer_index}${CLEAR_ANSI} Again to Confirm Installing ${ANSI_BOLD}${os_installer_name}${CLEAR_ANSI}: "
 			read -r confirmed_os_installer_index
@@ -1281,17 +1244,14 @@ if (( os_installer_choices_count > 0 )); then
 
 	if [[ -n "${os_installer_usage_notes}" ]]; then
 		if [[ -z "${global_install_notes}" ]]; then global_install_notes="${GLOBAL_INSTALL_NOTES_HEADER}"; fi
-		IFS='&'
-		for this_os_installer_usage_note in ${os_installer_usage_notes}; do
-			this_os_installer_usage_note="$(trim_like_xargs "${this_os_installer_usage_note}")"
+		while read -rd '&' this_os_installer_usage_note; do # NOTE: NOT setting "IFS=''" so that leading and trailing whitespace (which will exist) DOES get trimmed automatically like we would want to be manually anyways.
 			if [[ "${this_os_installer_usage_note}" == 'Internet Required' ]]; then
 				this_os_installer_usage_note="Selected installer ${ANSI_BOLD}is a stub${CLEAR_ANSI}, full installer will be downloaded."
 			elif [[ "${this_os_installer_usage_note}" == 'Clean Install Only' ]]; then
 				this_os_installer_usage_note="Selected installer ${ANSI_BOLD}does not support${CLEAR_ANSI} including customization packages."
 			fi
 			global_install_notes+="\n    - ${this_os_installer_usage_note}"
-		done
-		unset IFS
+		done <<< "${os_installer_usage_notes}&" # NOTE: MUST include a trailing/terminating "&" so that the last last value doesn't get lost by the "while read" loop.
 	fi
 fi
 
@@ -1344,7 +1304,7 @@ if $IS_APPLE_SILICON; then
 
 	# ABOUT PERFORMING MANUALLY ASSISTED CUSTOMIZED CLEAN INSTALL ON APPLE SILICON
 
-	# As of macOS 11.3 Big Sur, "startosinstall" does not work in recoveryOS on Apple Silicon.
+	# In recoveryOS on Apple Silicon, "startosinstall" does not work (which has not changed from macOS 11 Big Sur through macOS 13 Ventura, which is the current latest version at the time of writing this).
 	# When "startosinstall" is run in recoveryOS on Apple Silicon, it simply outputs "startosinstall is not currently supported in the recoveryOS on Apple Silicon".
 
 	# BUT, I've discovered a simple way to customize a clean install by tricking the installer into thinking it's an upgrade/re-install.
@@ -1359,7 +1319,7 @@ if $IS_APPLE_SILICON; then
 	# "Erase Mac" can also be done by following the prompts in Disk Utility when erasing the internal volume group (I think these prompted were added to Disk Utility in macOS 11.2 Big Sur).
 	# Since we are in Terminal at this point, the easiest option is to launch "resetpassword" to re-open Recovery Assistant and then display instructions on how to manually run "Erase Mac".
 
-	# After "Erase Mac" has been run, the internal drive will be named "Untitled" on macOS 11 Big Sur or "Macintosh HD" on macOS 12 Monterey and it will be empty except for the ".fseventsd" folder.
+	# After "Erase Mac" has been run, the internal drive will be named "Untitled" on macOS 11 Big Sur or "Macintosh HD" on macOS 12 Monterey and newer and it will be empty except for the ".fseventsd" folder.
 	# So, this is what we will check for to determine if "Erase Mac" has already been run and proceed with preparing the drive to trick the installer
 	# into performing a upgrade/re-install as well as copying the customization resources (the same as when customizing an existing clean install).
 
@@ -1454,32 +1414,34 @@ if $IS_APPLE_SILICON; then
 		diskutil mountDisk "${this_disk_id}" &> /dev/null
 
 		# Mounting parent disk IDs appears to not mount the child APFS Container disk IDs, so mount them too to be able to check if "Erase Mac" has been run successfully.
-		apfs_container_disk_ids="$(diskutil list "${this_disk_id}" | awk '(($3 ~ /Container$/) && ($4 ~ /^disk/)) { gsub(/[^0-9]/, "", $4); print "disk" $4 }')"
-		# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop, so just "awk" the human readable output of a single "diskutil list" command instead since it's right there.
-		# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID, so they must be removed from the disk IDs for them to be usable.
-		# When using gsub(/[^[:print:]]/, "", $4), I was seeing an extraneous "?" get outputted after the disk ID on one computer but not another (which is odd), but removing all non-digits and then adding "disk" back solved that for all computers.
+		while read -ra this_disk_info_line_elements; do
+			if [[ "${this_disk_info_line_elements[2]#[^[:alpha:]]}" == 'Container' && "${this_disk_info_line_elements[3]}" == 'disk'* ]]; then
+				this_apfs_container_disk_id="${this_disk_info_line_elements[3]%[^[:digit:]]}"
+				# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop,
+				# so just parse the human readable output of a single "diskutil list" command instead since it's right there even though it's not necessarily future-proof to parse the human readable output.
+				# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID as of macOS 11 Big Sur and newer, so they must be removed.
 
-		for this_apfs_container_disk_id in ${apfs_container_disk_ids}; do
-			diskutil mountDisk "${this_apfs_container_disk_id}" &> /dev/null
+				diskutil mountDisk "${this_apfs_container_disk_id}" &> /dev/null
 
-			this_apfs_container_info_plist="$(diskutil list -plist "${this_apfs_container_disk_id}")"
-			if echo "${this_apfs_container_info_plist}" | grep -q '>/Volumes/'; then # Using PlistBuddy would not make these checks any easier.
-				# Make sure any volume is mounted on the internal drive to check for a possible error after "Erase Mac" has been run. See comments below for more information.
-				internal_drive_has_mounted_volume=true
+				this_apfs_container_info_plist="$(diskutil list -plist "${this_apfs_container_disk_id}")"
+				if echo "${this_apfs_container_info_plist}" | grep -q '>/Volumes/'; then # Using PlistBuddy would not make these checks any easier.
+					# Make sure any volume is mounted on the internal drive to check for a possible error after "Erase Mac" has been run. See comments below for more information.
+					internal_drive_has_mounted_volume=true
 
-				if $nvram_indicates_erase_mac_has_been_run; then # Only bother checking for "Untitled" or "Macintosh HD" volume after "Erase Mac" if nvram_indicates_erase_mac_has_been_run. See comments above for more information.
-					erased_volume_name="$( (( BOOTED_DARWIN_MAJOR_VERSION >= 21 )) && echo 'Macintosh HD' || echo 'Untitled' )" # Internal drive will be named "Untitled" after "Erase Mac" on macOS 11 Big Sur or named "Macintosh HD" on macOS 12 Monterey and newer.
-					if echo "${this_apfs_container_info_plist}" | grep -q ">/Volumes/${erased_volume_name}<" && [[ -d "/Volumes/${erased_volume_name}" ]]; then
-						erased_volume_contents="$(find "/Volumes/${erased_volume_name}" -mindepth 1 -maxdepth 1 2> /dev/null)"
+					if $nvram_indicates_erase_mac_has_been_run; then # Only bother checking for "Untitled" or "Macintosh HD" volume after "Erase Mac" if nvram_indicates_erase_mac_has_been_run. See comments above for more information.
+						erased_volume_name="$( (( BOOTED_DARWIN_MAJOR_VERSION >= 21 )) && echo 'Macintosh HD' || echo 'Untitled' )" # Internal drive will be named "Untitled" after "Erase Mac" on macOS 11 Big Sur or named "Macintosh HD" on macOS 12 Monterey and newer.
+						if echo "${this_apfs_container_info_plist}" | grep -q ">/Volumes/${erased_volume_name}<" && [[ -d "/Volumes/${erased_volume_name}" ]]; then
+							erased_volume_contents="$(find "/Volumes/${erased_volume_name}" -mindepth 1 -maxdepth 1 2> /dev/null)"
 
-						if [[ -z "${erased_volume_contents}" || "${erased_volume_contents}" == "/Volumes/${erased_volume_name}/.fseventsd" ]]; then
-							# If nvram_indicates_erase_mac_has_been_run and an internal drive has an empty "/Volumes/Untitled" or "/Volumes/Macintosh HD" volume, we can safely assume "Erase Mac" has been run successfully.
-							erase_mac_has_been_run=true
+							if [[ -z "${erased_volume_contents}" || "${erased_volume_contents}" == "/Volumes/${erased_volume_name}/.fseventsd" ]]; then
+								# If nvram_indicates_erase_mac_has_been_run and an internal drive has an empty "/Volumes/Untitled" or "/Volumes/Macintosh HD" volume, we can safely assume "Erase Mac" has been run successfully.
+								erase_mac_has_been_run=true
+							fi
 						fi
 					fi
 				fi
 			fi
-		done
+		done < <(diskutil list "${this_disk_id}")
 	done
 
 	if ! $internal_drive_has_mounted_volume; then
@@ -1498,7 +1460,7 @@ if $IS_APPLE_SILICON; then
 	fi
 
 	confirm_continue_response=''
-	while [[ "${confirm_continue_response}" != 'Y' ]]; do
+	until [[ "${confirm_continue_response}" == 'Y' ]]; do
 		load_specs_overview
 		ansi_clear_screen
 		echo -e "${FG_MIB_HEADER}${specs_overview}"
@@ -1608,7 +1570,7 @@ if $IS_APPLE_SILICON; then
 			mkdir -p "${install_volume_path}/Library/Application Support/com.apple.TCC"
 			chown -R 0:0 "${install_volume_path}/Library" # Make sure this folder (and LaunchDaemons) gets properly owned by root:wheel after installation, see notes above for more information.
 
-			if [[ ! -f "${install_volume_path}/System/Library/CoreServices/SystemVersion.plist" || ! -d "${install_volume_path}/private/var/db/dslocal/nodes/Default" || \
+			if [[ ! -f "${install_volume_path}/System/Library/CoreServices/SystemVersion.plist" || ! -d "${install_volume_path}/private/var/db/dslocal/nodes/Default" ||
 				! -d "${install_volume_path}/Users/Shared" || ! -d "${install_volume_path}/Library/LaunchDaemons" || ! -d "${install_volume_path}/Library/Application Support/com.apple.TCC" ]]; then
 				>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Failed Setup Files/Folders for Customized Clean Install${CLEAR_ANSI}\n\n"
 				write_to_log 'ERROR: Failed Setup Files/Folders for Customized Clean Install'
@@ -1654,8 +1616,8 @@ if $IS_APPLE_SILICON; then
     ${ANSI_PURPLE}${ANSI_BOLD}Now, the ${os_installer_name} installation must be started manually.${CLEAR_ANSI}
 
     The ${ANSI_BOLD}Install Assistant${CLEAR_ANSI} app has been opened in the background.
-    $($CLEAN_INSTALL_REQUESTED && \
-		echo "Clean installation will be peformed since \"$1\" argument has been used." || \
+    $($CLEAN_INSTALL_REQUESTED &&
+		echo "Clean installation will be peformed since \"$1\" argument has been used." ||
 		echo "Even though it will look like you're starting a clean install process,
     it will be a customized install because of the preparation that's been done.")
 
@@ -1676,7 +1638,7 @@ if $IS_APPLE_SILICON; then
 
 			# Suppress ShellCheck suggestion to use "pgrep" since it's not available in recoveryOS.
 			# shellcheck disable=SC2009
-			if ! ps | grep -v grep | grep -q 'InstallAssistant'; then # Do not want to launch a new instance if it's already running.
+			if ! ps | grep -v 'grep' | grep -q 'InstallAssistant'; then # Do not want to launch a new instance if it's already running.
 				"${os_install_assistant_springboard_path}" &> /dev/null & disown
 				write_to_log 'Displayed Instructions and Launched "InstallAssistant_springboard" for Manual Installation'
 			fi
@@ -1724,7 +1686,7 @@ if $IS_APPLE_SILICON; then
 
 			# Suppress ShellCheck suggestion to use "pgrep" since it's not available in recoveryOS.
 			# shellcheck disable=SC2009
-			if ! ps | grep -v grep | grep -q 'KeyRecoveryAssistant'; then # Do not want to launch a new instance if it's already running.
+			if ! ps | grep -v 'grep' | grep -q 'KeyRecoveryAssistant'; then # Do not want to launch a new instance if it's already running.
 				resetpassword &> /dev/null
 				write_to_log 'Displayed Instructions and Launched "KeyRecoveryAssistant" for Manual "Erase Mac"'
 			fi
@@ -1740,7 +1702,7 @@ else
 	install_drive_name=''
 
 	last_choose_drive_error=''
-	while [[ -z "${install_disk_id}" ]]; do
+	until [[ -n "${install_disk_id}" ]]; do
 		load_specs_overview
 		ansi_clear_screen
 		echo -e "${FG_MIB_HEADER}${specs_overview}"
@@ -1818,7 +1780,7 @@ else
 		# Also, for T2 Macs, I've confirmed that any existing Touch ID entries are automatically removed when the associated volume is deleted, which will always happen since if any Touch ID entries exist, it will not be considered a clean install and the volume will always be deleted.
 
 		xartutil_output='CLEAR ONCE NO MATTER WHAT'
-		while [[ -n "${xartutil_output}" ]]; do # Cleared output is empty on T1s (and would be "Total Session count: 0" on T2s, but that's never done anymore for the reasons described above).
+		until [[ -z "${xartutil_output}" ]]; do # Cleared output is empty on T1s (and would be "Total Session count: 0" on T2s, but that's never done anymore for the reasons described above).
 			ansi_clear_screen
 			echo -e "\n  ${ANSI_CYAN}${ANSI_BOLD}Clearing All Touch ID Data...${CLEAR_ANSI}\n"
 
@@ -1881,16 +1843,16 @@ else
 
 				for this_disk_id in "${install_drive_choices[@]}"; do
 					if [[ -n "${this_disk_id}" && "${this_disk_id}" != 'diskF' ]]; then
-						apfs_container_disk_ids="$(diskutil list "${this_disk_id}" | awk '(($3 ~ /Container$/) && ($4 ~ /^disk/)) { gsub(/[^0-9]/, "", $4); print "disk" $4 }')"
-						# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop, so just "awk" the human readable output of a single "diskutil list" command instead since it's right there.
-						# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID, so they must be removed from the disk IDs for them to be usable.
-						# When using gsub(/[^[:print:]]/, "", $4), I was seeing an extraneous "?" get outputted after the disk ID on one computer but not another (which is odd), but removing all non-digits and then adding "disk" back solved that for all computers.
+						while read -ra this_disk_info_line_elements; do
+							if [[ "${this_disk_info_line_elements[2]#[^[:alpha:]]}" == 'Container' && "${this_disk_info_line_elements[3]}" == 'disk'* ]] &&
+								diskutil apfs deleteContainer "${this_disk_info_line_elements[3]%[^[:digit:]]}"; then
+								# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop,
+								# so just parse the human readable output of a single "diskutil list" command instead since it's right there even though it's not necessarily future-proof to parse the human readable output.
+								# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID as of macOS 11 Big Sur and newer, so they must be removed.
 
-						for this_apfs_container_disk_id in ${apfs_container_disk_ids}; do
-							if diskutil apfs deleteContainer "${this_apfs_container_disk_id}"; then
 								did_delete_apfs_container=true
 							fi
-						done
+						done < <(diskutil list "${this_disk_id}")
 					fi
 				done
 
@@ -1928,16 +1890,16 @@ else
 
 				did_delete_apfs_container=false
 
-				apfs_container_disk_ids="$(diskutil list "${install_disk_id}" | awk '(($3 ~ /Container$/) && ($4 ~ /^disk/)) { gsub(/[^0-9]/, "", $4); print "disk" $4 }')"
-				# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop, so just "awk" the human readable output of a single "diskutil list" command instead since it's right there.
-				# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID, so they must be removed from the disk IDs for them to be usable.
-				# When using gsub(/[^[:print:]]/, "", $4), I was seeing an extraneous "?" get outputted after the disk ID on one computer but not another (which is odd), but removing all non-digits and then adding "disk" back solved that for all computers.
+				while read -ra this_disk_info_line_elements; do
+					if [[ "${this_disk_info_line_elements[2]#[^[:alpha:]]}" == 'Container' && "${this_disk_info_line_elements[3]}" == 'disk'* ]] &&
+						diskutil apfs deleteContainer "${this_disk_info_line_elements[3]%[^[:digit:]]}"; then
+						# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop,
+						# so just parse the human readable output of a single "diskutil list" command instead since it's right there even though it's not necessarily future-proof to parse the human readable output.
+						# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID as of macOS 11 Big Sur and newer, so they must be removed.
 
-				for this_apfs_container_disk_id in ${apfs_container_disk_ids}; do
-					if diskutil apfs deleteContainer "${this_apfs_container_disk_id}"; then
 						did_delete_apfs_container=true
 					fi
-				done
+				done < <(diskutil list "${install_disk_id}")
 
 				if $did_delete_apfs_container && diskutil eraseDisk "${format_for_drive}" "${install_volume_name}" "${install_disk_id}"; then
 					erase_did_succeed=true
@@ -2103,7 +2065,7 @@ else
 
 		mkdir -p "${install_volume_path}/Library/Application Support/com.apple.TCC" # This folder need to be created for our custom global "TCC.db" file.
 
-		if [[ ! -f "${install_volume_path}/System/Library/CoreServices/SystemVersion.plist" || ! -d "${install_volume_path}/private/var/db/dslocal/nodes/Default" || \
+		if [[ ! -f "${install_volume_path}/System/Library/CoreServices/SystemVersion.plist" || ! -d "${install_volume_path}/private/var/db/dslocal/nodes/Default" ||
 			! -d "${install_volume_path}/Library/Application Support/com.apple.TCC" ]]; then
 			>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Failed Setup Files/Folders for Customized Installation${CLEAR_ANSI}\n\n"
 			write_to_log 'ERROR: Failed Setup Files/Folders for Customized Installation'

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.6-1
+-- Version: 2022.11.28-1
 
 -- App Icon is “DVD” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -64,8 +64,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -121,7 +121,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -148,12 +148,12 @@ considering numeric strings
 end considering
 
 
-set iTunesOrMusic to "iTunes"
-if (isCatalinaOrNewer) then set iTunesOrMusic to "Music"
+set iTunesOrMusicID to "com.apple.iTunes"
+if (isCatalinaOrNewer) then set iTunesOrMusicID to "com.apple.Music"
 
 try
 	with timeout of 1 second
-		tell application iTunesOrMusic to quit
+		tell application id iTunesOrMusicID to quit
 	end timeout
 end try
 
@@ -165,13 +165,13 @@ try
 end try
 
 try
-	tell application "DVD Player" to activate
+	tell application id "com.apple.DVDPlayer" to activate
 end try
 
 if (not isMojaveOrNewer) then -- DVD Player on Mojave or newer isn't scriptable.
 	try
 		run script "
-			tell application \"DVD Player\"
+			tell application id \"com.apple.DVDPlayer\"
 				try
 					activate
 				end try

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.17-1
+-- Version: 2022.11.30-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -47,8 +47,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -100,9 +100,9 @@ set progress additional description to ("
 try
 	repeat with thisWindow in (current application's NSApp's |windows|())
 		if (thisWindow's isVisible() is true) then
-			if (((thisWindow's title()) as string) is equal to (name of me)) then
+			if (((thisWindow's title()) as text) is equal to (name of me)) then
 				repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-					if (((thisProgressWindowSubView's className()) as string) is equal to "NSProgressIndicator") then
+					if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
 						if (isResetting) then
 							(thisWindow's setTitle:"Free Geek Reset Progress")
 						else
@@ -132,7 +132,7 @@ try
 						(thisWindow's setCanBecomeVisibleWithoutLogin:true)
 						(thisWindow's setLevel:2.147483647E+9) -- The highest defined window level is "kCGMaximumWindowLevelKey" which is equal to "2147483631" (https://michelf.ca/blog/2016/choosing-window-level/). We are setting an even higher level of "2147483647" which is the signed 32-bit interger max which seems to be the highest possible level since any higher and the value appears to roll over and no longer be topmost.
 						(thisWindow's orderFrontRegardless()) -- This seemed to not be necessary on macOS 11 Big Sur and older, but I found that it is very necessary on macOS 12 Monterey and newer since this (or presumably any) app cannot actually activate itself to become frontmost.
-					else if ((((thisProgressWindowSubView's className()) as string) is equal to "NSButton") and ((thisProgressWindowSubView's title() as string) is equal to "Stop")) then
+					else if ((((thisProgressWindowSubView's className()) as text) is equal to "NSButton") and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
 						if (isRunningAtLoginWindow) then (thisProgressWindowSubView's setEnabled:false) -- Only do this if at the login window to make debugging easier when running in OS.
 					end if
 				end repeat
@@ -207,7 +207,7 @@ repeat
 		try
 			repeat with thisWindow in (current application's NSApp's |windows|())
 				if (thisWindow's isVisible() is true) then
-					set thisWindowTitle to ((thisWindow's title()) as string)
+					set thisWindowTitle to ((thisWindow's title()) as text)
 					if ((thisWindowTitle is equal to (name of me)) or (thisWindowTitle ends with " Progress")) then
 						((thisWindow's contentView())'s display()) -- Force display before re-centering since sometimes it takes a moment for the window contents to be updated on their own which can cause the centering to happen before the contents update.
 						(thisWindow's |center|()) -- Keep re-centering window so the most contents will always be displayed no matter how long the log gets and what the screen size is.

@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # Created by Pico Mitchell on 3/19/21.
@@ -45,7 +46,7 @@
 	# It seems that somehow the "deleted" daemon is maybe marking the reset Snapshot as unusable and preventing it from being able to show up in "Restore from Time Machine Backup" in Recovery. This seems to not be an issue on macOS 11 Big Sur though.
 	# So, ALWAYS manipulate the system date (Solution 1) to keep set to the Snapshot date on macOS 10.15 Catalina and do not bother mounting the Snapshot (since knowing the Snapshot got purged is better user feedback than it just not showing in Recovery).
 
-readonly SCRIPT_VERSION='2022.9.27-1'
+readonly SCRIPT_VERSION='2023.1.9-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
@@ -69,7 +70,7 @@ write_to_log "Running Snapshot Preserver (version ${SCRIPT_VERSION})"
 
 if pgrep -qf "${BASH_SOURCE[0]}"; then
 	# Need to check for an existing instance already running because of how this script could also be executed by a LaunchDaemon as well as
-	# "Free Geek Setup" or "Free Geek Demo Helper" which could conflict with eachother and cause multiple instances to be executed at the same time.
+	# "Free Geek Setup" or "Free Geek Demo Helper" which could conflict with each other and cause multiple instances to be executed at the same time.
 	# But, the LaunchDaemon schedule alone will never execute multiple instances if the previous LaunchDaemon instance is still running.
 
 	write_to_log 'Exiting Snapshot Preserver - Another Instance Is Already Running'
@@ -78,7 +79,7 @@ fi
 
 manually_sync_time() {
 	if [[ "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then
-		actual_date_time_info="$(curl -m 5 -sL 'http://worldtimeapi.org/api/ip.txt' 2> /dev/null)" # Always use "http" since this is to set the correct time when we know the date will be in the past and if the date is too far in the past then "https" will fail anyways while "http" never will.
+		actual_date_time_info="$(curl -m 5 -sfL 'http://worldtimeapi.org/api/ip.txt' 2> /dev/null)" # Always use "http" since this is to set the correct time when we know the date will be in the past and if the date is too far in the past then "https" will fail anyways while "http" never will.
 		actual_timezone="$(echo "${actual_date_time_info}" | awk -F ': ' '($1 == "timezone") { print $NF; exit }')"
 		actual_date_time="$(echo "${actual_date_time_info}" | awk -F ': ' '($1 == "datetime") { print $NF; exit }')"
 		
@@ -123,7 +124,7 @@ attempt_to_mount_reset_snapshot() {
 			# This is done in an app instead of this script since Full Disk Access is required to be able to mount Snapshots. This script could mount the Snapshot if "bash" was granted Full Disk Access, but that is overzealous.
 			# "Free Geek Snapshot Helper" will always be granted Full Disk Access right off the bat during a customized installation by "fg-install-os" (which you can read about in the comments in that script).
 
-			if pgrep -q 'Finder'; then
+			if pgrep -qx 'Finder'; then
 				# "Free Geek Snapshot Helper" will not be able to mount the reset Snapshot when this global LaunchDaemon is first run very early on boot, so will not try to launch unless logged in (by checking if Finder is running).
 				# But, "Free Geek Demo Helper" will launch this script when it is run on login via user LaunchAgent which will get the reset Snapshot mounted as soon as possible.
 
@@ -204,7 +205,7 @@ secure_token_holder_exists_that_cannot_be_removed="$([[ -n "$(ioreg -rc AppleSEP
 # This way, the technician can be notified of the issue by Snapshot Helper before a Snapshot reset is attempted and fails.
 
 if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/.fgResetSnapshotCreated' && "$(tmutil listlocalsnapshots / | grep 'com.apple.TimeMachine' | head -1)" == "$(head -1 '/Users/Shared/.fgResetSnapshotCreated')" && "$(fdesetup isactive)" == 'false' ]]; then
-	was_logged_in_at_launch="$(pgrep -q 'Finder' && echo 'true' || echo 'false')"
+	was_logged_in_at_launch="$(pgrep -qx 'Finder' && echo 'true' || echo 'false')"
 	
 	if ! attempt_to_mount_reset_snapshot; then
 		# If "Free Geek Snapshot Helper" has not been granted Full Disk Access yet (or could not mount the Snapshot very early on boot),
@@ -263,7 +264,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 			# If was not logged in on first attempt to mount reset Snapshot, wait until login to attempt to mount reset Snapshot again before forcing a reboot if necessary.
 			write_to_log 'Waiting for Login to Launch Free Geek Snapshot Helper'
 
-			until pgrep -q 'Finder'; do
+			until pgrep -qx 'Finder'; do
 				did_wait_for_login=true
 				sleep 2
 
@@ -374,7 +375,7 @@ else
 		tmutil deletelocalsnapshots / &> /dev/null
 	fi
 
-	if pgrep -q 'Finder'; then
+	if pgrep -qx 'Finder'; then
 		# Launch "Free Geek Snapshot Helper" (if logged in) since it also serves as a GUI to display an alert about the reset Snapshot being lost.
 		launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" open -na "/Users/${DEMO_USERNAME}/Applications/Free Geek Snapshot Helper.app"
 	fi

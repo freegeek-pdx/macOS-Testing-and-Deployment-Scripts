@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.24-1
+-- Version: 2022.11.30-1
 
 -- App Icon is “Donut” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -63,8 +63,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -120,7 +120,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -173,11 +173,11 @@ end considering
 
 if (isMojaveOrNewer) then
 	try
-		tell application "System Events" to every window -- To prompt for Automation access on Mojave
+		tell application id "com.apple.systemevents" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences" to activate
+				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
 				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -213,16 +213,16 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 end if
 
 try
-	tell application "System Events" to tell application process "Finder" to (get windows)
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to (get windows)
 on error (assistiveAccessTestErrorMessage)
 	if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
 		if (isMojaveOrNewer) then
 			try
-				tell application ("Text" & "Edit") to every window -- To prompt for Automation access on Mojave
+				tell application id ("com.apple." & "TextEdit") to every window -- To prompt for Automation access on Mojave (Break up App ID to prevent TextEdit from launching when the script is being compiled.)
 			on error automationAccessErrorMessage number automationAccessErrorNumber
 				if (automationAccessErrorNumber is equal to -1743) then
 					try
-						tell application "System Preferences" to activate
+						tell application id "com.apple.systempreferences" to activate
 					end try
 					try
 						do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -257,16 +257,16 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			end try
 			try
 				with timeout of 1 second
-					tell application ("Text" & "Edit") to quit
+					tell application id ("com.apple." & "TextEdit") to quit -- Break up App ID to prevent TextEdit from launching when the script is being compiled.
 				end timeout
 			end try
 		end if
 		
 		try
-			tell application "Finder" to reveal (path to me)
+			tell application id "com.apple.finder" to reveal (path to me)
 		end try
 		try
-			tell application "System Preferences"
+			tell application id "com.apple.systempreferences"
 				try
 					activate
 				end try
@@ -306,7 +306,7 @@ end try
 
 
 set AppleScript's text item delimiters to ""
-set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 
 set isLaptop to false
 set modelIdentifier to "UNKNOWN Model Identifier"
@@ -320,19 +320,19 @@ set modelAndGraphicsInfoPath to tmpPath & "modelAndGraphicsInfo.plist"
 repeat 5 times
 	try
 		do shell script "system_profiler -xml SPHardwareDataType SPDisplaysDataType > " & (quoted form of modelAndGraphicsInfoPath)
-		tell application "System Events" to tell property list file modelAndGraphicsInfoPath
+		tell application id "com.apple.systemevents" to tell property list file modelAndGraphicsInfoPath
 			repeat with i from 1 to (number of property list items)
 				set thisDataTypeProperties to (item i of property list items)
-				set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as string)
+				set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as text)
 				if (thisDataType is equal to "SPHardwareDataType") then
 					set hardwareItems to (first property list item of property list item "_items" of thisDataTypeProperties)
 					
-					set shortModelName to ((value of property list item "machine_name" of hardwareItems) as string)
+					set shortModelName to ((value of property list item "machine_name" of hardwareItems) as text)
 					if ((words of shortModelName) contains "MacBook") then set isLaptop to true
-					set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
+					set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as text)
 					
 					try
-						set serialNumber to ((value of property list item "serial_number" of hardwareItems) as string) -- https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/
+						set serialNumber to ((value of property list item "serial_number" of hardwareItems) as text) -- https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/
 						if (((length of serialNumber) ≥ 11) and (serialNumber is not equal to "Not Available")) then
 							set serialNumberDatePart to (text 3 thru 5 of serialNumber)
 							if ((count of serialNumber) is equal to 12) then set serialNumberDatePart to (text 2 thru -1 of serialNumberDatePart)
@@ -344,12 +344,12 @@ repeat 5 times
 					
 					repeat with j from 1 to (number of property list items in graphicsItems)
 						set thisGraphicsItem to (property list item j of graphicsItems)
-						set (end of graphicsCardModels) to ((value of property list item "sppci_model" of thisGraphicsItem) as string)
+						set (end of graphicsCardModels) to ((value of property list item "sppci_model" of thisGraphicsItem) as text)
 						
 						set thisGraphicsBusRaw to "unknown"
 						try
 							set AppleScript's text item delimiters to "_"
-							set thisGraphicsBusCodeParts to (every text item of ((value of property list item "sppci_bus" of thisGraphicsItem) as string))
+							set thisGraphicsBusCodeParts to (every text item of ((value of property list item "sppci_bus" of thisGraphicsItem) as text))
 							if ((count of thisGraphicsBusCodeParts) ≥ 2) then set thisGraphicsBusRaw to (text item 2 of thisGraphicsBusCodeParts)
 						end try
 						if (thisGraphicsBusRaw is equal to "builtin") then
@@ -384,7 +384,7 @@ set gpuStressTestCompleted to false
 if (shouldRunGPUStressTest) then
 	set listOfRunningApps to {}
 	try
-		tell application "System Events"
+		tell application id "com.apple.systemevents"
 			tell dock preferences to set autohide to false
 			set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Mac Scope") and (short name is not (name of me))))
 		end tell
@@ -397,16 +397,16 @@ if (shouldRunGPUStressTest) then
 		end try
 		set AppleScript's text item delimiters to ", "
 		display alert "All Other Apps Must be Quit Before Running “" & (name of me) & "”" message "The following " & pluralizedApplicationIsAre & " currently running:
-" & (listOfRunningApps as string) buttons {"Don't Run “" & (name of me) & "”", "Quit All Other Applications"} cancel button 1 default button 2 as critical
+" & (listOfRunningApps as text) buttons {"Don't Run “" & (name of me) & "”", "Quit All Other Applications"} cancel button 1 default button 2 as critical
 		try
-			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Mac Scope") and (short name is not (name of me))))
-			if ((count of listOfRunningApps) > 0) then
+			tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Mac-Scope") and (bundle identifier is not (id of me))))
+			if ((count of listOfRunningAppIDs) > 0) then
 				try
-					repeat with thisAppName in listOfRunningApps
+					repeat with thisAppID in listOfRunningAppIDs
 						try
-							if (application thisAppName is running) then
+							if (application id thisAppID is running) then
 								with timeout of 1 second
-									tell application thisAppName to quit
+									tell application id thisAppID to quit without saving
 								end timeout
 							end if
 						end try
@@ -414,14 +414,11 @@ if (shouldRunGPUStressTest) then
 				end try
 				delay 3
 				try
-					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Mac Scope") and (short name is not (name of me))))
-					repeat with thisAppName in listOfRunningApps
-						repeat 2 times
-							try
-								do shell script "pkill -f " & (quoted form of thisAppName)
-							end try
-						end repeat
-					end repeat
+					set AppleScript's text item delimiters to space
+					tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Mac-Scope") and (bundle identifier is not (id of me)))) as text)
+					if (allRunningAppPIDs is not equal to "") then
+						do shell script ("kill " & allRunningAppPIDs)
+					end if
 				end try
 			end if
 		end try
@@ -440,7 +437,7 @@ if (shouldRunGPUStressTest) then
 	set isBootedToSourceDrive to false
 	set startupDiskCapacity to 0
 	try
-		tell application "System Events" to set startupDiskCapacity to ((capacity of startup disk) as number)
+		tell application id "com.apple.systemevents" to set startupDiskCapacity to ((capacity of startup disk) as number)
 	end try
 	if ((startupDiskCapacity ≤ 3.3E+10) and (serialNumber is equal to "C02R49Y5G8WP")) then
 		set isBootedToSourceDrive to true
@@ -517,7 +514,7 @@ if (shouldRunGPUStressTest) then
 		end try
 		set selectedDuration to (choose from list durationsList with prompt "Select a Longer " & (name of me) & " Duration:" default items (text item 1 of durationsList) OK button name "Start " & (name of me) & "…" cancel button name "Quit" with title "Run Longer " & (name of me))
 		if (selectedDuration is not equal to false) then
-			set testDurationDisplay to (selectedDuration as string)
+			set testDurationDisplay to (selectedDuration as text)
 			if (testDurationDisplay is equal to "forever") then
 				set testDurationSeconds to -1
 			else
@@ -529,14 +526,14 @@ if (shouldRunGPUStressTest) then
 	if ((testDurationSeconds = -1) or (testDurationSeconds > 0)) then
 		set antiAliasingNote to ""
 		repeat
-			if (application ("Gpu" & "Test") is running) then
+			if (application id ("Geeks3D." & "GpuTest") is running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 				try
 					do shell script "killall -SIGKILL GpuTest" -- SIGKILL so it can't crash when quit nicely.
 				end try
 			end if
 			try
 				with timeout of 1 second
-					tell application "XRG" to quit
+					tell application id ("com.piatekjimenez." & "XRG") to quit -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 				end timeout
 			end try
 			
@@ -548,9 +545,9 @@ if (shouldRunGPUStressTest) then
 			try
 				repeat with thisWindow in (current application's NSApp's |windows|())
 					if (thisWindow's isVisible() is true) then
-						if (((thisWindow's title()) as string) is equal to (name of me)) then
+						if (((thisWindow's title()) as text) is equal to (name of me)) then
 							repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-								if (((thisProgressWindowSubView's className()) as string) is equal to "NSProgressIndicator") then
+								if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
 									(thisWindow's setLevel:(current application's NSScreenSaverWindowLevel))
 									
 									exit repeat
@@ -564,13 +561,13 @@ if (shouldRunGPUStressTest) then
 			set setupAppsErrorMessages to {}
 			
 			try
-				tell application "System Events" to set delay interval of screen saver preferences to 0
+				tell application id "com.apple.systemevents" to set delay interval of screen saver preferences to 0
 			on error (errorMessage)
 				set end of setupAppsErrorMessages to errorMessage
 			end try
 			
 			try
-				tell application "System Events" to tell dock preferences to set autohide to true
+				tell application id "com.apple.systemevents" to tell dock preferences to set autohide to true
 			on error (errorMessage)
 				if (setupAppsErrorMessages does not contain getScreenBoundsErrorMessage) then set end of setupAppsErrorMessages to errorMessage
 			end try
@@ -594,14 +591,14 @@ if (shouldRunGPUStressTest) then
 							end try
 							delay textEditAttemptCount
 							set originalWindowBounds to {0, 0, -1, 0}
-							tell application ("Text" & "Edit") -- This stops Script Editor from opening TextEdit automatially.
+							tell application id ("com.apple." & "TextEdit")
 								repeat with thisTextEditWindow in windows
 									if ((name of thisTextEditWindow) ends with "DetectingScreenSize") then
 										tell thisTextEditWindow
 											set originalWindowBounds to (get bounds)
 											if ((textEditAttemptCount is equal to 2) or (textEditAttemptCount is equal to 4)) then -- Try performing "AXZoomWindow" action a couple times if "set zoomed" isn't working.
 												try
-													tell application "System Events" to tell application process ("Text" & "Edit") to tell (first window whose name ends with "Untitled") to perform action "AXZoomWindow" of (first button whose subrole is "AXFullScreenButton")
+													tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.TextEdit") to tell (first window whose name ends with "DetectingScreenSize") to perform action "AXZoomWindow" of (first button whose subrole is "AXFullScreenButton")
 												on error
 													set zoomed to true
 												end try
@@ -626,7 +623,7 @@ if (shouldRunGPUStressTest) then
 						on error (errorMessage) number (errorNumber)
 							try
 								with timeout of 1 second
-									if (application ("Text" & "Edit") is running) then tell application ("Text" & "Edit") to quit
+									if (application id ("com.apple." & "TextEdit") is running) then tell application id ("com.apple." & "TextEdit") to quit
 								end timeout
 							end try
 							if (errorNumber is equal to -128) then error errorMessage number errorNumber
@@ -639,7 +636,7 @@ if (shouldRunGPUStressTest) then
 				end try
 				try
 					with timeout of 1 second
-						if (application ("Text" & "Edit") is running) then tell application ("Text" & "Edit") to quit
+						if (application id ("com.apple." & "TextEdit") is running) then tell application id ("com.apple." & "TextEdit") to quit
 					end timeout
 				end try
 				do shell script "rm -f " & (quoted form of tmpFileForScreenBounds)
@@ -649,9 +646,9 @@ if (shouldRunGPUStressTest) then
 				try
 					repeat with thisWindow in (current application's NSApp's |windows|())
 						if (thisWindow's isVisible() is true) then
-							if (((thisWindow's title()) as string) is equal to (name of me)) then
+							if (((thisWindow's title()) as text) is equal to (name of me)) then
 								repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-									if (((thisProgressWindowSubView's className()) as string) is equal to "NSProgressIndicator") then
+									if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
 										set progressWindowFrame to (thisWindow's frame())
 										set thisWindowsScreenVisibleFrame to (thisWindow's screen()'s frame()) -- Need to use windows screen to get the true bottom edge of any screen that can be used with setFrameOrigin. Can't use visibleFrame because for some reason it never calculated with the Dock hidden.
 										(thisWindow's setFrameOrigin:{((item 3 of screenBounds) - (item 1 of (item 2 of progressWindowFrame))), (item 2 of (item 1 of thisWindowsScreenVisibleFrame))})
@@ -673,7 +670,7 @@ if (shouldRunGPUStressTest) then
 					set xrgHeight to 140
 					do shell script "open -a '/Applications/XRG.app'"
 					delay 1
-					tell application "System Events" to tell application process "XRG"
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.piatekjimenez.XRG")
 						repeat 3 times
 							try
 								set frontmost to true
@@ -718,7 +715,7 @@ if (shouldRunGPUStressTest) then
 									repeat with thisSensorPrefix in sensorPrefixPickingOrder
 										if (clickedMenuItem is false) then
 											repeat with thisMenuItem in thisPopUpButtonMenuItems
-												set thisMenuItemName to ((name of thisMenuItem) as string)
+												set thisMenuItemName to ((name of thisMenuItem) as text)
 												if (selectedSensors does not contain thisMenuItemName) then
 													if ((offset of thisSensorPrefix in thisMenuItemName) > 0) then
 														set frontmost to true
@@ -807,7 +804,7 @@ if (shouldRunGPUStressTest) then
 					try
 						set msaaArgument to "0"
 						repeat 6 times
-							if (application ("Gpu" & "Test") is running) then
+							if (application id ("Geeks3D." & "GpuTest") is running) then
 								try
 									do shell script "killall -SIGKILL GpuTest" -- SIGKILL so it can't crash when quit nicely.
 								on error (errorMessage) number (errorNumber)
@@ -815,7 +812,7 @@ if (shouldRunGPUStressTest) then
 								end try
 							end if
 							
-							if (application "XRG" is not running) then do shell script "open -a '/Applications/XRG.app'"
+							if (application id ("com.piatekjimenez." & "XRG") is not running) then do shell script "open -a '/Applications/XRG.app'"
 							
 							set testName to "fur"
 							if (modelIdentifier is equal to "iMac7,1") then set testName to "gi" -- iMac7,1's are too slow to handle FurMark, they always freeze. But they can run GiMark successfully.
@@ -824,7 +821,7 @@ if (shouldRunGPUStressTest) then
 							repeat 10 times
 								try
 									delay 0.5
-									tell application "System Events" to tell application process "GpuTest" to tell window 1
+									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "Geeks3D.GpuTest") to tell window 1
 										set position to {(item 1 of screenBounds), (item 2 of screenBounds)}
 										delay 0.5
 										set size to {((item 3 of screenBounds) - (item 1 of screenBounds)), ((item 4 of screenBounds) - (item 2 of screenBounds) - xrgHeight)}
@@ -839,7 +836,7 @@ if (shouldRunGPUStressTest) then
 							
 							set currentGpuTestWindowTitle to "UNKNOWN GPU TEST WINDOW TITLE"
 							try
-								tell application "System Events" to tell application process "GpuTest" to set currentGpuTestWindowTitle to (title of window 1)
+								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "Geeks3D.GpuTest") to set currentGpuTestWindowTitle to (title of window 1)
 							on error (errorMessage) number (errorNumber)
 								if (errorNumber is equal to -128) then error errorMessage number errorNumber
 							end try
@@ -882,7 +879,7 @@ if (shouldRunGPUStressTest) then
 							end if
 						end repeat
 						if (msaaArgument is not equal to "0") then set antiAliasingNote to " (" & msaaArgument & "x Anti-Aliasing)"
-						if (application ("Gpu" & "Test") is not running) then error "“GpuTest” application is no longer running."
+						if (application id ("Geeks3D." & "GpuTest") is not running) then error "“GpuTest” application is no longer running."
 					on error (setupGpuTestErrorMessage)
 						if (setupAppsErrorMessages does not contain setupGpuTestErrorMessage) then set end of setupAppsErrorMessages to setupGpuTestErrorMessage
 					end try
@@ -902,11 +899,11 @@ if (shouldRunGPUStressTest) then
 				end try
 				try
 					with timeout of 1 second
-						tell application "XRG" to quit
+						tell application id ("com.piatekjimenez." & "XRG") to quit
 					end timeout
 				end try
 				try
-					tell application "System Events" to tell dock preferences to set autohide to false
+					tell application id "com.apple.systemevents" to tell dock preferences to set autohide to false
 				end try
 				if (userCanceled) then
 					quit
@@ -916,7 +913,7 @@ if (shouldRunGPUStressTest) then
 					try
 						activate
 					end try
-					display alert "Failed to Setup “XRG” or “GpuTest” Apps" message (setupAppsErrorMessages as string) buttons {"Quit", "Try Again"} cancel button 1 default button 2 as critical giving up after 15
+					display alert "Failed to Setup “XRG” or “GpuTest” Apps" message (setupAppsErrorMessages as text) buttons {"Quit", "Try Again"} cancel button 1 default button 2 as critical giving up after 15
 				end if
 			else
 				exit repeat
@@ -924,7 +921,7 @@ if (shouldRunGPUStressTest) then
 		end repeat
 		
 		try
-			if (application "XRG" is not running) then do shell script "open -a '/Applications/XRG.app'"
+			if (application id ("com.piatekjimenez." & "XRG") is not running) then do shell script "open -a '/Applications/XRG.app'"
 			
 			set hourGlass to "⏳"
 			set testStartTime to (current date)
@@ -957,12 +954,12 @@ if (shouldRunGPUStressTest) then
 				set progress completed steps to (progress completed steps + 30)
 				set elapsedTime to ((current date) - testStartTime)
 				if (elapsedTime ≥ 3600) then
-					set elapsedHours to (((round ((elapsedTime / 3600) * 10)) / 10) as string)
+					set elapsedHours to (((round ((elapsedTime / 3600) * 10)) / 10) as text)
 					if ((text -2 thru -1 of elapsedHours) is equal to ".0") then set elapsedHours to (text 1 thru -3 of elapsedHours)
 					set elapsedTimeDisplay to elapsedHours & " Hours"
 					if (elapsedHours is equal to "1") then set elapsedTimeDisplay to "1 Hour"
 				else
-					set elapsedMinutes to ((round (elapsedTime / 60)) as string)
+					set elapsedMinutes to ((round (elapsedTime / 60)) as text)
 					set elapsedTimeDisplay to elapsedMinutes & " Minutes"
 					if (elapsedMinutes is equal to "1") then set elapsedTimeDisplay to "1 Minute"
 				end if
@@ -977,7 +974,7 @@ if (shouldRunGPUStressTest) then
 " & hourGlass & "	Elapsed Time: " & elapsedTimeDisplay & "  —  " & completionTimeString
 				set gpuTestStillRunning to false
 				try
-					set gpuTestStillRunning to (application ("Gpu" & "Test") is running)
+					set gpuTestStillRunning to (application id ("Geeks3D." & "GpuTest") is running)
 				on error (errorMessage) number (errorNumber)
 					if (errorNumber is equal to -128) then error errorMessage number errorNumber
 				end try
@@ -1028,24 +1025,24 @@ if (shouldRunGPUStressTest) then
 👉 CONSULT INSTRUCTOR IF GPU STRESS TEST FAILED ‼️" buttons {"Quit"} default button 1 with title "Completed " & singularTestDurationDisplay & " " & (name of me)
 						try
 							with timeout of 1 second
-								tell application "XRG" to quit
+								tell application id ("com.piatekjimenez." & "XRG") to quit
 							end timeout
 						on error (errorMessage) number (errorNumber)
 							if (errorNumber is equal to -128) then error errorMessage number errorNumber
 						end try
 						exit repeat
 					else
-						if (application "XRG" is not running) then do shell script "open -a '/Applications/XRG.app'"
+						if (application id ("com.piatekjimenez." & "XRG") is not running) then do shell script "open -a '/Applications/XRG.app'"
 					end if
 				else
 					set testFailDuration to ((current date) - testStartTime)
 					if (testFailDuration ≥ 3600) then
-						set testFailHours to (((round ((testFailDuration / 3600) * 10)) / 10) as string)
+						set testFailHours to (((round ((testFailDuration / 3600) * 10)) / 10) as text)
 						if ((text -2 thru -1 of testFailHours) is equal to ".0") then set testFailHours to (text 1 thru -3 of testFailHours)
 						set testFailTimeDisplay to testFailHours & " hours"
 						if (testFailHours is equal to "1") then set testFailHoursDisplay to "1 hour"
 					else
-						set testFailMinutes to ((round (testFailDuration / 60)) as string)
+						set testFailMinutes to ((round (testFailDuration / 60)) as text)
 						set testFailTimeDisplay to testFailMinutes & " minutes"
 						if (testFailMinutes is equal to 1) then set testFailTimeDisplay to "1 minute"
 					end if
@@ -1103,7 +1100,7 @@ if (shouldRunGPUStressTest) then
 					end try
 					try
 						with timeout of 1 second
-							tell application "XRG" to quit
+							tell application id ("com.piatekjimenez." & "XRG") to quit
 						end timeout
 					end try
 					exit repeat
@@ -1113,12 +1110,12 @@ if (shouldRunGPUStressTest) then
 			if (runtimeErrorNumber is equal to -128) then
 				set testStopDuration to ((current date) - testStartTime)
 				if (testStopDuration ≥ 3600) then
-					set testStopHours to (((round ((testStopDuration / 3600) * 10)) / 10) as string)
+					set testStopHours to (((round ((testStopDuration / 3600) * 10)) / 10) as text)
 					if ((text -2 thru -1 of testStopHours) is equal to ".0") then set testStopHours to (text 1 thru -3 of testStopHours)
 					set testStopTimeDisplay to testStopHours & " hours"
 					if (testStopHours is equal to "1") then set testStopTimeDisplay to "1 hour"
 				else
-					set testStopMinutes to ((round (testStopDuration / 60)) as string)
+					set testStopMinutes to ((round (testStopDuration / 60)) as text)
 					set testStopTimeDisplay to testStopMinutes & " minutes"
 					if (testStopMinutes is equal to 1) then set testStopTimeDisplay to "1 minute"
 				end if
@@ -1137,7 +1134,7 @@ if (shouldRunGPUStressTest) then
 				end try
 				try
 					with timeout of 1 second
-						if (application "XRG" is running) then tell application "XRG" to quit
+						if (application id ("com.piatekjimenez." & "XRG") is running) then tell application id ("com.piatekjimenez." & "XRG") to quit
 					end timeout
 				end try
 				try
@@ -1172,7 +1169,7 @@ if (shouldRunGPUStressTest) then
 
 
 👉 CONSULT INSTRUCTOR IF GPU STRESS TEST FAILED ‼️" buttons {"Quit"} default button 1 with title "Stopped " & singularTestDurationDisplay & " " & (name of me)
-				tell application "System Events" to tell dock preferences to set autohide to false
+				tell application id "com.apple.systemevents" to tell dock preferences to set autohide to false
 			else
 				try
 					activate
@@ -1184,13 +1181,13 @@ if (shouldRunGPUStressTest) then
 end if
 do shell script "rm -f /Users/Tester/_geeks3d_gputest_log.txt"
 try
-	tell application "System Events" to tell dock preferences to set autohide to false
+	tell application id "com.apple.systemevents" to tell dock preferences to set autohide to false
 end try
 
 if (gpuStressTestCompleted or (not shouldRunGPUStressTest)) then
 	try
 		(("/Applications/DriveDx.app" as POSIX file) as alias)
-		if (application ("Drive" & "Dx") is not running) then
+		if (application id ("com.binaryfruit." & "DriveDx") is not running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 			try
 				activate
 			end try
@@ -1201,7 +1198,7 @@ to test the internal hard drive?" message ("If this Mac happens to have multiple
 	on error
 		try
 			(("/Applications/Internet Test.app" as POSIX file) as alias)
-			if (application ("Internet" & " Test") is not running) then
+			if (application id ("org.freegeek." & "Internet-Test") is not running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 				try
 					activate
 				end try

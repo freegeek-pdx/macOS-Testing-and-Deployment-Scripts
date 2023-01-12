@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.24-1
+-- Version: 2022.11.30-1
 
 -- App Icon is “Brain” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -62,8 +62,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -119,7 +119,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -160,11 +160,11 @@ end considering
 
 if (isMojaveOrNewer) then
 	try
-		tell application "System Events" to every window -- To prompt for Automation access on Mojave
+		tell application id "com.apple.systemevents" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences" to activate
+				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
 				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -200,14 +200,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 end if
 
 try
-	tell application "System Events" to tell application process "Finder" to (get windows)
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to (get windows)
 on error (assistiveAccessTestErrorMessage)
 	if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
 		try
-			tell application "Finder" to reveal (path to me)
+			tell application id "com.apple.finder" to reveal (path to me)
 		end try
 		try
-			tell application "System Preferences"
+			tell application id "com.apple.systempreferences"
 				try
 					activate
 				end try
@@ -265,7 +265,7 @@ repeat
 	
 	set listOfRunningApps to {}
 	try
-		tell application "System Events"
+		tell application id "com.apple.systemevents"
 			tell dock preferences to set autohide to false
 			set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Mac Scope") and (short name is not (name of me))))
 		end tell
@@ -278,16 +278,16 @@ repeat
 		end try
 		set AppleScript's text item delimiters to ", "
 		display alert "All Other Apps Must be Quit Before Running “" & (name of me) & "”" message "The following " & pluralizedApplicationIsAre & " currently running:
-" & (listOfRunningApps as string) buttons {"Don't Run “" & (name of me) & "”", "Quit All Other Applications"} cancel button 1 default button 2 as critical
+" & (listOfRunningApps as text) buttons {"Don't Run “" & (name of me) & "”", "Quit All Other Applications"} cancel button 1 default button 2 as critical
 		try
-			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Mac Scope") and (short name is not (name of me))))
-			if ((count of listOfRunningApps) > 0) then
+			tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Mac-Scope") and (bundle identifier is not (id of me))))
+			if ((count of listOfRunningAppIDs) > 0) then
 				try
-					repeat with thisAppName in listOfRunningApps
+					repeat with thisAppID in listOfRunningAppIDs
 						try
-							if (application thisAppName is running) then
+							if (application id thisAppID is running) then
 								with timeout of 1 second
-									tell application thisAppName to quit
+									tell application id thisAppID to quit without saving
 								end timeout
 							end if
 						end try
@@ -295,14 +295,11 @@ repeat
 				end try
 				delay 3
 				try
-					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Mac Scope") and (short name is not (name of me))))
-					repeat with thisAppName in listOfRunningApps
-						repeat 2 times
-							try
-								do shell script "pkill -f " & (quoted form of thisAppName)
-							end try
-						end repeat
-					end repeat
+					set AppleScript's text item delimiters to space
+					tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Mac-Scope") and (bundle identifier is not (id of me)))) as text)
+					if (allRunningAppPIDs is not equal to "") then
+						do shell script ("kill " & allRunningAppPIDs)
+					end if
 				end try
 			end if
 		end try
@@ -313,16 +310,16 @@ repeat
 	set processorTotalCoreCount to "0"
 	
 	set AppleScript's text item delimiters to ""
-	set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+	set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 	set hardwareInfoPath to tmpPath & "hardwareInfo.plist"
 	try
 		do shell script "system_profiler -xml SPHardwareDataType > " & (quoted form of hardwareInfoPath)
-		tell application "System Events" to tell property list file hardwareInfoPath
+		tell application id "com.apple.systemevents" to tell property list file hardwareInfoPath
 			set hardwareItems to (first property list item of property list item "_items" of first property list item)
-			set shortModelName to ((value of property list item "machine_name" of hardwareItems) as string)
+			set shortModelName to ((value of property list item "machine_name" of hardwareItems) as text)
 			if ((words of shortModelName) contains "MacBook") then set isLaptop to true
-			set processorsCount to ((value of property list item "packages" of hardwareItems) as string)
-			set processorTotalCoreCount to ((value of property list item "number_processors" of hardwareItems) as string)
+			set processorsCount to ((value of property list item "packages" of hardwareItems) as text)
+			set processorTotalCoreCount to ((value of property list item "number_processors" of hardwareItems) as text)
 		end tell
 	on error (hardwareInfoErrorMessage)
 		log "Hardware Info Error: " & hardwareInfoErrorMessage
@@ -350,7 +347,7 @@ repeat
 			try
 				activate
 			end try
-			tell application "System Events" to tell application process "CPUTest"
+			tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "se.coolbook.CPUTest")
 				--set frontmost to true
 				set cpuTestWindow to window 1
 				repeat with thisWindow in windows
@@ -439,7 +436,7 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 🧠	Starting " & (name of me)
 				set progress additional description to ""
 				delay 0.5
-				tell application "System Events" to tell application process "CPUTest"
+				tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "se.coolbook.CPUTest")
 					--set frontmost to true
 					set cpuTestWindow to window 1
 					repeat with thisWindow in windows
@@ -449,7 +446,7 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 						end if
 					end repeat
 					set startStopButton to (last button of cpuTestWindow)
-					if (((name of startStopButton) as string) is equal to "Start") then click startStopButton
+					if (((name of startStopButton) as text) is equal to "Start") then click startStopButton
 				end tell
 				try
 					activate
@@ -458,8 +455,8 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 					set didExtraPassAfterFinished to false
 					set hourGlass to "⏳"
 					repeat
-						if (application ("CPU" & "Test") is running) then
-							tell application "System Events" to tell application process "CPUTest"
+						if (application id ("se.coolbook." & "CPUTest") is running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
+							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "se.coolbook.CPUTest")
 								set cpuTestWindow to window 1
 								repeat with thisWindow in windows
 									if ((title of thisWindow) is "CPUTest") then
@@ -470,13 +467,13 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 								
 								click (radio button 1 of tab group 1 of cpuTestWindow)
 								
-								set startStopButtonName to ((name of (last button of cpuTestWindow)) as string)
+								set startStopButtonName to ((name of (last button of cpuTestWindow)) as text)
 								
-								set finishedTests to ((value of (static text 5 of tab group 1 of cpuTestWindow)) as string)
-								set successfulTests to ((value of (static text 6 of tab group 1 of cpuTestWindow)) as string)
-								set failedTests to ((value of (static text 7 of tab group 1 of cpuTestWindow)) as string)
-								set remainingTests to ((value of (static text 10 of tab group 1 of cpuTestWindow)) as string)
-								set elapsedTime to ((value of (static text 11 of tab group 1 of cpuTestWindow)) as string)
+								set finishedTests to ((value of (static text 5 of tab group 1 of cpuTestWindow)) as text)
+								set successfulTests to ((value of (static text 6 of tab group 1 of cpuTestWindow)) as text)
+								set failedTests to ((value of (static text 7 of tab group 1 of cpuTestWindow)) as text)
+								set remainingTests to ((value of (static text 10 of tab group 1 of cpuTestWindow)) as text)
+								set elapsedTime to ((value of (static text 11 of tab group 1 of cpuTestWindow)) as text)
 								
 								tell me
 									set progress total steps to ((remainingTests + finishedTests) as number)
@@ -673,7 +670,7 @@ end try
 if (cpuTestStatus is equal to "Passed") then
 	try
 		(("/Applications/GPU Stress Test.app" as POSIX file) as alias)
-		if (application ("GPU" & " Stress Test") is not running) then
+		if (application id ("org.freegeek." & "GPU-Stress-Test") is not running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 			try
 				activate
 			end try

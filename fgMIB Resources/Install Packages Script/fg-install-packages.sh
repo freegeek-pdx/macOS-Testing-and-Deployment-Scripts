@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # Created by Pico Mitchell on 3/11/21.
@@ -21,7 +22,7 @@
 
 # NOTICE: This script will only be installed and run via LaunchDaemon when customizing an existing clean install, such as on Apple Silicon Macs.
 
-readonly SCRIPT_VERSION='2022.10.17-1'
+readonly SCRIPT_VERSION='2023.1.9-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -35,7 +36,7 @@ launch_daemon_path='/Library/LaunchDaemons/org.freegeek.fg-install-packages.plis
 
 launch_login_progress_app() {
 	if [[ -f "${SCRIPT_DIR}/Tools/Free-Geek-Login-Progress.zip" && ! -d "${SCRIPT_DIR}/Tools/Free Geek Login Progress.app" ]]; then
-		ditto -x -k --noqtn "${SCRIPT_DIR}/Tools/Free-Geek-Login-Progress.zip" "${SCRIPT_DIR}/Tools" &> /dev/null
+		ditto -xk --noqtn "${SCRIPT_DIR}/Tools/Free-Geek-Login-Progress.zip" "${SCRIPT_DIR}/Tools" &> /dev/null
 		touch "${SCRIPT_DIR}/Tools/Free Geek Login Progress.app"
 	fi
 
@@ -61,7 +62,7 @@ launch_login_progress_app() {
 		launchctl load -S LoginWindow "${login_progress_launch_agent_path}"
 
 		for (( wait_for_progress_app_seconds = 0; wait_for_progress_app_seconds < 15; wait_for_progress_app_seconds ++ )); do
-			if pgrep -q 'Free Geek Login Progress'; then
+			if pgrep -qx 'Free Geek Login Progress'; then
 				break
 			else
 				sleep 1
@@ -95,7 +96,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		# Since LaunchDaemons start so early on boot, always wait for full boot before continuing so that everything is run in a consistent state and all system services have been started.
 		# Through investigation, I found that "coreauthd" is consistently the last, or nearly the last, root process to be started before the login window is displayed.
 
-		until pgrep -q 'coreauthd'; do
+		until pgrep -qx 'coreauthd'; do
 			sleep 2
 		done
 		
@@ -156,7 +157,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 
 		write_to_log 'Waiting for Full Boot'
 
-		until pgrep -q 'coreauthd'; do
+		until pgrep -qx 'coreauthd'; do
 			sleep 2
 		done
 		
@@ -234,7 +235,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		write_to_log 'Launching Login Progress App'
 		launch_login_progress_app
 
-		if ! pgrep -q 'Free Geek Login Progress'; then
+		if ! pgrep -qx 'Free Geek Login Progress'; then
 			write_to_log 'Failed to Launch Login Progress App'
 		fi
 

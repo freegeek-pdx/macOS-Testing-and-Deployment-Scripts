@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.24-1
+-- Version: 2022.11.29-1
 
 -- App Icon is “Victory Hand” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -63,8 +63,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -120,7 +120,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -161,11 +161,11 @@ end considering
 
 if (isMojaveOrNewer) then
 	try
-		tell application "System Events" to every window -- To prompt for Automation access on Mojave
+		tell application id "com.apple.systemevents" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences" to activate
+				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
 				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -201,16 +201,16 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 end if
 
 try
-	tell application "System Events" to tell application process "Finder" to (get windows)
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to (get windows)
 on error (assistiveAccessTestErrorMessage)
 	if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
 		if (isMojaveOrNewer) then
 			try
-				tell application ("Finger" & "Mgmt") to every window -- To prompt for Automation access on Mojave
+				tell application id ("com.yellowagents." & "FingerMgmt") to every window -- To prompt for Automation access on Mojave (Break up App ID or else build will fail if not found during compilation when app is not installed.)
 			on error automationAccessErrorMessage number automationAccessErrorNumber
 				if (automationAccessErrorNumber is equal to -1743) then
 					try
-						tell application "System Preferences" to activate
+						tell application id "com.apple.systempreferences" to activate
 					end try
 					try
 						do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -245,16 +245,16 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			end try
 			try
 				with timeout of 1 second
-					tell application ("Finger" & "Mgmt") to quit
+					tell application id ("com.yellowagents." & "FingerMgmt") to quit -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 				end timeout
 			end try
 		end if
 		
 		try
-			tell application "Finder" to reveal (path to me)
+			tell application id "com.apple.finder" to reveal (path to me)
 		end try
 		try
-			tell application "System Preferences"
+			tell application id "com.apple.systempreferences"
 				try
 					activate
 				end try
@@ -396,10 +396,10 @@ end repeat
 repeat
 	
 	repeat
-		if (application ("Finger" & "Mgmt") is running) then
+		if (application id ("com.yellowagents." & "FingerMgmt") is running) then
 			try
 				with timeout of 1 second
-					tell application ("Finger" & "Mgmt") to quit
+					tell application id ("com.yellowagents." & "FingerMgmt") to quit
 				end timeout
 			end try
 			delay 1
@@ -409,10 +409,10 @@ repeat
 	end repeat
 	
 	try
-		tell application ("Finger" & "Mgmt") to activate
+		tell application id ("com.yellowagents." & "FingerMgmt") to activate
 	end try
 	
-	tell application "System Events" to tell application process ("Finger" & "Mgmt")
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.yellowagents.FingerMgmt")
 		repeat
 			if ((count of windows) = 1) then exit repeat
 			delay 1
@@ -425,12 +425,12 @@ repeat
 	end tell
 	
 	--repeat
-	--	if (application ("Finger" & "Mgmt") is not running) then exit repeat
-	--	tell application "System Events" to tell application process ("Finger" & "Mgmt")
+	--	if (application id ("com.yellowagents." & "FingerMgmt") is not running) then exit repeat
+	--	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.yellowagents.FingerMgmt")
 	--		if (((count of windows) = 0)) then
 	--			try
 	--				with timeout of 1 second
-	--					tell application ("Finger" & "Mgmt") to quit
+	--					tell application id ("com.yellowagents." & "FingerMgmt") to quit
 	--				end timeout
 	--			end try
 	--			exit repeat
@@ -439,7 +439,7 @@ repeat
 	--	delay 1
 	--end repeat
 	
-	tell application ("Finger" & "Mgmt")
+	tell application id ("com.yellowagents." & "FingerMgmt")
 		repeat
 			try
 				try
@@ -597,7 +597,7 @@ end repeat
 
 try
 	(("/Applications/Keyboard Test.app" as POSIX file) as alias)
-	if (application ("Keyboard" & " Test") is not running) then
+	if (application id ("org.freegeek." & "Keyboard-Test") is not running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 		try
 			activate
 		end try

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.24-1
+-- Version: 2022.11.29-1
 
 -- App Icon is “Optical Disc” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -64,8 +64,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -121,7 +121,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -151,13 +151,15 @@ end considering
 set iTunesOrMusic to "iTunes"
 if (isCatalinaOrNewer) then set iTunesOrMusic to "Music"
 
+set iTunesOrMusicID to ("com.apple." & iTunesOrMusic)
+
 if (isMojaveOrNewer) then
 	try
-		tell application "System Events" to every window -- To prompt for Automation access on Mojave
+		tell application id "com.apple.systemevents" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences" to activate
+				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
 				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -193,16 +195,16 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 end if
 
 try
-	tell application "System Events" to tell application process "Finder" to (get windows)
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to (get windows)
 on error (assistiveAccessTestErrorMessage)
 	if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
 		if (isMojaveOrNewer) then
 			try
-				tell application iTunesOrMusic to every window -- To prompt for Automation access on Mojave
+				tell application id iTunesOrMusicID to every window -- To prompt for Automation access on Mojave
 			on error automationAccessErrorMessage number automationAccessErrorNumber
 				if (automationAccessErrorNumber is equal to -1743) then
 					try
-						tell application "System Preferences" to activate
+						tell application id "com.apple.systempreferences" to activate
 					end try
 					try
 						do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -235,14 +237,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 					delay 10
 				end if
 			end try
-			tell application iTunesOrMusic to quit
+			tell application id iTunesOrMusicID to quit
 		end if
 		
 		try
-			tell application "Finder" to reveal (path to me)
+			tell application id "com.apple.finder" to reveal (path to me)
 		end try
 		try
-			tell application "System Preferences"
+			tell application id "com.apple.systempreferences"
 				try
 					activate
 				end try
@@ -283,7 +285,7 @@ end try
 
 try
 	with timeout of 1 second
-		tell application "DVD Player" to quit
+		tell application id "com.apple.DVDPlayer" to quit
 	end timeout
 end try
 
@@ -299,9 +301,9 @@ end try
 
 try
 	run script "
-		if (application \"" & iTunesOrMusic & "\" is running) then tell application \"" & iTunesOrMusic & "\" to set visible of browser window 1 to true
+		if (application id \"" & iTunesOrMusicID & "\" is running) then tell application id \"" & iTunesOrMusicID & "\" to set visible of browser window 1 to true
 		
-		tell application \"" & iTunesOrMusic & "\"
+		tell application id \"" & iTunesOrMusicID & "\"
 			try
 				activate
 			end try
@@ -320,7 +322,7 @@ try
 end try
 
 try
-	tell application "System Events" to tell application process iTunesOrMusic
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is iTunesOrMusicID)
 		set frontmost to true
 		keystroke return -- To close possible CD Lookup Results window (which doesn't show up when getting windows with AppleScript).
 	end tell
@@ -336,7 +338,7 @@ try
 end try
 
 try
-	tell application "System Events" to tell application process iTunesOrMusic
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is iTunesOrMusicID)
 		set frontmost to true
 		repeat with thisButton in (buttons of window 1)
 			if ((name of thisButton) is "No Thanks") then
@@ -352,7 +354,7 @@ delay 0.5
 
 try
 	run script "
-		tell application \"" & iTunesOrMusic & "\"
+		tell application id \"" & iTunesOrMusicID & "\"
 			try
 				activate
 			end try

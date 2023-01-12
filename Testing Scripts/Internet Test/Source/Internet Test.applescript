@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.24-1
+-- Version: 2022.11.29-1
 
 -- App Icon is “Satellite Antenna” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -62,8 +62,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -122,7 +122,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string))))
+		doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text))))
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -179,9 +179,9 @@ repeat
 		set AppleScript's text item delimiters to ": "
 		repeat with thisNetworkInterfaceLine in (paragraphs of allNetworkInterfaces)
 			if (thisNetworkInterfaceLine starts with "Hardware Port:") then
-				set thisNetworkDeviceName to ((last text item of thisNetworkInterfaceLine) as string)
+				set thisNetworkDeviceName to ((last text item of thisNetworkInterfaceLine) as text)
 			else if (thisNetworkInterfaceLine starts with "Device:") then
-				set thisNetworkDeviceID to ((last text item of thisNetworkInterfaceLine) as string)
+				set thisNetworkDeviceID to ((last text item of thisNetworkInterfaceLine) as text)
 				if (thisNetworkDeviceName contains "Wi-Fi") then
 					set (end of wiFiNetworkDeviceIDs) to thisNetworkDeviceID
 				else if ((thisNetworkDeviceName contains "Ethernet") or (thisNetworkDeviceName contains " LAN")) then
@@ -679,7 +679,7 @@ end repeat
 
 try
 	(("/Applications/Audio Test.app" as POSIX file) as alias)
-	if (application ("Audio" & " Test") is not running) then
+	if (application id ("org.freegeek." & "Audio-Test") is not running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 		try
 			activate
 		end try
@@ -690,26 +690,26 @@ Would you like to launch “Audio Test”?" buttons {"No", "Yes"} cancel button 
 end try
 
 on openTestSitesInSafari()
-	tell application "Safari"
+	tell application id "com.apple.Safari"
 		try
 			activate
 		end try
 		close every window without saving
 	end tell
 	
-	tell application "System Events" to keystroke "n" using {shift down, command down} -- Open New Private Window
+	tell application id "com.apple.systemevents" to keystroke "n" using {shift down, command down} -- Open New Private Window
 	
 	repeat 10 times
 		delay 1
-		tell application "Safari"
+		tell application id "com.apple.Safari"
 			if ((count of windows) ≥ 1) then exit repeat -- Make sure New Private Window is Open
 		end tell
 	end repeat
 	
-	tell application "System Events" to keystroke tab -- Tab to take focus out of address field
+	tell application id "com.apple.systemevents" to keystroke tab -- Tab to take focus out of address field
 	
-	tell application "Safari"
-		if (application "Safari" is not running) then
+	tell application id "com.apple.Safari"
+		if (application id "com.apple.Safari" is not running) then
 			open location "https://google.com"
 			try
 				activate
@@ -737,7 +737,7 @@ on openTestSitesInSafari()
 end openTestSitesInSafari
 
 on doShellScriptAsAdmin(command)
-	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_ & https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_4/RN-10_4.html#//apple_ref/doc/uid/TP40000982-CH104-SW10
 	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
 	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
 	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.

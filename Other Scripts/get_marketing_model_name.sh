@@ -1,10 +1,11 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 get_marketing_model_name() {
 	##
 	## Created by Pico Mitchell (of Free Geek)
 	##
-	## Version: 2022.10.6-1
+	## Version: 2023.1.10-1
 	##
 	## MIT License
 	##
@@ -66,7 +67,7 @@ get_marketing_model_name() {
 	if $IS_APPLE_SILICON; then
 		# This local Marketing Model Name within "ioreg" only exists on Apple Silicon Macs.
 		if $VERBOSE_LOGGING; then >&2 echo 'DEBUG - LOADING FROM IOREG ON APPLE SILICON'; fi
-		possible_marketing_model_name="$(PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< "$(ioreg -arc IOPlatformDevice -k product-name)" 2> /dev/null | tr -dc '[:print:]')" # Remove non-printable characters because this decoded value could end with a null char.
+		possible_marketing_model_name="$(PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< "$(ioreg -arc IOPlatformDevice -k product-name)" 2> /dev/null | tr -d '[:cntrl:]')" # Remove control characters because this decoded value could end with a NUL char.
 
 		if $IS_VIRTUAL_MACHINE; then
 			# It appears that Apple Silicon Virtual Machines will always output "Apple Virtual Machine 1" as their local Marketing Model Name from the previous "ioreg" command.
@@ -97,28 +98,50 @@ get_marketing_model_name() {
 			local model_characters_of_serial_number="${SERIAL_NUMBER:8}"
 			local marketing_model_name_was_cached=false
 
-			if [[ "${EUID:-$(id -u)}" == '0' ]]; then # If running as root, check for the cached Marketing Model Name from the current user and if not found check for it from any and all other users.
-				local current_user_id
-				current_user_id="$(echo 'show State:/Users/ConsoleUser' | scutil | awk '($1 == "UID") { print $NF; exit }')"
-				local current_user_name
-				if [[ -n "${current_user_id}" ]] && (( current_user_id != 0 )); then
-					current_user_name="$(dscl /Search -search /Users UniqueID "${current_user_id}" 2> /dev/null | awk '{ print $1; exit }')"
+			local logged_in_user_id
+			logged_in_user_id="$(echo 'show State:/Users/ConsoleUser' | scutil | awk '(($1 == "Name") && (($NF == "loginwindow") || ($NF ~ /^_/))) { exit } ($1 == "UID") { print $NF; exit }')"
+			# NOTES ABOUT RETRIEVING LOGGED IN USER VIA "scutil" (RATHER THAN USING "stat")
+			# Retrieving the logged in user UID with "stat -f '%u' /dev/console" will returns "0" (for the "root" user) very early on boot before any user is logged in and before even getting to the login window, and it will also return "0" when at the login window.
+			# Both of those scenarios could be mistaken for the "root" user actually being logged in graphically if the "stat" technique is used instead of "scutil".
+			# Using "scutil" (with some "awk" filtering) can do better in both of those situations vs using "stat" to be able to return an empty string early on boot and at the login window while correctly returning the logged in user UID when a user is actually logged in (even if that is actually the root user).
+			# Early on boot (before getting to the login window), "echo 'show State:/Users/ConsoleUser' | scutil" will return "No such key" so an empty string will be returned after piping to "awk" since no "UID" field would be found.
+			# When at the intial boot login window, there will be no top level "Name" or "UID" fields, but there will be "SessionInfo" array with either the "root" user (UID 0) indicated on macOS 10.14 Mojave and older or "_windowserver" user (UID 88)
+			# indicated on macOS 10.15 Catalina and newer, but those "SessionInfo" fields are NOT checked by this code. So an empty string will be properly returned when at the initial boot login window after piping to "awk".
+			# When at the login window after a user has logged out, the top level "Name" will be "loginwindow" (and "UID" will be "0") on macOS 10.15 Catalina and newer so we want to ignore it and return an empty string so that the "root" user is not
+			# considered to be logged in at the login window (on macOS 10.14 Mojave and older, the same info as the initial boot login window as described above is also shown after logout which will also result in an empty string being properly returned).
+			# Also, return an empty string if any service/role account is logged in which would start with "_" (such as "_mbsetupuser" which would indicate that the system is at Setup Assistant).
+			# Otherwise return the actual logged in user UID (which could be "0" if actually logged in as root, even though that is quite rare and not a recommended thing to do).
+			# For more information, see https://scriptingosx.com/2020/02/getting-the-current-user-in-macos-update/
+
+			local is_logged_in_as_root=false
+			if [[ -n "${logged_in_user_id}" ]] && (( logged_in_user_id == 0 )); then
+				is_logged_in_as_root=true
+			fi
+
+			local logged_in_user_name=''
+			if ! $is_logged_in_as_root && (( ${EUID:-$(id -u)} == 0 )); then
+				# If running as root (but not logged in graphically as root), check for the cached Marketing Model Name from the logged in user, if a user is logged it.
+				# If not found or no user is logged in, check for the cached Marketing Model Name from other users with home folders within "/Users".
+				# If runnning as root and the root user is graphically logged in (which is rare but possible), only their preferences will be checked (and cached to) just like any other running user (even though they could technically check other users preferences).
+
+				if [[ -n "${logged_in_user_id}" ]]; then
+					logged_in_user_name="$(dscl /Search -search /Users UniqueID "${logged_in_user_id}" 2> /dev/null | awk '{ print $1; exit }')"
 				fi
 
-				if [[ -n "${current_user_name}" ]]; then # Always check cached preferences for current user first so that we know whether or not it needs to be cached for the current user if it is already cached for another user.
-					if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING CURRENT USER ${current_user_name} DEFAULTS"; fi
+				if [[ -n "${logged_in_user_name}" ]]; then # Always check cached preferences for logged in user first so that we know whether or not it needs to be cached for the logged in user if it is already cached for another user.
+					if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING LOGGED IN USER ${logged_in_user_name} DEFAULTS"; fi
 					# Since "defaults read" has no option to traverse into keys of dictionary values, use the whole "defaults export" output and parse it with "PlistBuddy" to get at the specific key of the "CPU Names" dictionary value that we want.
 					# Using "defaults export" instead of accessing the plist file directly with "PlistBuddy" is important since preferences are not guaranteed to be written to disk if they were just set.
-					possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${model_characters_of_serial_number}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${current_user_id}" sudo -u "${current_user_name}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)"
+					possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${model_characters_of_serial_number}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${logged_in_user_id}" sudo -u "${logged_in_user_name}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)"
 
 					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM CURRENT USER ${current_user_name} CACHE"; fi
+						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM LOGGED IN USER ${logged_in_user_name} CACHE"; fi
 						marketing_model_name="${possible_marketing_model_name}"
 						marketing_model_name_was_cached=true
 					fi
 				fi
 
-				if [[ -z "${marketing_model_name}" ]]; then # If was not cached for current user, check any and all other users.
+				if [[ -z "${marketing_model_name}" ]]; then # If was not cached for logged in user, check other users with home folders in "/Users" (there could technically users with home folders in other locations, but this is thorough enough for normal scenarios).
 					local this_home_folder
 					local user_name_for_home
 					local user_id_for_home
@@ -129,7 +152,7 @@ get_marketing_model_name() {
 							if [[ -n "${user_name_for_home}" ]]; then
 								user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)"
 
-								if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' && ( -z "${current_user_name}" || "${current_user_name}" != "${user_name_for_home}" ) ]]; then # No need to check current user in this loop since it was already checked.
+								if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' && "${user_name_for_home}" != "${logged_in_user_name}" ]]; then # No need to check logged in user in this loop since it was already checked.
 									if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING ${this_home_folder} DEFAULTS"; fi
 									possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${model_characters_of_serial_number}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${user_id_for_home}" sudo -u "${user_name_for_home}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
 
@@ -137,27 +160,27 @@ get_marketing_model_name() {
 										if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM ${this_home_folder} CACHE"; fi
 										marketing_model_name="${possible_marketing_model_name}"
 
-										if [[ -z "${current_user_name}" ]]; then # DO NOT consider the Marketing Model Name cached if there is a current user that it was not cached for so that it can be cached to the current user.
+										if [[ -z "${logged_in_user_name}" ]]; then # DO NOT consider the Marketing Model Name cached if there is a logged in user that it was not cached for so that it can be cached to the logged in user.
 											marketing_model_name_was_cached=true
 										elif $VERBOSE_LOGGING; then
-											>&2 echo 'DEBUG - NOT CONSIDERING IT CACHED SINCE THERE IS A CURRENT USER'
+											>&2 echo 'DEBUG - NOT CONSIDERING IT CACHED SINCE THERE IS A LOGGED IN USER'
 										fi
 
 										break
 									fi
 								elif $VERBOSE_LOGGING; then
-									>&2 echo "DEBUG - SKIPPING ${this_home_folder} SINCE IS CURRENT USER"
+									>&2 echo "DEBUG - SKIPPING ${this_home_folder} SINCE IS LOGGED IN USER"
 								fi
 							fi
 						fi
 					done
 				fi
-			else # If running as a user, won't be able to check others home folders, so only check current user preferences.
-				if $VERBOSE_LOGGING; then >&2 echo 'DEBUG - CHECKING CURRENT USER DEFAULTS'; fi
+			else # If running as a user, won't be able to check others home folders, so only check running user preferences.
+				if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING RUNNING USER $(id -un) DEFAULTS"; fi
 				possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${model_characters_of_serial_number}-en-US_US" /dev/stdin <<< "$(defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
 
 				if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-					if $VERBOSE_LOGGING; then >&2 echo 'DEBUG - LOADED FROM CURRENT USER CACHE'; fi
+					if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM RUNNING USER $(id -un) CACHE"; fi
 					marketing_model_name="${possible_marketing_model_name}"
 					marketing_model_name_was_cached=true
 				fi
@@ -165,13 +188,13 @@ get_marketing_model_name() {
 
 			if [[ -z "${marketing_model_name}" ]]; then
 				local marketing_model_name_xml
-				marketing_model_name_xml="$(curl -m 5 -sL "https://support-sp.apple.com/sp/product?cc=${model_characters_of_serial_number}" 2> /dev/null)"
+				marketing_model_name_xml="$(curl -m 5 -sfL "https://support-sp.apple.com/sp/product?cc=${model_characters_of_serial_number}" 2> /dev/null)"
 
 				if [[ "${marketing_model_name_xml}" == '<?xml'* ]]; then
 					possible_marketing_model_name="$(echo "${marketing_model_name_xml}" | xmllint --xpath '//configCode/text()' - 2> /dev/null)"
 
 					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-						if $VERBOSE_LOGGING; then >&2 echo 'DEBUG - LOADED FROM "About This Mac" URL API'; fi
+						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM \"About This Mac\" URL API: ${possible_marketing_model_name}"; fi
 						marketing_model_name="${possible_marketing_model_name}"
 					else
 						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - INVALID FROM \"About This Mac\" URL API (${possible_marketing_model_name:-N/A}): ${marketing_model_name_xml}"; fi
@@ -191,13 +214,13 @@ get_marketing_model_name() {
 				# Also worth noting that this technique also works for the new randomized 10 character serial numbers for Apple Silicon Macs, but the local Marketing Model Name will always be retrieved instead on Apple Silicon Macs.
 
 				local serial_search_results_json
-				serial_search_results_json="$(curl -m 5 -sL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${SERIAL_NUMBER}" 2> /dev/null)"
+				serial_search_results_json="$(curl -m 5 -sfL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${SERIAL_NUMBER}" 2> /dev/null)"
 
 				if [[ "${serial_search_results_json}" == *'"id":'* ]]; then # A valid JSON structure containing an "id" key should always be returned, even for invalid serials.
-					possible_marketing_model_name="$(OSASCRIPT_ENV_JSON="${serial_search_results_json}" osascript -l 'JavaScript' -e 'JSON.parse($.NSProcessInfo.processInfo.environment.objectForKey("OSASCRIPT_ENV_JSON").js).name' 2> /dev/null)" # Parsing JSON with JXA: https://paulgalow.com/how-to-work-with-json-api-data-in-macos-shell-scripts
+					possible_marketing_model_name="$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).name' -- "${serial_search_results_json}" 2> /dev/null)" # Parsing JSON with JXA: https://paulgalow.com/how-to-work-with-json-api-data-in-macos-shell-scripts & https://twitter.com/n8henrie/status/1529513429203300352
 
 					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-						if $VERBOSE_LOGGING; then >&2 echo 'DEBUG - LOADED FROM "Specs Search" URL API'; fi
+						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM \"Specs Search\" URL API: ${possible_marketing_model_name}"; fi
 						marketing_model_name="${possible_marketing_model_name}"
 						load_fallback_marketing_model_name=false
 					else
@@ -215,20 +238,21 @@ get_marketing_model_name() {
 				if [[ -n "${marketing_model_name}" ]]; then
 					if ! $marketing_model_name_was_cached; then
 						# Cache the Marketing Model Name into the "About This Mac" preference key...
-							# for the current user, if there is a current user (whether or not running as root), and the Marketing Model Name was downloaded or was loaded from another users cache,
-							# OR for the first valid home folder detected if running as root and there is no current user and the Marketing Model Name was downloaded.
+							# for the running user (if not running as root, unless graphically logged in as root) if the Marketing Model Name was downloaded,
+							# OR if running as root, for the logged in user (if a user is logged in) and the Marketing Model Name was downloaded or was loaded from another users cache,
+							# OR for the first valid home folder detected within "/Users" if running as root and there is no user logged in and the Marketing Model Name was downloaded.
 
 						local cpu_name_key_for_serial="${model_characters_of_serial_number}-en-US_US"
 						local quoted_marketing_model_name_for_defaults
 						quoted_marketing_model_name_for_defaults="$([[ "${marketing_model_name}" =~ [\(\)] ]] && echo "'${marketing_model_name}'" || echo "${marketing_model_name}")"
 						# If the model contains parentheses, "defaults write" has trouble with it and the value needs to be specially quoted: https://apple.stackexchange.com/questions/300845/how-do-i-handle-e-g-correctly-escape-parens-in-a-defaults-write-key-val#answer-300853
 
-						if [[ "${EUID:-$(id -u)}" == '0' ]]; then
+						if ! $is_logged_in_as_root && (( ${EUID:-$(id -u)} == 0 )); then # As noted above, if graphically logged in as root, only cache to their preferences just like when running as any other user.
 							local user_id_for_cache
 							local user_name_for_cache
-							if [[ -n "${current_user_name}" ]]; then # Always cache for current user if there is one.
-								user_id_for_cache="${current_user_id}"
-								user_name_for_cache="${current_user_name}"
+							if [[ -n "${logged_in_user_name}" ]]; then # Always cache for logged in user if there is one.
+								user_id_for_cache="${logged_in_user_id}"
+								user_name_for_cache="${logged_in_user_name}"
 							else # Otherwise cache to first valid home folder detected.
 								for this_home_folder in '/Users/'*; do
 									if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
@@ -247,21 +271,26 @@ get_marketing_model_name() {
 								done
 							fi
 
-							if [[ -n "${user_id_for_cache}" && "${user_name_for_cache}" != '0' && -n "${user_name_for_cache}" ]]; then
+							if [[ -n "${user_id_for_cache}" && "${user_id_for_cache}" != '0' && -n "${user_name_for_cache}" ]]; then
 								launchctl asuser "${user_id_for_cache}" sudo -u "${user_name_for_cache}" defaults write com.apple.SystemProfiler 'CPU Names' -dict-add "${cpu_name_key_for_serial}" "${quoted_marketing_model_name_for_defaults}"
 
 								if $VERBOSE_LOGGING; then
-									>&2 echo "DEBUG - CACHED FOR ${user_name_for_cache}"
+									if [[ "${logged_in_user_name}" == "${user_name_for_cache}" ]]; then
+										>&2 echo "DEBUG - CACHED FOR LOGGED IN USER ${user_name_for_cache}"
+									else
+										>&2 echo "DEBUG - CACHED FOR OTHER USER ${user_name_for_cache}"
+									fi
+
 									>&2 launchctl asuser "${user_id_for_cache}" sudo -u "${user_name_for_cache}" defaults read com.apple.SystemProfiler 'CPU Names'
 								fi
 							elif $VERBOSE_LOGGING; then
-								>&2 echo 'DEBUG - NO USERS TO CACHE FOR'
+								>&2 echo 'DEBUG - NO USER TO CACHE FOR'
 							fi
 						else
 							defaults write com.apple.SystemProfiler 'CPU Names' -dict-add "${cpu_name_key_for_serial}" "${quoted_marketing_model_name_for_defaults}"
 
 							if $VERBOSE_LOGGING; then
-								>&2 echo 'DEBUG - CACHED FOR CURRENT USER'
+								>&2 echo "DEBUG - CACHED FOR RUNNING USER $(id -un)"
 								>&2 defaults read com.apple.SystemProfiler 'CPU Names'
 							fi
 						fi

@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # MIT License
@@ -16,37 +17,44 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
+PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
 readonly MIST_PATH='/usr/local/bin/mist'
 
 installer_dmgs_path="${HOME}/Documents/Programming/Free Geek/MacLand Images/macOS Installers"
 
-declare -a installer_names_to_download=( 'High Sierra' 'Mojave' 'Catalina' 'Big Sur' 'Monterey' 'Ventura' )
+declare -a installer_names_to_download=( 'Big Sur' 'Monterey' 'Ventura' ) # NOT including 'High Sierra' 'Mojave' 'Catalina' anymore since the latest installers are already downloaded and they will never get any new updates.
 
 for this_installer_name_to_download in "${installer_names_to_download[@]}"; do
-	mist_list_options=( 'list' 'installer' )
+	mist_list_options=( 'list' 'installer' "${this_installer_name_to_download}" )
 	if [[ "${this_installer_name_to_download}" == *' beta' ]]; then
 		mist_list_options+=( '-b' )
 	fi
-	mist_list_options+=( '-l' '-q' '-o' 'plist' "${this_installer_name_to_download}" )
+	mist_list_options+=( '-lqo' 'json' )
 
-	this_installer_info_plist="$("${MIST_PATH}" "${mist_list_options[@]}")"
+	this_installer_info_json="$("${MIST_PATH}" "${mist_list_options[@]}")"
 
-	this_installer_name="$(PlistBuddy -c 'Print :0:name' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
-	this_installer_build="$(PlistBuddy -c 'Print :0:build' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
-	this_installer_version="$(PlistBuddy -c 'Print :0:version' /dev/stdin <<< "${this_installer_info_plist}" 2> /dev/null)"
+	IFS=$'\n' read -rd '' -a this_installer_info < <(osascript -l 'JavaScript' -e '
+function run(argv) {
+	const latestInstallerDict = JSON.parse(argv[0])[0]
+	return [latestInstallerDict.name, latestInstallerDict.version, latestInstallerDict.build].join("\n")
+}
+' -- "${this_installer_info_json}")
+# NOTE: Because of JavaScript behavior, any "undefined" (or "null") values in an array would be turned into empty strings when using "join", making them empty lines.
+# And, because of bash behaviors with whitespace IFS treating consecutive whitespace as a single delimiter (explained in https://mywiki.wooledge.org/IFS),
+# any empty lines will NOT be included in the bash array being created with this technique to set all lines to an array.
+# So, that means if any of these values are not found, the bash array WILL NOT have a count of exactly 3 which we can check to verify all required values were properly loaded.
 
-	if [[ -n "${this_installer_name}" && -n "${this_installer_build}" && -n "${this_installer_version}" ]]; then
-		this_installer_dmg_name="Install ${this_installer_name} ${this_installer_version}-${this_installer_build}.dmg"
+	if (( ${#this_installer_info[@]} == 3 )); then
+		this_installer_dmg_name="Install ${this_installer_info[0]} ${this_installer_info[1]}-${this_installer_info[2]}.dmg"
 
 		if [[ -f "${installer_dmgs_path}/${this_installer_dmg_name}" ]]; then
 			echo "\"${this_installer_dmg_name}\" is up-to-date!"
 		else
 			echo "\"${this_installer_dmg_name}\" needs to be downloaded..."
-			rm -f "${installer_dmgs_path}/Install ${this_installer_name} "*'.dmg' # Delete any outdated installer dmgs.
+			rm -f "${installer_dmgs_path}/Install ${this_installer_info[0]} "*'.dmg' # Delete any outdated installer dmgs.
 
-			mist_download_options=( 'download' 'installer' "${this_installer_name}" 'image' )
+			mist_download_options=( 'download' 'installer' "${this_installer_info[0]}" 'image' )
 			if [[ "${this_installer_name_to_download}" == *' beta' ]]; then
 				mist_download_options+=( '-b' )
 			fi
@@ -55,6 +63,6 @@ for this_installer_name_to_download in "${installer_names_to_download[@]}"; do
 			sudo "${MIST_PATH}" "${mist_download_options[@]}"
 		fi
 	else
-		echo "\"${this_installer_name_to_download}\" WAS NOT FOUND!"
+		echo "\"${this_installer_name_to_download}\" WAS NOT FOUND: $(declare -p this_installer_info | cut -d '=' -f 2-)"
 	fi
 done

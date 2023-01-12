@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.26-1
+-- Version: 2023.1.10-1
 
 -- App Icon is “Microscope” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -62,8 +62,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -122,7 +122,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -151,11 +151,11 @@ end considering
 
 if (isMojaveOrNewer) then
 	try
-		tell application "System Events" to every window -- To prompt for Automation access on Mojave
+		tell application id "com.apple.systemevents" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences" to activate
+				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
 				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -195,14 +195,14 @@ try
 	((aboutThisMacAppPath as POSIX file) as alias)
 on error
 	try
-		tell application "System Events" to tell application process "Finder" to (get windows)
+		tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to (get windows)
 	on error (assistiveAccessTestErrorMessage)
 		if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
 			try
-				tell application "Finder" to reveal (path to me)
+				tell application id "com.apple.finder" to reveal (path to me)
 			end try
 			try
-				tell application "System Preferences"
+				tell application id "com.apple.systempreferences"
 					try
 						activate
 					end try
@@ -245,11 +245,11 @@ end try
 repeat
 	repeat 3 times -- Will exit early if got Hardware, Memory, and Graphics info. But try 3 times in case these critical things didn't load.
 		try
-			tell application "System Events" to tell current location of network preferences
+			tell application id "com.apple.systemevents" to tell current location of network preferences
 				repeat with thisActiveNetworkService in (every service whose active is true)
-					if (((name of interface of thisActiveNetworkService) as string) is equal to "Wi-Fi") then
+					if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
 						try
-							do shell script ("networksetup -setairportpower " & ((id of interface of thisActiveNetworkService) as string) & " on")
+							do shell script ("networksetup -setairportpower " & ((id of interface of thisActiveNetworkService) as text) & " on")
 						end try
 					end if
 				end repeat
@@ -272,7 +272,7 @@ repeat
 		set showAboutMacWindowButton to false
 		
 		set AppleScript's text item delimiters to ""
-		set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+		set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 		
 		set hardwareInfoPath to tmpPath & "hardwareInfo.plist"
 		set restOfSystemOverviewInfoPath to tmpPath & "restOfSystemOverviewInfo.plist"
@@ -312,11 +312,11 @@ repeat
 			set showSystemInfoAppButton to false
 			try
 				do shell script "system_profiler -xml SPHardwareDataType > " & (quoted form of hardwareInfoPath)
-				tell application "System Events" to tell property list file hardwareInfoPath
+				tell application id "com.apple.systemevents" to tell property list file hardwareInfoPath
 					set hardwareItems to (first property list item of property list item "_items" of first property list item)
 					
 					try
-						set serialNumber to ((value of property list item "serial_number" of hardwareItems) as string) -- https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/
+						set serialNumber to ((value of property list item "serial_number" of hardwareItems) as text) -- https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/
 						if (serialNumber is equal to "Not Available") then
 							set serialNumber to "UNKNOWNXXXXX"
 						else if ((length of serialNumber) ≥ 11) then
@@ -330,12 +330,12 @@ repeat
 						set serialNumber to "UNKNOWNXXXXX"
 					end try
 					
-					set shortModelName to ((value of property list item "machine_name" of hardwareItems) as string)
+					set shortModelName to ((value of property list item "machine_name" of hardwareItems) as text)
 					if ((words of shortModelName) contains "MacBook") then
 						set computerIcon to "💻"
 						set isLaptop to true
 					end if
-					set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
+					set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as text)
 					set modelIdentifierName to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -d '[:digit:],'") -- Need use this whenever comparing along with Model ID numbers since there could be false matches for the newer "MacXX,Y" style Model IDs if I used shortModelName in those conditions instead (which I used to do).
 					set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
 					set AppleScript's text item delimiters to ","
@@ -355,21 +355,21 @@ repeat
 					
 					if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 18)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 14)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 7)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsVentura to true
 					
-					set memorySize to ((value of property list item "physical_memory" of hardwareItems) as string)
+					set memorySize to ((value of property list item "physical_memory" of hardwareItems) as text)
 					
 					try
-						set chipType to ((value of property list item "chip_type" of hardwareItems) as string) -- This will only exist when running natively on Apple Silicon
+						set chipType to ((value of property list item "chip_type" of hardwareItems) as text) -- This will only exist when running natively on Apple Silicon
 						set isAppleSilicon to true
 					end try
 					
 					try
-						set processorsCount to ((value of property list item "packages" of hardwareItems) as string) -- This will only exist on Intel or Apple Silicon under Rosetta
+						set processorsCount to ((value of property list item "packages" of hardwareItems) as text) -- This will only exist on Intel or Apple Silicon under Rosetta
 					end try
 					
-					set processorTotalCoreCount to ((value of property list item "number_processors" of hardwareItems) as string)
+					set processorTotalCoreCount to ((value of property list item "number_processors" of hardwareItems) as text)
 					
 					try
-						set processorHyperthreadingValue to ((value of property list item "platform_cpu_htt" of hardwareItems) as string) -- This will only exist on Mojave and newer
+						set processorHyperthreadingValue to ((value of property list item "platform_cpu_htt" of hardwareItems) as text) -- This will only exist on Mojave and newer
 					end try
 				end tell
 				set didGetHardwareInfo to true
@@ -428,7 +428,7 @@ repeat
 		set restOfSystemOverviewInfoToLoad to {"SPMemoryDataType", "SPNVMeDataType", "SPSerialATADataType", "SPDisplaysDataType", "SPAirPortDataType", "SPBluetoothDataType", "SPDiscBurningDataType"}
 		if (isLaptop) then set (end of restOfSystemOverviewInfoToLoad) to "SPPowerDataType"
 		set AppleScript's text item delimiters to space
-		set systemProfilerPID to (do shell script "system_profiler -xml " & (restOfSystemOverviewInfoToLoad as string) & " > " & (quoted form of restOfSystemOverviewInfoPath) & " 2> /dev/null & echo $!")
+		set systemProfilerPID to (do shell script "system_profiler -xml " & (restOfSystemOverviewInfoToLoad as text) & " > " & (quoted form of restOfSystemOverviewInfoPath) & " 2> /dev/null & echo $!")
 		
 		
 		set progress completed steps to (progress completed steps + 1)
@@ -492,19 +492,19 @@ repeat
 				set AppleScript's text item delimiters to {"Genuine", "Intel", "(R)", "(TM)", "CPU", "GHz", "processor"}
 				set processorInfoParts to (every text item of rawProcessorBrandString)
 				set AppleScript's text item delimiters to space
-				set processorInfoParts to (words of (processorInfoParts as string))
-				set processorSpeed to ((last item of processorInfoParts) as string)
+				set processorInfoParts to (words of (processorInfoParts as text))
+				set processorSpeed to ((last item of processorInfoParts) as text)
 				if ((last character of processorSpeed) is equal to "0") then set processorSpeed to (text 1 thru -2 of processorSpeed)
 				set processorInfoParts to (text items 1 thru -2 of processorInfoParts)
 				set processorModelFrom to {"Core i", "Core 2 Duo"}
 				set processorModelTo to {"i", "C2D"}
-				set processorModelPart to (processorInfoParts as string)
+				set processorModelPart to (processorInfoParts as text)
 				repeat with i from 1 to (count of processorModelFrom)
 					set AppleScript's text item delimiters to (text item i of processorModelFrom)
 					set processorModelCoreParts to (every text item of processorModelPart)
 					if ((count of processorModelCoreParts) ≥ 2) then
 						set AppleScript's text item delimiters to (text item i of processorModelTo)
-						set processorModelPart to (processorModelCoreParts as string)
+						set processorModelPart to (processorModelCoreParts as text)
 					end if
 				end repeat
 				
@@ -581,14 +581,14 @@ repeat
 				
 				if (designCapacityMhA is equal to 0) then error "No Battery Found"
 				set batteryCapacityPercentageLimit to 75
-				set batteryCapacityPercentageNumber to (((round (((maxCapacityMhA / designCapacityMhA) * 100) * 10)) / 10) as string)
+				set batteryCapacityPercentageNumber to (((round (((maxCapacityMhA / designCapacityMhA) * 100) * 10)) / 10) as text)
 				if ((text -2 thru -1 of batteryCapacityPercentageNumber) is equal to ".0") then set batteryCapacityPercentageNumber to (text 1 thru -3 of batteryCapacityPercentageNumber)
 				set batteryCapacityPercentageNumber to (batteryCapacityPercentageNumber as number)
 				if (batteryCapacityPercentageNumber is equal to 0) then error "No Battery Found"
 				
 				set pluralizeCycles to "Cycle"
 				if (cycleCount is not equal to 1) then set pluralizeCycles to "Cycles"
-				set batteryCapacityPercentage to (batteryCapacityPercentageNumber as string) & "% (Remaining of Design Capacity) + " & cycleCount & " " & pluralizeCycles
+				set batteryCapacityPercentage to (batteryCapacityPercentageNumber as text) & "% (Remaining of Design Capacity) + " & cycleCount & " " & pluralizeCycles
 				if (batteryCapacityPercentageNumber < batteryCapacityPercentageLimit) then
 					set batteryCapacityPercentage to batteryCapacityPercentage & "
 	⚠️	BELOW " & batteryCapacityPercentageLimit & "% DESIGN CAPACITY  ⚠️"
@@ -789,7 +789,7 @@ repeat
 		if (isAppleSilicon) then
 			try
 				-- This local marketing model name only exists on Apple Silicon Macs.
-				set marketingModelName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< \"$(ioreg -arc IOPlatformDevice -k product-name)\" | tr -dc '[:print:]'"))) -- Remove non-printable characters because this decoded value could end with a null char.
+				set marketingModelName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< \"$(ioreg -arc IOPlatformDevice -k product-name)\" | tr -d '[:cntrl:]'"))) -- Remove control characters because this decoded value could end with a NUL char.
 				
 				if (marketingModelName is not equal to "") then
 					set didGetLocalMarketingModelName to true
@@ -829,7 +829,7 @@ repeat
 									do shell script "systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on" user name adminUsername password adminPassword with administrator privileges
 								end try
 							end if
-							do shell script "curl -m 5 -sL https://support-sp.apple.com/sp/product?cc=" & serialNumberModelPart & " -o " & (quoted form of marketingModelNameXMLpath)
+							do shell script "curl -m 5 -sfL https://support-sp.apple.com/sp/product?cc=" & serialNumberModelPart & " -o " & (quoted form of marketingModelNameXMLpath)
 							set didDownloadMarketingModelName to true
 							exit repeat
 						on error (downloadMarketingModelNameErrorMessage) number (downloadMarketingModelNameErrorNumber)
@@ -854,8 +854,8 @@ repeat
 				end if
 				try
 					if (didDownloadMarketingModelName) then
-						tell application "System Events" to tell first XML element of contents of XML file marketingModelNameXMLpath
-							set marketingModelName to ((value of XML elements whose name is "configCode") as string)
+						tell application id "com.apple.systemevents" to tell first XML element of contents of XML file marketingModelNameXMLpath
+							set marketingModelName to ((value of XML elements whose name is "configCode") as text)
 						end tell
 						
 						if ((marketingModelName is equal to "") or (marketingModelName does not start with shortModelName)) then
@@ -916,7 +916,7 @@ repeat
 					set AppleScript's text item delimiters to "Thunderbolt 3"
 					set marketingModelNameThunderboltParts to (every text item of marketingModelName)
 					set AppleScript's text item delimiters to "TB3"
-					set marketingModelName to (marketingModelNameThunderboltParts as string)
+					set marketingModelName to (marketingModelNameThunderboltParts as text)
 				end if
 				set AppleScript's text item delimiters to "-Inch"
 				set marketingModelNameParts to (every text item of marketingModelName)
@@ -924,10 +924,10 @@ repeat
 					set AppleScript's text item delimiters to " 20"
 					set marketingModelNameYearParts to (every text item of (text item 2 of marketingModelNameParts))
 					set AppleScript's text item delimiters to " ’"
-					set text item 2 of marketingModelNameParts to (marketingModelNameYearParts as string)
+					set text item 2 of marketingModelNameParts to (marketingModelNameYearParts as text)
 				end if
 				set AppleScript's text item delimiters to "”"
-				set modelInfo to (marketingModelNameParts as string)
+				set modelInfo to (marketingModelNameParts as text)
 				if (modelPartNumber is not equal to "") then set modelInfo to (modelInfo & " / " & modelPartNumber)
 			end if
 		else if (modelInfo is equal to "") then
@@ -1008,10 +1008,10 @@ repeat
 		
 		
 		try
-			tell application "System Events" to tell property list file restOfSystemOverviewInfoPath
+			tell application id "com.apple.systemevents" to tell property list file restOfSystemOverviewInfoPath
 				repeat with i from 1 to (number of property list items)
 					set thisDataTypeProperties to (item i of property list items)
-					set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as string)
+					set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as text)
 					if (thisDataType is equal to "SPMemoryDataType") then -- MEMORY TYPE & SPEED INFORMATION
 						try
 							tell me
@@ -1021,12 +1021,12 @@ repeat
 							end tell
 							set memoryInfo to (first property list item of property list item "_items" of thisDataTypeProperties)
 							try
-								set memoryUpgradeable to ((value of property list item "is_memory_upgradeable" of memoryInfo) as string)
+								set memoryUpgradeable to ((value of property list item "is_memory_upgradeable" of memoryInfo) as text)
 								if (memoryUpgradeable is equal to "No") then set memoryNote to "
 	🚫	RAM is Soldered Onboard (NOT Upgradeable)"
 							end try
 							try
-								set memoryType to ((value of property list item "dimm_type" of memoryInfo) as string) -- This top level "Type" (not within any Banks), will only exist when running natively on Apple Silicon.
+								set memoryType to ((value of property list item "dimm_type" of memoryInfo) as text) -- This top level "Type" (not within any Banks), will only exist when running natively on Apple Silicon.
 								set memoryType to (do shell script "echo " & (quoted form of memoryType) & " | tr -dc '[:alnum:]' | tr '[:lower:]' '[:upper:]'")
 								set memorySpeed to ""
 								set didGetMemoryInfo to true
@@ -1034,7 +1034,7 @@ repeat
 								set memoryItems to (property list item "_items" of memoryInfo)
 								repeat with j from 1 to (number of property list items in memoryItems)
 									set thisMemoryItem to (property list item j of memoryItems)
-									set thisMemoryType to ((value of property list item "dimm_type" of thisMemoryItem) as string)
+									set thisMemoryType to ((value of property list item "dimm_type" of thisMemoryItem) as text)
 									set thisMemorySlot to "Empty"
 									if (thisMemoryType is not equal to "empty") then
 										if (memoryType contains "UNKNOWN") then
@@ -1042,10 +1042,10 @@ repeat
 												set thisMemoryType to (do shell script "echo " & (quoted form of thisMemoryType) & " | sed 's/ SO-DIMM//'") -- Remove " SO-DIMM" suffix that exists on iMacs with DDR4 RAM.
 												if (thisMemoryType contains "DDR") then set memoryType to thisMemoryType
 											end try
-											set memorySpeed to (" @ " & ((value of property list item "dimm_speed" of thisMemoryItem) as string))
+											set memorySpeed to (" @ " & ((value of property list item "dimm_speed" of thisMemoryItem) as text))
 										end if
 										
-										set thisMemorySlot to ((value of property list item "dimm_size" of thisMemoryItem) as string)
+										set thisMemorySlot to ((value of property list item "dimm_size" of thisMemoryItem) as text)
 									end if
 									
 									set end of memorySlots to thisMemorySlot
@@ -1070,14 +1070,14 @@ repeat
 							set sataItems to (property list item "_items" of thisDataTypeProperties)
 							repeat with j from 1 to (number of property list items in sataItems)
 								set thisSataController to (property list item j of sataItems)
-								set thisSataControllerName to ((value of property list item "_name" of thisSataController) as string)
+								set thisSataControllerName to ((value of property list item "_name" of thisSataController) as text)
 								if (thisSataControllerName does not contain "Thunderbolt") then
 									set thisSataControllerPortSataRevision to 0
 									set thisSataControllerDriveSataRevision to 0
 									
 									if (thisDataType is equal to "SPSerialATADataType") then
 										try
-											set thisSataControllerPortSpeed to ((value of property list item "spsata_portspeed" of thisSataController) as string)
+											set thisSataControllerPortSpeed to ((value of property list item "spsata_portspeed" of thisSataController) as text)
 											
 											if (thisSataControllerPortSpeed is equal to "6 Gigabit") then
 												set thisSataControllerPortSataRevision to 3
@@ -1091,7 +1091,7 @@ repeat
 										end try
 										
 										try
-											set thisSataControllerNegotiatedLinkSpeed to ((value of property list item "spsata_negotiatedlinkspeed" of thisSataController) as string)
+											set thisSataControllerNegotiatedLinkSpeed to ((value of property list item "spsata_negotiatedlinkspeed" of thisSataController) as text)
 											
 											if (thisSataControllerNegotiatedLinkSpeed is equal to "6 Gigabit") then
 												set thisSataControllerDriveSataRevision to 3
@@ -1107,18 +1107,18 @@ repeat
 									repeat with k from 1 to (number of property list items in thisSataControllerItems)
 										try
 											set thisSataControllerItem to (property list item k of thisSataControllerItems)
-											set thisDiskModelName to ((value of property list item "_name" of thisSataControllerItem) as string)
-											set thisDiskID to ((value of property list item "bsd_name" of thisSataControllerItem) as string)
+											set thisDiskModelName to ((value of property list item "_name" of thisSataControllerItem) as text)
+											set thisDiskID to ((value of property list item "bsd_name" of thisSataControllerItem) as text)
 											set thisSataItemSizeBytes to ((value of property list item "size_in_bytes" of thisSataControllerItem) as number)
 											
 											if (thisDataType is equal to "SPNVMeDataType") then
 												set thisSataItemMediumType to "NVMe SSD" -- NVMe drives are always Solid State
 											else
-												set thisSataItemMediumType to ((value of property list item "spsata_medium_type" of thisSataControllerItem) as string)
+												set thisSataItemMediumType to ((value of property list item "spsata_medium_type" of thisSataControllerItem) as text)
 											end if
 											
 											try
-												set thisSataItemSmartStatus to ((value of property list item "smart_status" of thisSataControllerItem) as string)
+												set thisSataItemSmartStatus to ((value of property list item "smart_status" of thisSataControllerItem) as text)
 											on error
 												set thisSataItemSmartStatus to "Verified" -- Don't error if no Smart Status (Apple NVMe drives may not have Smart Status)
 											end try
@@ -1227,7 +1227,7 @@ repeat
 	‼️		   DRIVE MUST BE REPLACED			‼️"
 												end if
 												set (end of hardDriveDiskIDs) to thisDiskID
-												set (end of hardDrivesList) to ((round (thisSataItemSizeBytes / 1.0E+9)) as string) & " GB (" & ssdOrHdd & ")" & incorrectDriveInstalledNote & smartStatusWarning
+												set (end of hardDrivesList) to ((round (thisSataItemSizeBytes / 1.0E+9)) as text) & " GB (" & ssdOrHdd & ")" & incorrectDriveInstalledNote & smartStatusWarning
 											end if
 										on error number (storageInfoPlistErrorNumber)
 											if (storageInfoPlistErrorNumber is equal to -128) then
@@ -1262,12 +1262,12 @@ repeat
 							repeat with j from 1 to (number of property list items in graphicsItems)
 								set thisGraphicsItem to (property list item j of graphicsItems)
 								set AppleScript's text item delimiters to space
-								set thisGraphicsModel to ((words of ((value of property list item "sppci_model" of thisGraphicsItem) as string)) as string)
+								set thisGraphicsModel to ((words of ((value of property list item "sppci_model" of thisGraphicsItem) as text)) as text)
 								if (macProRecalledSerialDatePartsMatched and (macProRecalledGraphicsCards contains thisGraphicsModel)) then set macProPossibleBadGraphics to true
 								set thisGraphicsBusRaw to "unknown"
 								try
 									set AppleScript's text item delimiters to "_"
-									set thisGraphicsBusCodeParts to (every text item of ((value of property list item "sppci_bus" of thisGraphicsItem) as string))
+									set thisGraphicsBusCodeParts to (every text item of ((value of property list item "sppci_bus" of thisGraphicsItem) as text))
 									if ((count of thisGraphicsBusCodeParts) ≥ 2) then set thisGraphicsBusRaw to (text item 2 of thisGraphicsBusCodeParts)
 								end try
 								if (thisGraphicsBusRaw is equal to "builtin") then
@@ -1281,7 +1281,7 @@ repeat
 								set thisGraphicsCores to "UNKNOWN"
 								set thisGraphicsMemorySharedNote to ""
 								try
-									set thisGraphicsVRAM to ((value of property list item "spdisplays_vram_shared" of thisGraphicsItem) as string)
+									set thisGraphicsVRAM to ((value of property list item "spdisplays_vram_shared" of thisGraphicsItem) as text)
 									set thisGraphicsMemorySharedNote to " - Shared"
 								on error number (graphicsVRAMSharedErrorNumber)
 									if (graphicsVRAMSharedErrorNumber is equal to -128) then
@@ -1291,7 +1291,7 @@ repeat
 									end if
 								end try
 								try
-									set thisGraphicsVRAM to ((value of property list item "spdisplays_vram" of thisGraphicsItem) as string)
+									set thisGraphicsVRAM to ((value of property list item "spdisplays_vram" of thisGraphicsItem) as text)
 								on error number (graphicsVRAMErrorNumber)
 									if (graphicsVRAMErrorNumber is equal to -128) then
 										do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
@@ -1300,7 +1300,7 @@ repeat
 									end if
 								end try
 								try
-									set thisGraphicsCores to ((value of property list item "sppci_cores" of thisGraphicsItem) as string)
+									set thisGraphicsCores to ((value of property list item "sppci_cores" of thisGraphicsItem) as text)
 								on error number (graphicsCoresErrorNumber)
 									if (graphicsCoresErrorNumber is equal to -128) then
 										do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
@@ -1310,8 +1310,8 @@ repeat
 								end try
 								if (thisGraphicsVRAM is not equal to "UNKNOWN") then
 									set graphicsMemoryParts to (words of thisGraphicsVRAM)
-									if ((((item 2 of graphicsMemoryParts) as string) is equal to "MB") and (((item 1 of graphicsMemoryParts) as number) ≥ 1024)) then
-										set graphicsMemoryGB to (((item 1 of graphicsMemoryParts) / 1024) as string)
+									if ((((item 2 of graphicsMemoryParts) as text) is equal to "MB") and (((item 1 of graphicsMemoryParts) as number) ≥ 1024)) then
+										set graphicsMemoryGB to (((item 1 of graphicsMemoryParts) / 1024) as text)
 										if ((text -2 thru -1 of graphicsMemoryGB) is equal to ".0") then set graphicsMemoryGB to (text 1 thru -3 of graphicsMemoryGB)
 										set thisGraphicsVRAM to graphicsMemoryGB & " GB"
 									end if
@@ -1331,11 +1331,11 @@ repeat
 							end repeat
 							if ((count of graphicsList) is equal to 0) then error "No Graphics Found"
 							set AppleScript's text item delimiters to (linefeed & tab)
-							set graphicsInfo to (graphicsList as string)
+							set graphicsInfo to (graphicsList as text)
 							set AppleScript's text item delimiters to {"Intel ", "NVIDIA ", "AMD "}
 							set graphicsInfoPartsWithoutBrands to (every text item of graphicsInfo)
 							set AppleScript's text item delimiters to ""
-							set graphicsInfo to (graphicsInfoPartsWithoutBrands as string)
+							set graphicsInfo to (graphicsInfoPartsWithoutBrands as text)
 							set didGetGraphicsInfo to true
 						on error (graphicsInfoErrorMessage) number (graphicsInfoErrorNumber)
 							log "Graphics Info Error: " & graphicsInfoErrorMessage
@@ -1358,14 +1358,14 @@ repeat
 							repeat with j from 1 to (number of property list items in wiFiInterfaces)
 								set thisWiFiInterface to (property list item j of wiFiInterfaces)
 								try -- The spairport_airport_interfaces array has 2 items on Monterey and only one of them contains spairport_status_information etc.
-									set wiFiStatus to ((value of property list item "spairport_status_information" of thisWiFiInterface) as string)
+									set wiFiStatus to ((value of property list item "spairport_status_information" of thisWiFiInterface) as text)
 									if (wiFiStatus is not equal to "spairport_status_connected") then
 										set wiFiInfo to "Wi-Fi Detected (⚠️ UNKNOWN Versions/Protocols - Wi-Fi DISABLED ⚠️)
 	‼️	ENABLE WI-FI AND RELOAD  ‼️"
 									end if
-									set possibleWiFiProtocols to (words of ((value of property list item "spairport_supported_phymodes" of thisWiFiInterface) as string))
+									set possibleWiFiProtocols to (words of ((value of property list item "spairport_supported_phymodes" of thisWiFiInterface) as text))
 									repeat with thisPossibleWiFiProtocol in possibleWiFiProtocols
-										set thisWiFiVersionAndProtocol to (thisPossibleWiFiProtocol as string)
+										set thisWiFiVersionAndProtocol to (thisPossibleWiFiProtocol as text)
 										if (thisWiFiVersionAndProtocol is not equal to "802.11") then
 											if (thisWiFiVersionAndProtocol is equal to "b") then
 												set thisWiFiVersionAndProtocol to ("1/" & thisWiFiVersionAndProtocol)
@@ -1394,12 +1394,12 @@ repeat
 								set lastWiFiProtocol to ""
 								if ((count of wiFiProtocolsList) > 1) then
 									set AppleScript's text item delimiters to linefeed
-									set wiFiProtocolsList to (paragraphs of (do shell script ("echo " & (quoted form of (wiFiProtocolsList as string)) & " | sort -V")))
+									set wiFiProtocolsList to (paragraphs of (do shell script ("echo " & (quoted form of (wiFiProtocolsList as text)) & " | sort -V")))
 									set lastWiFiProtocol to (last item of wiFiProtocolsList)
 									set wiFiProtocolsList to (reverse of (rest of (reverse of wiFiProtocolsList)))
 								end if
 								set AppleScript's text item delimiters to ", "
-								set wiFiProtocolsString to (wiFiProtocolsList as string)
+								set wiFiProtocolsString to (wiFiProtocolsList as text)
 								if (lastWiFiProtocol is not equal to "") then
 									set commaAndOrJustAnd to ", and "
 									if ((count of wiFiProtocolsList) = 1) then set commaAndOrJustAnd to " and "
@@ -1430,22 +1430,22 @@ repeat
 							set bluetoothItems to (first property list item of property list item "_items" of thisDataTypeProperties)
 							try
 								set bluetoothInfo to (property list item "local_device_title" of bluetoothItems)
-								set bluetoothVersion to ((first word of ((value of property list item "general_hci_version" of bluetoothInfo) as string)) as string)
-								if (bluetoothVersion starts with "0x") then set bluetoothVersion to ((first word of ((value of property list item "general_lmp_version" of bluetoothInfo) as string)) as string)
+								set bluetoothVersion to ((first word of ((value of property list item "general_hci_version" of bluetoothInfo) as text)) as text)
+								if (bluetoothVersion starts with "0x") then set bluetoothVersion to ((first word of ((value of property list item "general_lmp_version" of bluetoothInfo) as text)) as text)
 								if (bluetoothVersion is equal to "0x9") then set bluetoothVersion to "5.0" -- BT 5.0 will not be detected properly on High Sierra.
 								try
-									set bluetoothLEsupported to ((value of property list item "general_supports_lowEnergy" of bluetoothInfo) as string)
+									set bluetoothLEsupported to ((value of property list item "general_supports_lowEnergy" of bluetoothInfo) as text)
 									if (bluetoothLEsupported is equal to "attrib_Yes") then set (end of bluetoothSupportedFeaturesList) to "BLE"
 								end try
 								try
-									set bluetoothHandoffSupported to ((value of property list item "general_supports_handoff" of bluetoothInfo) as string)
+									set bluetoothHandoffSupported to ((value of property list item "general_supports_handoff" of bluetoothInfo) as text)
 									if (bluetoothHandoffSupported is equal to "attrib_Yes") then set (end of bluetoothSupportedFeaturesList) to "Handoff"
 								end try
 								set bluetoothInfo to "Bluetooth " & bluetoothVersion & " Detected"
 								set didGetBluetoothInfo to true
 							on error
 								set bluetoothInfo to (property list item "controller_properties" of bluetoothItems)
-								set bluetoothChipset to ((value of property list item "controller_chipset" of bluetoothInfo) as string)
+								set bluetoothChipset to ((value of property list item "controller_chipset" of bluetoothInfo) as text)
 								if (bluetoothChipset is not equal to "") then
 									-- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
 									-- BUT, I wrote a script (in "Other Scripts/get_bluetooth_from_all_mac_specs_pages.sh") to extract every Bluetooth version from every specs URL to be able to know what version this model has if Bluetooth is detected.
@@ -1481,7 +1481,7 @@ repeat
 								set bluetoothSupportedFeatures to ""
 								if ((count of bluetoothSupportedFeaturesList) > 0) then
 									set AppleScript's text item delimiters to ", "
-									set bluetoothSupportedFeatures to " (Supports " & (bluetoothSupportedFeaturesList as string) & ")"
+									set bluetoothSupportedFeatures to " (Supports " & (bluetoothSupportedFeaturesList as text) & ")"
 								end if
 								set bluetoothInfo to (bluetoothInfo & bluetoothSupportedFeatures)
 							end if
@@ -1503,7 +1503,7 @@ repeat
 							set discWriteTypesList to {}
 							set discDriveItems to (first property list item of property list item "_items" of thisDataTypeProperties)
 							try
-								if (((value of property list item "device_cdwrite" of discDriveItems) as string) is not equal to "") then set (end of discWriteTypesList) to "CDs"
+								if (((value of property list item "device_cdwrite" of discDriveItems) as text) is not equal to "") then set (end of discWriteTypesList) to "CDs"
 							on error number (checkForCDErrorNumber)
 								if (checkForCDErrorNumber is equal to -128) then
 									do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
@@ -1512,7 +1512,7 @@ repeat
 								end if
 							end try
 							try
-								if (((value of property list item "device_dvdwrite" of discDriveItems) as string) is not equal to "") then set (end of discWriteTypesList) to "DVDs"
+								if (((value of property list item "device_dvdwrite" of discDriveItems) as text) is not equal to "") then set (end of discWriteTypesList) to "DVDs"
 							on error number (checkForDVDErrorNumber)
 								if (checkForDVDErrorNumber is equal to -128) then
 									do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
@@ -1521,7 +1521,7 @@ repeat
 								end if
 							end try
 							try
-								if (((value of property list item "device_bdwrite" of discDriveItems) as string) is not equal to "") then set (end of discWriteTypesList) to "Blu-rays"
+								if (((value of property list item "device_bdwrite" of discDriveItems) as text) is not equal to "") then set (end of discWriteTypesList) to "Blu-rays"
 							on error number (checkForBluRayErrorNumber)
 								if (checkForBluRayErrorNumber is equal to -128) then
 									do shell script "rm -f " & (quoted form of restOfSystemOverviewInfoPath)
@@ -1531,7 +1531,7 @@ repeat
 							end try
 							if ((count of discWriteTypesList) > 0) then
 								set AppleScript's text item delimiters to ", "
-								set discDriveDetected to "Detected (Supports Reading & Writing " & (discWriteTypesList as string) & ")"
+								set discDriveDetected to "Detected (Supports Reading & Writing " & (discWriteTypesList as text) & ")"
 								
 								if ((discWriteTypesList does not contain "CDs") or (discWriteTypesList does not contain "DVDs")) then
 									set discDriveDetected to discDriveDetected & "
@@ -1554,7 +1554,7 @@ repeat
 							repeat with j from 1 to (number of property list items in powerItems)
 								set thisPowerItem to (property list item j of powerItems)
 								try
-									set batteryCondition to ((value of property list item "sppower_battery_health" of property list item "sppower_battery_health_info" of thisPowerItem) as string)
+									set batteryCondition to ((value of property list item "sppower_battery_health" of property list item "sppower_battery_health_info" of thisPowerItem) as text)
 									if (batteryCondition is not equal to "Good") then -- https://support.apple.com/HT204054#battery
 										set batteryCapacityPercentage to batteryCapacityPercentage & "
 	⚠️	BATTERY CONDITION IS NOT NORMAL  ⚠️
@@ -1587,7 +1587,7 @@ repeat
 		
 		if ((count of hardDrivesList) > 0) then
 			set AppleScript's text item delimiters to (linefeed & tab)
-			set storageInfo to (hardDrivesList as string)
+			set storageInfo to (hardDrivesList as text)
 		end if
 		
 		if (not didGetMemoryInfo) then
@@ -1671,26 +1671,26 @@ repeat
 			
 			try
 				do shell script "system_profiler -xml SPBluetoothDataType > " & (quoted form of bluetoothInfoPath)
-				tell application "System Events" to tell property list file bluetoothInfoPath
+				tell application id "com.apple.systemevents" to tell property list file bluetoothInfoPath
 					set bluetoothSupportedFeaturesList to {}
 					set bluetoothItems to (first property list item of property list item "_items" of first property list item)
 					try
 						set bluetoothInfo to (property list item "local_device_title" of bluetoothItems)
-						set bluetoothVersion to ((first word of ((value of property list item "general_hci_version" of bluetoothInfo) as string)) as string)
-						if (bluetoothVersion starts with "0x") then set bluetoothVersion to ((first word of ((value of property list item "general_lmp_version" of bluetoothInfo) as string)) as string)
+						set bluetoothVersion to ((first word of ((value of property list item "general_hci_version" of bluetoothInfo) as text)) as text)
+						if (bluetoothVersion starts with "0x") then set bluetoothVersion to ((first word of ((value of property list item "general_lmp_version" of bluetoothInfo) as text)) as text)
 						if (bluetoothVersion is equal to "0x9") then set bluetoothVersion to "5.0" -- BT 5.0 will not be detected properly on High Sierra.
 						try
-							set bluetoothLEsupported to ((value of property list item "general_supports_lowEnergy" of bluetoothInfo) as string)
+							set bluetoothLEsupported to ((value of property list item "general_supports_lowEnergy" of bluetoothInfo) as text)
 							if (bluetoothLEsupported is equal to "attrib_Yes") then set (end of bluetoothSupportedFeaturesList) to "BLE"
 						end try
 						try
-							set bluetoothHandoffSupported to ((value of property list item "general_supports_handoff" of bluetoothInfo) as string)
+							set bluetoothHandoffSupported to ((value of property list item "general_supports_handoff" of bluetoothInfo) as text)
 							if (bluetoothHandoffSupported is equal to "attrib_Yes") then set (end of bluetoothSupportedFeaturesList) to "Handoff"
 						end try
 						set bluetoothInfo to "Bluetooth " & bluetoothVersion & " Detected"
 					on error -- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
 						set bluetoothInfo to (property list item "controller_properties" of bluetoothItems)
-						set bluetoothChipset to ((value of property list item "controller_chipset" of bluetoothInfo) as string)
+						set bluetoothChipset to ((value of property list item "controller_chipset" of bluetoothInfo) as text)
 						if (bluetoothChipset is not equal to "") then
 							-- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
 							-- BUT, I wrote a script (in "Other Scripts/get_bluetooth_from_all_mac_specs_pages.sh") to extract every Bluetooth version from every specs URL to be able to know what version this model has if Bluetooth is detected.
@@ -1726,7 +1726,7 @@ repeat
 						set bluetoothSupportedFeatures to ""
 						if ((count of bluetoothSupportedFeaturesList) > 0) then
 							set AppleScript's text item delimiters to ", "
-							set bluetoothSupportedFeatures to " (Supports " & (bluetoothSupportedFeaturesList as string) & ")"
+							set bluetoothSupportedFeatures to " (Supports " & (bluetoothSupportedFeaturesList as text) & ")"
 						end if
 						set bluetoothInfo to (bluetoothInfo & bluetoothSupportedFeatures)
 					end if
@@ -1868,7 +1868,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 						set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
 						if ((count of remoteManagementOrganizationContactInfo) > 0) then
 							set AppleScript's text item delimiters to (linefeed & tab & tab)
-							set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as string)
+							set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as text)
 						end if
 						
 						try
@@ -1975,7 +1975,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	set displayMemorySlots to ""
 	if ((count of memorySlots) > 0) then
 		set AppleScript's text item delimiters to " + "
-		set displayMemorySlots to " (" & (memorySlots as string) & ")"
+		set displayMemorySlots to " (" & (memorySlots as text) & ")"
 	end if
 	
 	try
@@ -2112,7 +2112,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 							((aboutThisMacAppPath as POSIX file) as alias)
 							do shell script "open -na " & (quoted form of aboutThisMacAppPath)
 						on error
-							tell application "System Events" to tell application process "Finder" to click menu item "About This Mac" of menu 1 of menu bar item "Apple" of menu bar 1
+							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to click menu item 1 of menu 1 of menu bar item 1 of menu bar 1
 						end try
 					on error (openAboutThisMacErrorMessage)
 						try
@@ -2257,7 +2257,7 @@ try
 					if ((count of hardDriveDiskIDs) > 0) then
 						repeat with thisDiskID in hardDriveDiskIDs
 							try
-								tell application "Terminal"
+								tell application id "com.apple.Terminal"
 									try
 										close every window without saving
 									end try

@@ -1,8 +1,9 @@
 #!/bin/sh
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables
 
-quit_app_by_bundle_id() { # $1 = Bundle ID to Quit
+quit_apps_by_bundle_id() { # Arguments = Bundle IDs to Quit (multiple can be specified)
 	#
-	# Created by Pico Mitchell (of Free Geek) on 9/13/22.
+	# Created by Pico Mitchell (of Free Geek) on 9/13/22 (updated on 1/9/23).
 	#
 	# MIT License
 	#
@@ -19,31 +20,35 @@ quit_app_by_bundle_id() { # $1 = Bundle ID to Quit
 	# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	#
 
-	if [ -z "$1" ]; then
-		>&2 echo 'Quit App by Bundle ID ERROR: A Bundle ID must be specified.'
+	if [ "$#" -eq '0' ]; then
+		>&2 echo 'Quit App by Bundle ID ERROR: At least one Bundle ID must be specified.'
 		return 1
 	fi
 
 	# Based On: https://github.com/t-lark/Auto-Update/blob/master/app_quitter.py#L179-L190 (Copyright (c) 2019 Snowflake Inc. Licensed under the Apache License, Version 2.0)
-	OSASCRIPT_ENV_BUNDLE_ID_TO_QUIT="$1" osascript -l 'JavaScript' -e '
+	/usr/bin/osascript -l 'JavaScript' -e '
 "use strict"
 ObjC.import("AppKit")
 
-const runningAppsForBundleID = $.NSRunningApplication.runningApplicationsWithBundleIdentifier($.NSProcessInfo.processInfo.environment.objectForKey("OSASCRIPT_ENV_BUNDLE_ID_TO_QUIT")).js
+function run(argv) {
+	for (const thisBundleID of argv) {
+		const runningAppsForBundleID = $.NSRunningApplication.runningApplicationsWithBundleIdentifier(thisBundleID).js
 
-for (const thisRunningApp of runningAppsForBundleID) { // An array is always returned, so must iterate all NSRunningApplication objects.
-	thisRunningApp.terminate // First tell the app to quit itself gracefully.
+		for (const thisRunningApp of runningAppsForBundleID) { // An array is always returned, so must iterate all NSRunningApplication objects.
+			thisRunningApp.terminate // First tell the app to quit itself gracefully.
 
-	for (let waitForQuitSeconds = 0; waitForQuitSeconds < 6; waitForQuitSeconds ++) { // Wait for UP TO 3 seconds for the app to quit.
-		delay(0.5) // Wait in half seconds so that we can be done quickly when the app quits itself gracefully.
-		if (thisRunningApp.terminated)
-			break
+			for (let waitForQuitSeconds = 0; waitForQuitSeconds < 6; waitForQuitSeconds ++) { // Wait for UP TO 3 seconds for the app to quit.
+				delay(0.5) // Wait in half seconds so that we can be done quickly when the app quits itself gracefully.
+				if (thisRunningApp.terminated)
+					break
+			}
+
+			if (!thisRunningApp.terminated) // If app has not quit gracefully after 3 seconds, force quit it.
+				thisRunningApp.forceTerminate
+		}
 	}
-	
-	if (!thisRunningApp.terminated) // If app has not quit gracefully after 3 seconds, force quit it.
-		thisRunningApp.forceTerminate
 }
-'
+' -- "$@"
 }
 
-quit_app_by_bundle_id "$@"
+quit_apps_by_bundle_id "$@"

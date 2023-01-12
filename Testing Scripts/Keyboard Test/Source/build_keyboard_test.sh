@@ -1,8 +1,9 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 # By: Pico Mitchell
 # For: MacLand @ Free Geek
-# Last Updated: September 27th, 2022
+# Last Updated: 01/09/23
 #
 # MIT License
 #
@@ -106,7 +107,7 @@ echo -e '\n\nZIPPING KEYBOARD TEST APP & UPDATING VERSION IN latest-versions.txt
 
 rm -f "${BUILD_DIR}/Keyboard-Test.zip"
 rm -f "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip"
-ditto -c -k --keepParent --sequesterRsrc --zlibCompressionLevel 9 "${BUILD_DIR}/Keyboard Test.app" "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip"
+ditto -ck --keepParent --sequesterRsrc --zlibCompressionLevel 9 "${BUILD_DIR}/Keyboard Test.app" "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip"
 
 mkdir -p "${FG_MIB_RESOURCES_PATH}/Prepare OS Package/Package Resources/User/fg-demo/Apps"
 rm -f "${FG_MIB_RESOURCES_PATH}/Prepare OS Package/Package Resources/User/fg-demo/Apps/Keyboard-Test.zip"

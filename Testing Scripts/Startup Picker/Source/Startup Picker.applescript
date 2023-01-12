@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.25-1
+-- Version: 2023.1.9-1
 
 -- App Icon is “Green Apple” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -62,8 +62,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -122,7 +122,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -151,20 +151,17 @@ considering numeric strings
 	set isVenturaOrNewer to (systemVersion ≥ "13.0")
 end considering
 
-set systemPreferencesOrSettings to "System Preferences"
-if (isVenturaOrNewer) then set systemPreferencesOrSettings to "System Settings"
-
 if (isMojaveOrNewer) then
 	set needsAutomationAccess to false
 	try
-		tell application "System Events" to every window -- To prompt for Automation access on Mojave
+		tell application id "com.apple.systemevents" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
 	end try
 	
 	if (needsAutomationAccess) then
 		try
-			tell application "System Preferences" to activate
+			tell application id "com.apple.systempreferences" to activate
 		end try
 		try
 			do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -199,16 +196,16 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 end if
 
 try
-	tell application "System Events" to tell application process "Finder" to (get windows)
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to (get windows)
 on error (assistiveAccessTestErrorMessage)
 	if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
 		if (isMojaveOrNewer) then
 			try
-				tell application "System Preferences" to every window -- To prompt for Automation access on Mojave
+				tell application id "com.apple.systempreferences" to every window -- To prompt for Automation access on Mojave
 			on error automationAccessErrorMessage number automationAccessErrorNumber
 				if (automationAccessErrorNumber is equal to -1743) then
 					try
-						tell application "System Preferences" to activate
+						tell application id "com.apple.systempreferences" to activate
 					end try
 					try
 						do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -243,16 +240,16 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			end try
 			try
 				with timeout of 1 second
-					tell application "System Preferences" to quit
+					tell application id "com.apple.systempreferences" to quit
 				end timeout
 			end try
 		end if
 		
 		try
-			tell application "Finder" to reveal (path to me)
+			tell application id "com.apple.finder" to reveal (path to me)
 		end try
 		try
-			tell application "System Preferences"
+			tell application id "com.apple.systempreferences"
 				try
 					activate
 				end try
@@ -292,7 +289,7 @@ end try
 
 
 set AppleScript's text item delimiters to ""
-set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 
 set supportsHighSierra to false
 set supportsCatalina to false
@@ -303,9 +300,9 @@ set supportsVentura to false
 set modelInfoPath to tmpPath & "modelInfo.plist"
 try
 	do shell script "system_profiler -xml SPHardwareDataType > " & (quoted form of modelInfoPath)
-	tell application "System Events" to tell property list file modelInfoPath
+	tell application id "com.apple.systemevents" to tell property list file modelInfoPath
 		set hardwareItems to (first property list item of property list item "_items" of first property list item)
-		set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
+		set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as text)
 		set modelIdentifierName to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -d '[:digit:],'") -- Need use this whenever comparing along with Model ID numbers since there could be false matches for the newer "MacXX,Y" style Model IDs if I used shortModelName in those conditions instead (which I used to do).
 		set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
 		set AppleScript's text item delimiters to ","
@@ -342,7 +339,7 @@ end if
 
 set nameOfBootedDisk to ""
 try
-	tell application "System Events" to set nameOfBootedDisk to (name of startup disk)
+	tell application id "com.apple.systemevents" to set nameOfBootedDisk to (name of startup disk)
 end try
 
 set shouldSetStartupDisk to false
@@ -368,16 +365,16 @@ repeat
 			set osDarwinMajorVersion to "00"
 			
 			try
-				tell application "System Events" to tell property list file thisSystemVersionPlist
+				tell application id "com.apple.systemevents" to tell property list file thisSystemVersionPlist
 					try
-						set osVersion to ((value of property list item "ProductUserVisibleVersion") as string)
+						set osVersion to ((value of property list item "ProductUserVisibleVersion") as text)
 					on error
 						try
-							set osVersion to ((value of property list item "ProductVersion") as string)
+							set osVersion to ((value of property list item "ProductVersion") as text)
 						end try
 					end try
 					try
-						set osDarwinMajorVersion to (text 1 thru 2 of ((value of property list item "ProductBuildVersion") as string))
+						set osDarwinMajorVersion to (text 1 thru 2 of ((value of property list item "ProductBuildVersion") as text))
 					end try
 				end tell
 			end try
@@ -429,8 +426,8 @@ repeat
 	
 	set startupDiskOptions to {}
 	if ((count of hdStartupDiskOptions) > 0) then
-		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-		set hdStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (hdStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as text)
+		set hdStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (hdStartupDiskOptions as text)) & " | sort -urV | cut -d ':' -f 2-")))
 		
 		set defaultStartupDiskSelection to (first item of hdStartupDiskOptions)
 		
@@ -440,8 +437,8 @@ repeat
 	set separatorLine to "———————————————————————"
 	
 	if ((count of otherStartupDiskOptions) > 0) then
-		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-		set otherStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (otherStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as text)
+		set otherStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (otherStartupDiskOptions as text)) & " | sort -urV | cut -d ':' -f 2-")))
 		
 		if ((count of startupDiskOptions) > 0) then
 			set startupDiskOptions to startupDiskOptions & {separatorLine} & otherStartupDiskOptions
@@ -451,8 +448,8 @@ repeat
 	end if
 	
 	if ((count of installerStartupDiskOptions) > 0) then
-		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-		set installerStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (installerStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as text)
+		set installerStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (installerStartupDiskOptions as text)) & " | sort -urV | cut -d ':' -f 2-")))
 		
 		if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of installerStartupDiskOptions)
 		
@@ -464,8 +461,8 @@ repeat
 	end if
 	
 	if ((count of testBootStartupDiskOptions) > 0) then
-		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-		set testBootStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (testBootStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as text)
+		set testBootStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (testBootStartupDiskOptions as text)) & " | sort -urV | cut -d ':' -f 2-")))
 		
 		if (defaultStartupDiskSelection is equal to "") then set defaultStartupDiskSelection to (first item of testBootStartupDiskOptions)
 		
@@ -478,14 +475,14 @@ repeat
 	
 	set incompatibleStartupDisksNote to ""
 	if ((incompatibleStartupDiskOptions count) > 0) then
-		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as string)
-		set incompatibleStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (incompatibleStartupDiskOptions as string)) & " | sort -urV | cut -d ':' -f 2")))
+		set AppleScript's text item delimiters to linefeed -- Must set delimiter for (array as text)
+		set incompatibleStartupDiskOptions to (paragraphs of (do shell script ("echo " & (quoted form of (incompatibleStartupDiskOptions as text)) & " | sort -urV | cut -d ':' -f 2-")))
 		
 		set pluralizeDisks to ""
 		if ((incompatibleStartupDiskOptions count) > 1) then set pluralizeDisks to "s"
 		set AppleScript's text item delimiters to (linefeed & tab)
 		set incompatibleStartupDisksNote to "Excluded Incompatible Startup Disk" & pluralizeDisks & ":
-	" & (incompatibleStartupDiskOptions as string)
+	" & (incompatibleStartupDiskOptions as text)
 	end if
 	
 	if ((count of startupDiskOptions) is equal to 0) then
@@ -515,13 +512,13 @@ No Startup Disks Detected"
 
 " & incompatibleStartupDisksNote & "Select Drive to Set as Startup Disk:" OK button name "Select Startup Disk" cancel button name "Quit" with title "Startup Picker")
 		if (chosenStartupDisk is not equal to false) then
-			if ((chosenStartupDisk as string) is equal to separatorLine) then
+			if ((chosenStartupDisk as text) is equal to separatorLine) then
 				-- Just display list again since user selected separator line.
-			else if ((last word of (chosenStartupDisk as string)) starts with "1") then
+			else if ((last word of (chosenStartupDisk as text)) starts with "1") then
 				set AppleScript's text item delimiters to " ("
-				set chosenStartupDiskParts to (every text item of (chosenStartupDisk as string))
-				set chosenStartupDiskName to ((text items 1 thru -2 of chosenStartupDiskParts) as string)
-				set chosenStartupDiskVersion to (do shell script "echo " & (quoted form of ((last text item of chosenStartupDiskParts) as string)) & " | tr -dc '[:digit:].'")
+				set chosenStartupDiskParts to (every text item of (chosenStartupDisk as text))
+				set chosenStartupDiskName to ((text items 1 thru -2 of chosenStartupDiskParts) as text)
+				set chosenStartupDiskVersion to (do shell script "echo " & (quoted form of ((last text item of chosenStartupDiskParts) as text)) & " | tr -dc '[:digit:].'")
 				try
 					try
 						activate
@@ -574,11 +571,11 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 		repeat 15 times
 			try
 				with timeout of 1 second
-					tell application systemPreferencesOrSettings to quit
+					tell application id "com.apple.systempreferences" to quit
 				end timeout
 			end try
 			try
-				tell application "System Preferences"
+				tell application id "com.apple.systempreferences"
 					repeat 180 times -- Wait for Security pane to load
 						try
 							activate
@@ -594,6 +591,10 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 						if ((name of window 1) is "Startup Disk") then exit repeat
 					end repeat
 				end tell
+				
+				set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
+				set securityAgentID to (id of application securityAgentPath)
+				
 				if (isCatalinaOrNewer and (not isVenturaOrNewer)) then
 					-- On Catalina, a SecurityAgent alert with "System Preferences wants to make changes." will appear IF an Encrypted Disk is present.
 					-- OR if Big Sur is installed on some drive, whose Sealed System Volume is unable to be mounted (ERROR -69808) and makes System Preferences think it needs to try again with admin privileges.
@@ -610,7 +611,6 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 							set volume alert volume 0
 						end try
 						
-						set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
 						repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch since it can take a moment, but the script will stall if we go past this before it launches.
 							delay 1
 							try
@@ -624,7 +624,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 							try
 								if (application securityAgentPath is running) then
 									with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-										tell application "System Events" to tell application process "SecurityAgent"
+										tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 											set frontmost to true
 											key code 53 -- Cannot reliably get SecurityAgent windows, so if it's running (for decryption prompts) just hit escape until it quits (or until 60 seconds passes)
 										end tell
@@ -648,7 +648,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 				set currentlySelectedStartupDiskValue to ""
 				set leftOrRightArrowKeyCode to 124 -- RIGHT ARROW Key
 				if (isVenturaOrNewer) then
-					tell application "System Events" to tell application process systemPreferencesOrSettings
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
@@ -686,7 +686,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 						set didAuthenticateSecurityAgent to false
 						
 						repeat numberOfStartupDisks times -- The loop should be exited before even getting through numberOfStartupDisks, but want some limit so we don't get stuck in an infinite loop if something goes very wrong.
-							tell application "System Events" to tell application process systemPreferencesOrSettings
+							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 								-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
 								set frontmost to true
 								set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
@@ -702,12 +702,11 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 							
 							if (not didAuthenticateSecurityAgent) then
 								set didTryToAuthenticateSecurityAgent to false
-								set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
 								repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
 									delay 1
 									try
 										if (application securityAgentPath is running) then
-											tell application "System Events" to tell application process "SecurityAgent"
+											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 												if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
 													repeat with thisSecurityAgentButton in (buttons of window 1)
 														if (((title of thisSecurityAgentButton) is equal to "Unlock") or ((title of thisSecurityAgentButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
@@ -729,7 +728,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 										delay 1
 										try
 											if (application securityAgentPath is running) then
-												tell application "System Events" to tell application process "SecurityAgent"
+												tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 													if ((number of windows) is 0) then
 														set didAuthenticateSecurityAgent to true
 														exit repeat
@@ -745,7 +744,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 							end if
 							
 							if (didAuthenticateSecurityAgent) then
-								tell application "System Events" to tell application process systemPreferencesOrSettings
+								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
 									if ((enabled of button 1 of startupDisksSelectionGroup) and ((value of static text 2 of startupDisksSelectionGroup) ends with ("“" & chosenStartupDiskName & "”."))) then
 										set didSetStartUpDisk to true
@@ -758,7 +757,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 						end repeat
 					end if
 				else
-					tell application "System Events" to tell application process systemPreferencesOrSettings
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
@@ -899,7 +898,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 					-- If didSetStartUpDisk, double-check by getting the name of the disk specified by "bless --getBoot" which seems to get updated shortly after System Preferences/Settings has QUIT.
 					try
 						with timeout of 1 second
-							tell application systemPreferencesOrSettings to quit
+							tell application id "com.apple.systempreferences" to quit
 						end timeout
 					end try
 					
@@ -924,7 +923,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 		end repeat
 		try
 			with timeout of 1 second
-				tell application systemPreferencesOrSettings to quit
+				tell application id "com.apple.systempreferences" to quit
 			end timeout
 		end try
 	end if
@@ -972,14 +971,14 @@ This Mac will automatically reboot into Startup Manager in 30 seconds…" button
 		
 		-- Quit all apps before rebooting
 		try
-			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-			if ((count of listOfRunningApps) > 0) then
+			tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not (id of me))))
+			if ((count of listOfRunningAppIDs) > 0) then
 				try
-					repeat with thisAppName in listOfRunningApps
+					repeat with thisAppID in listOfRunningAppIDs
 						try
-							if (application thisAppName is running) then
+							if (application id thisAppID is running) then
 								with timeout of 1 second
-									tell application thisAppName to quit
+									tell application id thisAppID to quit without saving
 								end timeout
 							end if
 						end try
@@ -987,18 +986,15 @@ This Mac will automatically reboot into Startup Manager in 30 seconds…" button
 				end try
 				delay 3
 				try
-					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-					repeat with thisAppName in listOfRunningApps
-						repeat 2 times
-							try
-								do shell script "pkill -f " & (quoted form of thisAppName)
-							end try
-						end repeat
-					end repeat
+					set AppleScript's text item delimiters to space
+					tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not (id of me)))) as text)
+					if (allRunningAppPIDs is not equal to "") then
+						do shell script ("kill " & allRunningAppPIDs)
+					end if
 				end try
 			end if
 		end try
 		
-		tell application "System Events" to restart with state saving preference
+		tell application id "com.apple.systemevents" to restart with state saving preference
 	end try
 end if

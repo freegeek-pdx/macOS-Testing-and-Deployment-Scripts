@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.25-1
+-- Version: 2023.1.11-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -40,7 +40,7 @@ repeat -- dialogs timeout when screen is asleep or locked (just in case)
 		exit repeat
 	else
 		try
-			tell application "System Events"
+			tell application id "com.apple.systemevents"
 				if (running of screen saver preferences) then key code 53 -- If screen saver is activate, simulate Escape key to end it.
 			end tell
 		end try
@@ -67,8 +67,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -139,19 +139,19 @@ if ((currentUsername is equal to "Tester") and ((POSIX path of (path to me)) is 
 	if (isMojaveOrNewer) then
 		set needsAutomationAccess to false
 		try
-			tell application "System Events" to every window -- To prompt for Automation access on Mojave
+			tell application id "com.apple.systemevents" to every window -- To prompt for Automation access on Mojave
 		on error automationAccessErrorMessage number automationAccessErrorNumber
 			if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
 		end try
 		try
-			tell application "Finder" to every window -- To prompt for Automation access on Mojave
+			tell application id "com.apple.finder" to every window -- To prompt for Automation access on Mojave
 		on error automationAccessErrorMessage number automationAccessErrorNumber
 			if (automationAccessErrorNumber is equal to -1743) then set needsAutomationAccess to true
 		end try
 		
 		if (needsAutomationAccess) then
 			try
-				tell application "System Preferences" to activate
+				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
 				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -186,14 +186,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	end if
 	
 	try
-		tell application "System Events" to tell application process "Finder" to (get windows)
+		tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to (get windows)
 	on error (assistiveAccessTestErrorMessage)
 		if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
 			try
-				tell application "Finder" to reveal (path to me)
+				tell application id "com.apple.finder" to reveal (path to me)
 			end try
 			try
-				tell application "System Preferences"
+				tell application id "com.apple.systempreferences"
 					try
 						activate
 					end try
@@ -244,7 +244,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	
 	set startupDiskCapacity to 0 -- This is for checking if is source drive.
 	try
-		tell application "System Events" to set startupDiskCapacity to ((capacity of startup disk) as number)
+		tell application id "com.apple.systemevents" to set startupDiskCapacity to ((capacity of startup disk) as number)
 	end try
 	
 	set macScopeAppExists to false
@@ -265,7 +265,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			-- The MTB version is NOT stored in a user accessable location so that it cannot be super easily manually edited.
 			set currentMTBversion to doShellScriptAsAdmin("cat '/private/var/root/.mtbVersion'") -- If the file doesn't exist, it's older than 20220726 which was the first version to include this file (version 20220705 stored the file at "/Users/Shared/.mtbVersion" and no MTB version file existed before that).
 			
-			if ((currentMTBversion is not equal to "20220726") and (currentMTBversion is not equal to "20221025")) then error "OUTDATED"
+			if ((currentMTBversion is not equal to "20221025") and (currentMTBversion is not equal to "20230111")) then error "OUTDATED"
 		on error
 			set serialNumber to ""
 			try
@@ -298,7 +298,7 @@ fi
 This " & thisDriveName & " Drive Is Outdated") message ("Deliver this " & thisDriveName & " drive to Free Geek I.T.
 ") buttons {"Shut Down"} default button 1 as critical
 				
-				tell application "System Events" to shut down with state saving preference
+				tell application id "com.apple.systemevents" to shut down with state saving preference
 				
 				quit
 				delay 10
@@ -314,7 +314,7 @@ This " & thisDriveName & " Drive Is Outdated") message ("Deliver this " & thisDr
 
 If you are seeing this message during production, SHUT DOWN and notify Free Geek I.T. since THIS DRIVE MUST NOT BE USED!") buttons {"Shut Down", "Continue with Setup"} cancel button 1 default button 2 as critical
 				on error
-					tell application "System Events" to shut down with state saving preference
+					tell application id "com.apple.systemevents" to shut down with state saving preference
 					
 					quit
 					delay 10
@@ -349,11 +349,11 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	try
 		repeat with thisWindow in (current application's NSApp's |windows|())
 			if (thisWindow's isVisible() is true) then
-				if (((thisWindow's title()) as string) is equal to (name of me)) then
+				if (((thisWindow's title()) as text) is equal to (name of me)) then
 					repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-						if (((thisProgressWindowSubView's className()) as string) is equal to "NSProgressIndicator") then
+						if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
 							(thisWindow's setLevel:(current application's NSScreenSaverWindowLevel))
-						else if (((thisProgressWindowSubView's className()) as string) is equal to "NSButton" and ((thisProgressWindowSubView's title() as string) is equal to "Stop")) then
+						else if (((thisProgressWindowSubView's className()) as text) is equal to "NSButton" and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
 							(thisProgressWindowSubView's setEnabled:false)
 						end if
 					end repeat
@@ -370,7 +370,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	
 	
 	try
-		tell application "System Events" to delete login item (name of me)
+		tell application id "com.apple.systemevents" to delete login item (name of me)
 	end try
 	
 	set userLaunchAgentsPath to ((POSIX path of (path to library folder from user domain)) & "LaunchAgents/")
@@ -383,30 +383,22 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		((userLaunchAgentsPath as POSIX file) as alias)
 	on error
 		try
-			tell application "Finder" to make new folder at (path to library folder from user domain) with properties {name:"LaunchAgents"}
+			tell application id "com.apple.finder" to make new folder at (path to library folder from user domain) with properties {name:"LaunchAgents"}
 		end try
 	end try
 	
 	-- NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
 	-- BUT, this is just done for consistency with other code since this particular script will never run on macOS 13 Ventura, but the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
-	set testBootSetupUserLaunchAgentPlistContents to "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>Label</key>
-	<string>" & testBootSetupLaunchAgentLabel & "</string>
-	<key>Program</key>
-	<string>/Applications/Test Boot Setup.app/Contents/Resources/Launch Test Boot Setup</string>
-	<key>AssociatedBundleIdentifiers</key>
-	<string>" & testBootSetupLaunchAgentLabel & "</string>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-</dict>
-</plist>"
+	set testBootSetupUserLaunchAgentPlistContents to (do shell script "
+echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to create an empty plist with root type of dictionary. This is effectively same as starting with 'plutil -create xml1 -' (which can be verified by comparing the output to 'echo '<dict/>' | plutil -convert xml1 -o - -') but the 'plutil -create' option is only available on macOS 12 Monterey and newer.
+	plutil -insert 'Label' -string " & (quoted form of testBootSetupLaunchAgentLabel) & " -o - - | # Using a pipeline of 'plutil' commands reading from stdin and outputting to stdout is a clean way of creating a plist string without needing to hardcode the plist contents and without creating a file (which would be required if PlistBuddy was used).
+	plutil -insert 'Program' -string " & (quoted form of ("/Applications/Test Boot Setup.app/Contents/Resources/Launch Test Boot Setup")) & " -o - - | # Even though doing this is technically less efficient vs just hard coding a plist string, it makes for cleaner and smaller code.
+	plutil -insert 'AssociatedBundleIdentifiers' -string " & (quoted form of testBootSetupLaunchAgentLabel) & " -o - - |
+	plutil -insert 'StandardOutPath' -string '/dev/null' -o - - |
+	plutil -insert 'StandardErrorPath' -string '/dev/null' -o - - |
+	plutil -insert 'RunAtLoad' -bool true -o - -
+" without altering line endings) -- "without altering line endings" MUST be used since "do shell script" replaces "\n" with "\r" line breaks by default which we DO NOT want in the plist file we are creating.
+	
 	set needsToWriteTestBootSetupUserLaunchAgentPlistFile to false
 	try
 		((testBootSetupUserLaunchAgentPlistPath as POSIX file) as alias)
@@ -420,7 +412,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	on error
 		set needsToWriteTestBootSetupUserLaunchAgentPlistFile to true
 		try
-			tell application "Finder" to make new file at (userLaunchAgentsPath as POSIX file) with properties {name:testBootSetupLaunchAgentPlistName}
+			tell application id "com.apple.finder" to make new file at (userLaunchAgentsPath as POSIX file) with properties {name:testBootSetupLaunchAgentPlistName}
 		end try
 	end try
 	if (needsToWriteTestBootSetupUserLaunchAgentPlistFile) then
@@ -443,17 +435,17 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 	
 	try
 		set AppleScript's text item delimiters to ""
-		set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+		set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 		set hardwareInfoPath to tmpPath & "hardwareInfo.plist"
 		repeat 30 times
 			try
 				do shell script "system_profiler -xml SPHardwareDataType > " & (quoted form of hardwareInfoPath)
-				tell application "System Events" to tell property list file hardwareInfoPath
+				tell application id "com.apple.systemevents" to tell property list file hardwareInfoPath
 					set hardwareItems to (first property list item of property list item "_items" of first property list item)
-					set serialNumber to ((value of property list item "serial_number" of hardwareItems) as string)
+					set serialNumber to ((value of property list item "serial_number" of hardwareItems) as text)
 					if (serialNumber is equal to "Not Available") then
 						try
-							set serialNumber to ((value of property list item "riser_serial_number" of hardwareItems) as string)
+							set serialNumber to ((value of property list item "riser_serial_number" of hardwareItems) as text)
 							set serialNumber to (do shell script "echo '" & serialNumber & "' | tr -d '[:space:]'")
 						on error
 							set serialNumber to "UNKNOWNSERIAL-" & (random number from 100 to 999)
@@ -483,8 +475,8 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 			if (efiCheckIsRunning is equal to 0) then
 				repeat
 					try -- EFIcheck may open UserNotificationCenter with a "Your computer has detected a potential problem" alert if EFI Firmware is out-of-date.
-						if (application "/System/Library/CoreServices/UserNotificationCenter.app" is running) then
-							tell application "System Events" to tell application process "UserNotificationCenter"
+						if (application id "com.apple.UserNotificationCenter" is running) then
+							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
 								repeat 60 times
 									set clickedDontSendButton to false
 									repeat with thisUNCWindow in windows
@@ -570,7 +562,7 @@ defaults write NSGlobalDomain AppleTextDirection -bool false
 			repeat with thisLocalSnapshot in (paragraphs of allLocalSnapshots)
 				try
 					-- Have to delete each Snapshot individually on High Sierra
-					do shell script ("tmutil deletelocalsnapshots " & (quoted form of (thisLocalSnapshot as string)))
+					do shell script ("tmutil deletelocalsnapshots " & (quoted form of (thisLocalSnapshot as text)))
 				end try
 			end repeat
 		end try
@@ -616,7 +608,7 @@ defaults export com.apple.menuextra.clock -") -- Seems that restarting SystemUIS
 		do shell script "defaults write com.apple.loginwindow TALLogoutSavesState -bool false"
 	end try
 	
-	-- DISABLE AUTOMATIC OS & APP STORE  UPDATES
+	-- DISABLE AUTOMATIC OS & APP STORE UPDATES
 	-- Keeping AutomaticCheckEnabled and AutomaticDownload enabled is required for EFIAllowListAll to be able to be updated when EFIcheck is run by our scripts, the rest should be disabled.
 	try
 		doShellScriptAsAdmin("
@@ -634,7 +626,7 @@ defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false
 	end try
 	
 	-- DO NOT SHOW INTERNAL/BOOT DRIVE ON DESKTOP AND SET NEW FINDER WINDOWS TO COMPUTER
-	tell application "Finder" to tell Finder preferences
+	tell application id "com.apple.finder" to tell Finder preferences
 		set desktop shows hard disks to false
 		set desktop shows external hard disks to true
 		set desktop shows removable media to true
@@ -660,7 +652,7 @@ defaults write com.apple.universalaccess closeViewPanningMode -int 0
 				set currentMouseButton to (do shell script ("defaults read com.apple.driver.AppleHIDMouse Button" & buttonNumber))
 			end try
 			
-			if (currentMouseButton is not equal to (buttonNumber as string)) then
+			if (currentMouseButton is not equal to (buttonNumber as text)) then
 				try
 					do shell script ("defaults write com.apple.driver.AppleHIDMouse Button" & buttonNumber & " -int " & buttonNumber)
 				end try
@@ -668,11 +660,12 @@ defaults write com.apple.universalaccess closeViewPanningMode -int 0
 		end repeat
 	end try
 	
-	-- HIDE ANY SYSTEM PREFERENCES BADGES FOR ANY UPDATES (such as Big Sur)
+	-- HIDE ANY SYSTEM PREFERENCES BADGES FOR ANY OS UPDATES
 	try
-		if ((do shell script "defaults read com.apple.systempreferences AttentionPrefBundleIDs") is not equal to "0") then
-			do shell script "defaults write com.apple.systempreferences AttentionPrefBundleIDs 0; killall Dock"
-		end if
+		do shell script "defaults delete com.apple.systempreferences AttentionPrefBundleIDs"
+		-- NOTE: Can just delete the "AttentionPrefBundleIDs" without checking if it exists since it will just error if not which will get caught by the try block.
+		-- Also, NOT running "killall Dock" after deleting since System Preferences is not always shown in the Dock (unless it is running).
+		-- But still deleting the key so that the "Update" tag is not shown in the Apple menu (and so the badge is not shown WITHIN System Preferences in the prefPane icon).
 	end try
 	
 	-- SET TOUCH BAR SETTINGS TO *NOT* BE "App Controls" (because AppleScript alert buttons don't update properly)
@@ -736,7 +729,7 @@ killall ControlStrip
 	if (currentComputerName is not equal to intendedComputerName) then
 		try
 			set AppleScript's text item delimiters to ""
-			set intendedLocalHostName to "FreeGeek-" & ((words of thisDriveName) as string) & "-" & serialNumber
+			set intendedLocalHostName to "FreeGeek-" & ((words of thisDriveName) as text) & "-" & serialNumber
 			doShellScriptAsAdmin("
 scutil --set ComputerName " & (quoted form of intendedComputerName) & "
 scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
@@ -752,7 +745,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 	
 	set wirelessNetworkPasswordsToDelete to {}
 	
-	tell application "System Events"
+	tell application id "com.apple.systemevents"
 		try
 			set currentDriveName to (name of startup disk)
 			if (currentDriveName is not equal to thisDriveName) then
@@ -789,8 +782,8 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 			set AppleScript's text item delimiters to ""
 			tell current location of network preferences
 				repeat with thisActiveNetworkService in (every service whose active is true)
-					if (((name of interface of thisActiveNetworkService) as string) is equal to "Wi-Fi") then
-						set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as string)
+					if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
+						set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as text)
 						try
 							set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & thisWiFiInterfaceID)))
 							try
@@ -802,7 +795,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 							end try
 							repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
 								if (thisPreferredWirelessNetwork starts with "	") then
-									set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as string)
+									set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 									if ((thisPreferredWirelessNetwork is not equal to "FG Reuse") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
 										try
 											do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
@@ -877,7 +870,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 	-- TRASH DESKTOP FILES WITH FINDER INSTEAD OF RM SO FOLDER ACCESS IS NOT NECESSARY ON CATALINA AND NEWER
 	try
 		with timeout of 5 seconds -- Timeout so that we don't wait if Finder prompts for permissions to trash a file/folder
-			tell application "Finder"
+			tell application id "com.apple.finder"
 				try
 					delete file ((("/Users/" & currentUsername & "/Desktop/QA Helper - Computer Specs.txt") as POSIX file) as alias)
 				end try
@@ -889,7 +882,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 	end try
 	
 	try
-		tell application "Finder"
+		tell application id "com.apple.finder"
 			set warns before emptying of trash to false
 			try
 				empty the trash
@@ -912,7 +905,7 @@ killall usernoted
 	end try
 	try
 		with timeout of 1 second
-			tell application "NotificationCenter" to quit
+			tell application id "com.apple.notificationcenterui" to quit
 		end timeout
 	end try
 	
@@ -955,7 +948,7 @@ killall usernoted
 	end try
 	
 	try
-		tell application "System Events"
+		tell application id "com.apple.systemevents"
 			-- Turn Brightness all the way up.
 			repeat 50 times
 				-- Undocumented key code to turn up brightness that works on 10.13+
@@ -972,11 +965,9 @@ killall usernoted
 	end try
 	
 	try
-		if (application "/System/Library/CoreServices/KeyboardSetupAssistant.app" is running) then
-			with timeout of 1 second
-				tell application "KeyboardSetupAssistant" to quit
-			end timeout
-		end if
+		with timeout of 1 second
+			tell application id "com.apple.KeyboardSetupAssistant" to quit
+		end timeout
 	end try
 	
 	try
@@ -984,11 +975,12 @@ killall usernoted
 		
 		try
 			set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
+			set securityAgentID to (id of application securityAgentPath)
 			repeat 60 times
 				if (application securityAgentPath is running) then
 					delay 1
 					with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-						tell application "System Events" to tell application process "SecurityAgent"
+						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 							set frontmost to true
 							key code 53 -- Cannot reliably get SecurityAgent windows, so if it's running (for decryption prompts) just hit escape until it quits (or until 60 seconds passes)
 						end tell
@@ -1001,11 +993,11 @@ killall usernoted
 	end try
 	
 	try
-		if (application "/System/Library/CoreServices/UserNotificationCenter.app" is running) then
+		if (application id "com.apple.UserNotificationCenter" is running) then
 			repeat 60 times
 				set clickedIgnoreCancelDontSendButton to false
 				with timeout of 2 seconds -- Adding timeout because maybe this could be where things are getting hung sometimes.
-					tell application "System Events" to tell application process "UserNotificationCenter"
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
 						repeat with thisUNCWindow in windows
 							if ((count of buttons of thisUNCWindow) ≥ 2) then
 								repeat with thisUNCButton in (buttons of thisUNCWindow)
@@ -1026,11 +1018,11 @@ killall usernoted
 	end try
 	
 	try
-		if (application "/System/Library/CoreServices/backupd.bundle/Contents/Resources/TMHelperAgent.app" is running) then
+		if (application id "com.apple.TMHelperAgent" is running) then
 			repeat 60 times
 				set clickedDontUseButton to false
 				with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-					tell application "System Events" to tell application process "TMHelperAgent"
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.TMHelperAgent")
 						repeat with thisTMHAWindow in windows
 							if ((count of buttons of thisTMHAWindow) ≥ 2) then
 								repeat with thisTMHAButton in (buttons of thisTMHAWindow)
@@ -1060,14 +1052,14 @@ killall usernoted
 		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
 	on error
 		try
-			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-			if ((count of listOfRunningApps) > 0) then
+			tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not (id of me))))
+			if ((count of listOfRunningAppIDs) > 0) then
 				try
-					repeat with thisAppName in listOfRunningApps
+					repeat with thisAppID in listOfRunningAppIDs
 						try
-							if (application thisAppName is running) then
+							if (application id thisAppID is running) then
 								with timeout of 1 second
-									tell application thisAppName to quit
+									tell application id thisAppID to quit without saving
 								end timeout
 							end if
 						end try
@@ -1075,14 +1067,11 @@ killall usernoted
 				end try
 				delay 3
 				try
-					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-					repeat with thisAppName in listOfRunningApps
-						repeat 2 times
-							try
-								do shell script "pkill -f " & (quoted form of thisAppName)
-							end try
-						end repeat
-					end repeat
+					set AppleScript's text item delimiters to space
+					tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not (id of me)))) as text)
+					if (allRunningAppPIDs is not equal to "") then
+						do shell script ("kill " & allRunningAppPIDs)
+					end if
 				end try
 			end if
 		end try
@@ -1090,7 +1079,7 @@ killall usernoted
 	
 	try
 		-- Previous brightness key codes may end with a file on the Desktop selected, so clear it
-		tell application "Finder" to set selection to {} of desktop
+		tell application id "com.apple.finder" to set selection to {} of desktop
 	end try
 	
 	try
@@ -1131,14 +1120,14 @@ killall usernoted
 			
 			-- Quit all apps before rebooting
 			try
-				tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-				if ((count of listOfRunningApps) > 0) then
+				tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not (id of me))))
+				if ((count of listOfRunningAppIDs) > 0) then
 					try
-						repeat with thisAppName in listOfRunningApps
+						repeat with thisAppID in listOfRunningAppIDs
 							try
-								if (application thisAppName is running) then
+								if (application id thisAppID is running) then
 									with timeout of 1 second
-										tell application thisAppName to quit
+										tell application id thisAppID to quit without saving
 									end timeout
 								end if
 							end try
@@ -1146,19 +1135,16 @@ killall usernoted
 					end try
 					delay 3
 					try
-						tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-						repeat with thisAppName in listOfRunningApps
-							repeat 2 times
-								try
-									do shell script "pkill -f " & (quoted form of thisAppName)
-								end try
-							end repeat
-						end repeat
+						set AppleScript's text item delimiters to space
+						tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not (id of me)))) as text)
+						if (allRunningAppPIDs is not equal to "") then
+							do shell script ("kill " & allRunningAppPIDs)
+						end if
 					end try
 				end if
 			end try
 			
-			tell application "System Events" to restart with state saving preference
+			tell application id "com.apple.systemevents" to restart with state saving preference
 			
 			quit
 			delay 10
@@ -1167,7 +1153,7 @@ killall usernoted
 	
 	try
 		(("/Applications/Breakaway.app" as POSIX file) as alias)
-		if (application ("Break" & "away") is not running) then do shell script "open -a '/Applications/Breakaway.app'"
+		if (application id ("com.mutablecode." & "breakaway") is not running) then do shell script "open -a '/Applications/Breakaway.app'" -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 	end try
 	
 	try
@@ -1196,7 +1182,7 @@ killall usernoted
 						try
 							if (thisLauncherFlagBundleId starts with "org.freegeek.") then
 								set AppleScript's text item delimiters to space
-								do shell script "open -na " & (quoted form of ("/Applications/" & ((words of (text 14 thru -1 of thisLauncherFlagBundleId)) as string) & ".app"))
+								do shell script "open -na " & (quoted form of ("/Applications/" & ((words of (text 14 thru -1 of thisLauncherFlagBundleId)) as text) & ".app"))
 							else
 								do shell script "open -nb " & thisLauncherFlagBundleId
 							end if
@@ -1250,7 +1236,7 @@ else
 end if
 
 on doShellScriptAsAdmin(command)
-	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_ & https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_4/RN-10_4.html#//apple_ref/doc/uid/TP40000982-CH104-SW10
 	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
 	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
 	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.

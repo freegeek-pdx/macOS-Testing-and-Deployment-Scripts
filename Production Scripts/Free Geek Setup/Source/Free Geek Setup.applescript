@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.26-2
+-- Version: 2022.12.21-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -65,8 +65,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -115,7 +115,7 @@ set demoPassword to "freegeek"
 
 
 set AppleScript's text item delimiters to ""
-set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 
 
 if (((short user name of (system info)) is equal to demoUsername) and ((POSIX path of (path to me)) is equal to ("/Users/" & demoUsername & "/Applications/" & (name of me) & ".app/"))) then
@@ -173,9 +173,9 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	try
 		repeat with thisWindow in (current application's NSApp's |windows|())
 			if (thisWindow's isVisible() is true) then
-				if (((thisWindow's title()) as string) is equal to (name of me)) then
+				if (((thisWindow's title()) as text) is equal to (name of me)) then
 					repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-						if (((thisProgressWindowSubView's className()) as string) is equal to "NSButton" and ((thisProgressWindowSubView's title() as string) is equal to "Stop")) then
+						if (((thisProgressWindowSubView's className()) as text) is equal to "NSButton" and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
 							(thisProgressWindowSubView's setEnabled:false)
 							
 							exit repeat
@@ -200,11 +200,9 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	
 	-- CLOSE KEYBOARD SETUP APP IF IT'S OPEN
 	try
-		if (application "/System/Library/CoreServices/KeyboardSetupAssistant.app" is running) then
-			with timeout of 1 second
-				tell application "KeyboardSetupAssistant" to quit
-			end timeout
-		end if
+		with timeout of 1 second
+			tell application id "com.apple.KeyboardSetupAssistant" to quit
+		end timeout
 	end try
 	
 	-- TURN OFF SCREEN LOCK (only do this on Mojave and newer since that is when the "sysadminctl -screenLock off" command was added, on High Sierra Screen Lock will be disabled with GUI scripting during "Cleanup After QA Complete".
@@ -253,7 +251,7 @@ killall ControlStrip
 		display alert "CRITICAL “" & (name of me) & "” ERROR:
 
 “" & adminUsername & "” Does Not Have Admin Privileges" message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Shut Down"} default button 1 as critical
-		tell application "System Events" to shut down with state saving preference
+		tell application id "com.apple.systemevents" to shut down with state saving preference
 		quit
 		delay 10
 	end if
@@ -315,9 +313,6 @@ killall ControlStrip
 		end try
 	end if
 	
-	set systemPreferencesOrSettings to "System Preferences"
-	if (isVenturaOrNewer) then set systemPreferencesOrSettings to "System Settings"
-	
 	try
 		set globalTCCdbPath to "/Library/Application Support/com.apple.TCC/TCC.db" -- For more info about the TCC.db structure, see "fg-install-os" script and https://www.rainforestqa.com/blog/macos-tcc-db-deep-dive
 		set whereAllowedOrAuthValue to "allowed = 1"
@@ -354,7 +349,7 @@ killall ControlStrip
 			try
 				if (userTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceAppleEvents|" & bundleIDofSystemEventsApp)) then error ("“" & (name of me) & "” WAS NOT GRANTED REQUIRED AppleEvents/Automation Access for “System Events”")
 				if (userTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceAppleEvents|" & bundleIDofFinderApp)) then error ("“" & (name of me) & "” WAS NOT GRANTED REQUIRED AppleEvents/Automation Access for “Finder”")
-				if (userTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceAppleEvents|" & bundleIDofSystemPreferencesOrSettingsApp)) then error ("“" & (name of me) & "”  WAS NOT GRANTED REQUIRED AppleEvents/Automation Access for “" & systemPreferencesOrSettings & "”")
+				if (userTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceAppleEvents|" & bundleIDofSystemPreferencesOrSettingsApp)) then error ("“" & (name of me) & "”  WAS NOT GRANTED REQUIRED AppleEvents/Automation Access for “" & (name of application id bundleIDofSystemPreferencesOrSettingsApp) & "”") -- Use "name of application id" to correctly display "System Preferences" or "System Settings" depending on macOS version.
 				
 				if (userTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceAppleEvents|" & bundleIDofSystemEventsApp)) then error "“Free Geek Demo Helper” WAS NOT GRANTED REQUIRED AppleEvents/Automation Access for “System Events”"
 				if (userTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceAppleEvents|" & bundleIDofFinderApp)) then error "“Free Geek Demo Helper” WAS NOT GRANTED REQUIRED AppleEvents/Automation Access for “Finder”"
@@ -371,8 +366,8 @@ killall ControlStrip
 			on error checkUserTCCErrorMessage
 				if (didJustGrantUserTCC) then error checkUserTCCErrorMessage
 				
-				-- The following csreq (Code Signing Requirement) hex strings were generated by the "generate-csreq-hex-for-tcc-db.jxa" script in the "Other Scripts" folder.
-				-- See comments in the "generate-csreq-hex-for-tcc-db.jxa" script for some important detailed information about these csreq hex strings (and https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+				-- The following csreq (Code Signing Requirement) hex strings were generated by the "generate_csreq_hex_for_tcc_db.jxa" script in the "Other Scripts" folder.
+				-- See comments in the "generate_csreq_hex_for_tcc_db.jxa" script for some important detailed information about these csreq hex strings (and https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
 				
 				-- The following apps are the CLIENT apps that will be sending AppleEvents (or accessing the Microphone).
 				-- Including the csreq for the client seems to NOT actually be required when initially setting the TCC permissions and macOS will fill them out when the app launches for the first time.
@@ -448,13 +443,14 @@ killall ControlStrip
 			end try
 			display alert ("CRITICAL “" & (name of me) & "” TCC ERROR:
 
-" & tccErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research if trying again does not work." buttons {"Shut Down", "Try Again"} cancel button 1 default button 2 as critical
-			-- NOTE: Allow trying again in case the error is "Error: in prepare, database is locked (5)" which I think indicates another process is currently editing the DB and our edits will work when it's not locked, or some other error that I'm unaware of that is also temporary.
+" & tccErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research if trying again does not work." buttons {"Shut Down", "Try Again"} cancel button 1 default button 2 as critical giving up after 10
+			-- NOTE: Allow trying again in case the error is "Error: in prepare, database is locked (5)" or "Error: near line 1: stepping, database is locked (5)" which I think indicates another process is currently editing the DB and our edits will work when it's not locked, or some other error that I'm unaware of that is also temporary.
+			-- Since this error seems to not be super uncommon, but a re-attempt always works, make the alert "give up after" 15 seconds so that the technician can see the error but it also just tried again automatically so they don't need to click "Try Again" manually.
 			try
 				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		on error
-			tell application "System Events" to shut down with state saving preference
+			tell application id "com.apple.systemevents" to shut down with state saving preference
 		end try
 		quit
 		delay 10
@@ -480,7 +476,7 @@ killall ControlStrip
 		end try
 	end repeat
 	
-	tell application "Finder"
+	tell application id "com.apple.finder"
 		try
 			set desktop position of alias file "QA Helper.app" of desktop to {100, 110}
 		end try
@@ -516,6 +512,8 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 		end if
 	end if
 	
+	set demoHelperAppPath to ("/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app")
+	
 	try
 		try
 			do shell script "mkdir " & (quoted form of buildInfoPath)
@@ -526,12 +524,12 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 		end try
 		
 		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-		do shell script "open -na '/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app'" -- Launch Demo Helper once first before any other long processes start and any situations that may cause Setup to not finish. Demo Helper will be set to auto-launch after Setup is finished.
+		do shell script ("open -na " & (quoted form of demoHelperAppPath)) -- Launch Demo Helper once first before any other long processes start and any situations that may cause Setup to not finish. Demo Helper will be set to auto-launch after Setup is finished.
 		
 		set demoHelperDidLaunch to false
 		repeat 10 times
 			try
-				if (application ("/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app") is running) then
+				if (application demoHelperAppPath is running) then
 					set demoHelperDidLaunch to true
 					exit repeat
 				end if
@@ -541,7 +539,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 		
 		if (demoHelperDidLaunch) then
 			try
-				repeat while (application ("/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app") is running) -- Wait for Demo Helper to finish so that Setup and Demo Helper don't interfere with eachother.
+				repeat while (application demoHelperAppPath is running) -- Wait for Demo Helper to finish so that Setup and Demo Helper don't interfere with eachother.
 					delay 0.5
 				end repeat
 			end try
@@ -557,11 +555,11 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 		repeat 15 times
 			try
 				with timeout of 1 second
-					tell application "System Preferences" to quit
+					tell application id "com.apple.systempreferences" to quit
 				end timeout
 			end try
 			try
-				tell application "System Preferences"
+				tell application id "com.apple.systempreferences"
 					repeat 180 times -- Wait for Security pane to load
 						try
 							activate
@@ -571,7 +569,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 						if ((name of window 1) is "Security & Privacy") then exit repeat
 					end repeat
 				end tell
-				tell application "System Events" to tell application process "System Preferences"
+				tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 					set screenLockCheckbox to (checkbox 1 of tab group 1 of window 1)
 					if ((screenLockCheckbox's value as boolean) is true) then
 						set frontmost to true
@@ -610,7 +608,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 		end repeat
 		try
 			with timeout of 1 second
-				tell application "System Preferences" to quit
+				tell application id "com.apple.systempreferences" to quit
 			end timeout
 		end try
 	end if
@@ -639,7 +637,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 	-- Not really sure this is actually necessary since "fgrest" and "fg-snapshot-reset.sh" both clear NVRAM which would clear this setting out (when TRIM is not manually enabled on Catalina or newer or when it's not protected on Apple Silicon).
 	set nameOfBootedDisk to ""
 	try
-		tell application "System Events" to set nameOfBootedDisk to (name of startup disk)
+		tell application id "com.apple.systemevents" to set nameOfBootedDisk to (name of startup disk)
 	end try
 	
 	set nameOfCurrentlySelectedStartupDisk to ""
@@ -650,14 +648,17 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 	if ((nameOfBootedDisk is not equal to "") and (nameOfBootedDisk is not equal to nameOfCurrentlySelectedStartupDisk)) then
 		set didSetStartUpDisk to false
 		
+		set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
+		set securityAgentID to (id of application securityAgentPath)
+		
 		repeat 15 times
 			try
 				with timeout of 1 second
-					tell application systemPreferencesOrSettings to quit
+					tell application id "com.apple.systempreferences" to quit
 				end timeout
 			end try
 			try
-				tell application "System Preferences"
+				tell application id "com.apple.systempreferences"
 					repeat 180 times -- Wait for Security pane to load
 						try
 							activate
@@ -689,7 +690,6 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 							set volume alert volume 0
 						end try
 						
-						set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
 						repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch since it can take a moment, but the script will stall if we go past this before it launches.
 							delay 1
 							try
@@ -703,7 +703,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 							try
 								if (application securityAgentPath is running) then
 									with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-										tell application "System Events" to tell application process "SecurityAgent"
+										tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 											set frontmost to true
 											key code 53 -- Cannot reliably get SecurityAgent windows, so if it's running (for decryption prompts) just hit escape until it quits (or until 60 seconds passes)
 										end tell
@@ -727,7 +727,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 				set currentlySelectedStartupDiskValue to ""
 				set leftOrRightArrowKeyCode to 124 -- RIGHT ARROW Key
 				if (isVenturaOrNewer) then
-					tell application "System Events" to tell application process systemPreferencesOrSettings
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
@@ -765,7 +765,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 						set didAuthenticateSecurityAgent to false
 						
 						repeat numberOfStartupDisks times -- The loop should be exited before even getting through numberOfStartupDisks, but want some limit so we don't get stuck in an infinite loop if something goes very wrong.
-							tell application "System Events" to tell application process systemPreferencesOrSettings
+							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 								-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
 								set frontmost to true
 								set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
@@ -781,12 +781,11 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 							
 							if (not didAuthenticateSecurityAgent) then
 								set didTryToAuthenticateSecurityAgent to false
-								set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
 								repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
 									delay 1
 									try
 										if (application securityAgentPath is running) then
-											tell application "System Events" to tell application process "SecurityAgent"
+											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 												if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
 													repeat with thisSecurityAgentButton in (buttons of window 1)
 														if (((title of thisSecurityAgentButton) is equal to "Unlock") or ((title of thisSecurityAgentButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
@@ -808,7 +807,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 										delay 1
 										try
 											if (application securityAgentPath is running) then
-												tell application "System Events" to tell application process "SecurityAgent"
+												tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 													if ((number of windows) is 0) then
 														set didAuthenticateSecurityAgent to true
 														exit repeat
@@ -824,7 +823,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 							end if
 							
 							if (didAuthenticateSecurityAgent) then
-								tell application "System Events" to tell application process systemPreferencesOrSettings
+								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
 									if ((enabled of button 1 of startupDisksSelectionGroup) and ((value of static text 2 of startupDisksSelectionGroup) ends with ("“" & nameOfBootedDisk & "”."))) then
 										set didSetStartUpDisk to true
@@ -837,7 +836,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 						end repeat
 					end if
 				else
-					tell application "System Events" to tell application process systemPreferencesOrSettings
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
@@ -978,7 +977,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 					-- If didSetStartUpDisk, double-check by getting the name of the disk specified by "bless --getBoot" which seems to get updated shortly after System Preferences/Settings has QUIT.
 					try
 						with timeout of 1 second
-							tell application systemPreferencesOrSettings to quit
+							tell application id "com.apple.systempreferences" to quit
 						end timeout
 					end try
 					
@@ -1003,7 +1002,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 		end repeat
 		try
 			with timeout of 1 second
-				tell application systemPreferencesOrSettings to quit
+				tell application id "com.apple.systempreferences" to quit
 			end timeout
 		end try
 	end if
@@ -1052,14 +1051,14 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 			
 			-- Quit all apps before shutting down or rebooting
 			try
-				tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-				if ((count of listOfRunningApps) > 0) then
+				tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not (id of me))))
+				if ((count of listOfRunningAppIDs) > 0) then
 					try
-						repeat with thisAppName in listOfRunningApps
+						repeat with thisAppID in listOfRunningAppIDs
 							try
-								if (application thisAppName is running) then
+								if (application id thisAppID is running) then
 									with timeout of 1 second
-										tell application thisAppName to quit
+										tell application id thisAppID to quit without saving
 									end timeout
 								end if
 							end try
@@ -1067,22 +1066,19 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 					end try
 					delay 3
 					try
-						tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not (name of me))))
-						repeat with thisAppName in listOfRunningApps
-							repeat 2 times
-								try
-									do shell script "pkill -f " & (quoted form of thisAppName)
-								end try
-							end repeat
-						end repeat
+						set AppleScript's text item delimiters to space
+						tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not (id of me)))) as text)
+						if (allRunningAppPIDs is not equal to "") then
+							do shell script ("kill " & allRunningAppPIDs)
+						end if
 					end try
 				end if
 			end try
 			
 			if (isAppleSilicon) then
-				tell application "System Events" to shut down with state saving preference
+				tell application id "com.apple.systemevents" to shut down with state saving preference
 			else
-				tell application "System Events" to restart with state saving preference
+				tell application id "com.apple.systemevents" to restart with state saving preference
 			end if
 			quit
 			delay 10
@@ -1184,7 +1180,7 @@ to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
 Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
 
 Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Shut Down"} as critical
-					tell application "System Events" to shut down with state saving preference
+					tell application id "com.apple.systemevents" to shut down with state saving preference
 					
 					quit
 					delay 10
@@ -1233,7 +1229,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 							set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
 							if ((count of remoteManagementOrganizationContactInfo) > 0) then
 								set AppleScript's text item delimiters to (linefeed & tab & tab)
-								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as string)
+								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as text)
 							end if
 							
 							try
@@ -1263,7 +1259,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 
 
 		    👉 ‼️ INFORM AN INSTRUCTOR OR MANAGER ‼️ 👈" buttons {remoteManagementDialogButton} with title "Remote Management Enabled"
-							tell application "System Events" to shut down with state saving preference
+							tell application id "com.apple.systemevents" to shut down with state saving preference
 							
 							quit
 							delay 10
@@ -1285,14 +1281,14 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	repeat 30 times
 		try
 			do shell script "system_profiler -xml SPHardwareDataType SPNVMeDataType SPSerialATADataType > " & (quoted form of hardwareAndDriveInfoPath)
-			tell application "System Events" to tell property list file hardwareAndDriveInfoPath
+			tell application id "com.apple.systemevents" to tell property list file hardwareAndDriveInfoPath
 				repeat with i from 1 to (number of property list items)
 					set thisDataTypeProperties to (item i of property list items)
-					set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as string)
+					set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as text)
 					if (thisDataType is equal to "SPHardwareDataType") then
 						set hardwareItems to (first property list item of property list item "_items" of thisDataTypeProperties)
-						set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as string)
-						set currentEFIfirmwareVersion to ((first word of ((value of property list item "boot_rom_version" of hardwareItems) as string)) as string) -- T2 Mac's have boot_rom_version's like "1037.100.362.0.0 (iBridge: 17.16.14281.0.0,0)" but we only care about the first part.
+						set modelIdentifier to ((value of property list item "machine_model" of hardwareItems) as text)
+						set currentEFIfirmwareVersion to ((first word of ((value of property list item "boot_rom_version" of hardwareItems) as text)) as text) -- T2 Mac's have boot_rom_version's like "1037.100.362.0.0 (iBridge: 17.16.14281.0.0,0)" but we only care about the first part.
 						set modelIdentifierName to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -d '[:digit:],'") -- Need use this whenever comparing along with Model ID numbers since there could be false matches for the newer "MacXX,Y" style Model IDs if I used shortModelName in those conditions instead (which I used to do).
 						set modelIdentifierNumber to (do shell script "echo " & (quoted form of modelIdentifier) & " | tr -dc '[:digit:],'")
 						set AppleScript's text item delimiters to ","
@@ -1306,7 +1302,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 						set sataItems to (property list item "_items" of thisDataTypeProperties)
 						repeat with j from 1 to (number of property list items in sataItems)
 							set thisSataController to (property list item j of sataItems)
-							set thisSataControllerName to ((value of property list item "_name" of thisSataController) as string)
+							set thisSataControllerName to ((value of property list item "_name" of thisSataController) as text)
 							if (thisSataControllerName does not contain "Thunderbolt") then
 								set thisSataControllerItems to (property list item "_items" of thisSataController)
 								repeat with k from 1 to (number of property list items in thisSataControllerItems)
@@ -1316,11 +1312,11 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 										
 										if (thisDataType is equal to "SPNVMeDataType") then
 											set internalDriveIsNVMe to true
-											set nvmeDriveModelName to ((value of property list item "_name" of thisSataControllerItem) as string)
-											set thisSataItemTrimSupport to ((value of property list item "spnvme_trim_support" of thisSataControllerItem) as string)
+											set nvmeDriveModelName to ((value of property list item "_name" of thisSataControllerItem) as text)
+											set thisSataItemTrimSupport to ((value of property list item "spnvme_trim_support" of thisSataControllerItem) as text)
 										else
-											set thisSataItemMediumType to ((value of property list item "spsata_medium_type" of thisSataControllerItem) as string)
-											if (thisSataItemMediumType is equal to "Solid State") then set thisSataItemTrimSupport to ((value of property list item "spsata_trim_support" of thisSataControllerItem) as string)
+											set thisSataItemMediumType to ((value of property list item "spsata_medium_type" of thisSataControllerItem) as text)
+											if (thisSataItemMediumType is equal to "Solid State") then set thisSataItemTrimSupport to ((value of property list item "spsata_trim_support" of thisSataControllerItem) as text)
 										end if
 										
 										if (thisSataItemTrimSupport is not equal to "Yes") then
@@ -1357,7 +1353,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		end try
 		display alert "Since this Mac has a T2 Security Chip, macOS must be installed on an “APFS” formatted drive." message "Future macOS Updates will not be able to be installed on T2 Macs with macOS installed on a “Mac OS Extended (Journaled)” formatted drive." buttons {"Shut Down"} default button 1 as critical
 		
-		tell application "System Events" to shut down with state saving preference
+		tell application id "com.apple.systemevents" to shut down with state saving preference
 		
 		quit
 		delay 10
@@ -1377,7 +1373,7 @@ You MUST replace the internal drive with a non-NVMe (AHCI) drive before this Mac
 
 The EFI Firmware will never be able to be properly updated when our customers run system updates with an NVMe drive installed as the primary internal drive." buttons {"Shut Down"} default button 1 with title (name of me) with icon caution
 		
-		tell application "System Events" to shut down with state saving preference
+		tell application id "com.apple.systemevents" to shut down with state saving preference
 		
 		quit
 		delay 10
@@ -1416,13 +1412,13 @@ The EFI Firmware or the EFI AllowList MUST be updated before this Mac can be sol
 					end try
 				end if
 			else
-				tell application "System Events" to restart with state saving preference
+				tell application id "com.apple.systemevents" to restart with state saving preference
 				
 				quit
 				delay 10
 			end if
 		on error
-			tell application "System Events" to shut down with state saving preference
+			tell application id "com.apple.systemevents" to shut down with state saving preference
 			
 			quit
 			delay 10
@@ -1471,27 +1467,27 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 
 	👉 ‼️ PLEASE CONSULT AN INSTRUCTOR BEFORE CONTINUING ‼️ 👈" buttons {"No, Just Close Alert", "Yes, Open “SSD Fan Control” Website"} cancel button 1 default button 2 as critical
 				if ((button returned of highFansAlertReply) is equal to "Yes, Open “SSD Fan Control” Website") then
-					tell application "Safari"
+					tell application id "com.apple.Safari"
 						try
 							activate
 						end try
 						close every window without saving
 					end tell
 					
-					tell application "System Events" to keystroke "n" using {shift down, command down} -- Open New Private Window
+					tell application id "com.apple.systemevents" to keystroke "n" using {shift down, command down} -- Open New Private Window
 					
 					repeat 10 times
 						delay 1
-						tell application "Safari"
+						tell application id "com.apple.Safari"
 							if ((count of windows) ≥ 1) then exit repeat -- Make sure New Private Window is Open
 						end tell
 					end repeat
 					
-					tell application "System Events" to keystroke tab -- Tab to take focus out of address field
+					tell application id "com.apple.systemevents" to keystroke tab -- Tab to take focus out of address field
 					
-					tell application "Safari"
+					tell application id "com.apple.Safari"
 						set ssdFanControlWebsite to "https://exirion.net/ssdfanctrl/"
-						if (application "Safari" is not running) then
+						if (application id "com.apple.Safari" is not running) then
 							open location ssdFanControlWebsite
 							try
 								activate
@@ -1520,49 +1516,7 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 			((userLaunchAgentsPath as POSIX file) as alias)
 		on error
 			try
-				tell application "Finder" to make new folder at (path to library folder from user domain) with properties {name:"LaunchAgents"}
-			end try
-		end try
-		
-		-- NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
-		-- On macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
-		set demoHelperLaunchAgentLabel to "org.freegeek.Free-Geek-Demo-Helper"
-		set demoHelperLaunchAgentPlistName to (demoHelperLaunchAgentLabel & ".plist")
-		set demoHelperUserLaunchAgentPlistPath to userLaunchAgentsPath & demoHelperLaunchAgentPlistName
-		set demoHelperUserLaunchAgentPlistContents to "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>Label</key>
-	<string>" & demoHelperLaunchAgentLabel & "</string>
-	<key>Program</key>
-	<string>/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app/Contents/Resources/Launch Free Geek Demo Helper</string>
-	<key>AssociatedBundleIdentifiers</key>
-	<string>" & demoHelperLaunchAgentLabel & "</string>
-	<key>StandardOutPath</key>
-	<string>/dev/null</string>
-	<key>StandardErrorPath</key>
-	<string>/dev/null</string>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>StartInterval</key>
-	<integer>1800</integer>
-</dict>
-</plist>"
-		set needsToWriteDemoHelperPlistFile to false
-		try
-			((demoHelperUserLaunchAgentPlistPath as POSIX file) as alias)
-			set currentDemoHelperUserLaunchAgentPlistContents to (read (demoHelperUserLaunchAgentPlistPath as POSIX file))
-			if (currentDemoHelperUserLaunchAgentPlistContents is not equal to demoHelperUserLaunchAgentPlistContents) then
-				set needsToWriteDemoHelperPlistFile to true
-				try
-					do shell script ("launchctl bootout gui/$(id -u " & demoUsername & ")/" & demoHelperLaunchAgentLabel)
-				end try
-			end if
-		on error
-			set needsToWriteDemoHelperPlistFile to true
-			try
-				tell application "Finder" to make new file at (userLaunchAgentsPath as POSIX file) with properties {name:demoHelperLaunchAgentPlistName}
+				tell application id "com.apple.finder" to make new folder at (path to library folder from user domain) with properties {name:"LaunchAgents"}
 			end try
 		end try
 		
@@ -1574,31 +1528,29 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper")))
 		end try
 		
-		if (needsToWriteDemoHelperPlistFile) then
-			try
-				set openedDemoHelperUserLaunchAgentPlistFile to open for access (demoHelperUserLaunchAgentPlistPath as POSIX file) with write permission
-				set eof of openedDemoHelperUserLaunchAgentPlistFile to 0
-				write demoHelperUserLaunchAgentPlistContents to openedDemoHelperUserLaunchAgentPlistFile starting at eof
-				close access openedDemoHelperUserLaunchAgentPlistFile
-			on error
-				try
-					close access (demoHelperUserLaunchAgentPlistPath as POSIX file)
-				end try
-			end try
-			try
-				do shell script "launchctl bootstrap gui/$(id -u " & demoUsername & ") " & (quoted form of demoHelperUserLaunchAgentPlistPath)
-			end try
-		else
-			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
-				do shell script "open -na '/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app'"
-			end try
-		end if
+		-- NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
+		-- On macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
+		set demoHelperLaunchAgentLabel to "org.freegeek.Free-Geek-Demo-Helper"
+		set demoHelperLaunchAgentPlistName to (demoHelperLaunchAgentLabel & ".plist")
+		set demoHelperUserLaunchAgentPlistPath to (userLaunchAgentsPath & demoHelperLaunchAgentPlistName)
+		try
+			do shell script ("
+/usr/libexec/PlistBuddy \\
+	-c 'Add :Label string " & demoHelperLaunchAgentLabel & "' \\
+	-c \"Add :Program string " & (quoted form of (demoHelperAppPath & "/Contents/Resources/Launch Free Geek Demo Helper")) & "\" \\
+	-c 'Add :AssociatedBundleIdentifiers string " & demoHelperLaunchAgentLabel & "' \\
+	-c 'Add :RunAtLoad bool true' \\
+	-c 'Add :StartInterval integer 1800' \\
+	-c 'Add :StandardOutPath string /dev/null' \\
+	-c 'Add :StandardErrorPath string /dev/null' \\
+	" & (quoted form of demoHelperUserLaunchAgentPlistPath) & "
+launchctl bootstrap gui/$(id -u " & demoUsername & ") " & (quoted form of demoHelperUserLaunchAgentPlistPath))
+		end try
 		
 		set demoHelperDidLaunch to false
 		repeat 10 times
 			try
-				if (application ("/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app") is running) then
+				if (application demoHelperAppPath is running) then
 					set demoHelperDidLaunch to true
 					exit repeat
 				end if
@@ -1608,7 +1560,7 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 		
 		if (demoHelperDidLaunch) then
 			try
-				repeat while (application ("/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app") is running) -- Wait for Demo Helper to finish so that Setup and Demo Helper don't interfere with eachother.
+				repeat while (application demoHelperAppPath is running) -- Wait for Demo Helper to finish so that Setup and Demo Helper don't interfere with eachother.
 					delay 0.5
 				end repeat
 			end try
@@ -1642,8 +1594,8 @@ on checkEFIfirmwareIsNotInAllowList()
 		if (efiCheckIsRunning is equal to 0) then
 			repeat
 				try -- EFIcheck may open UserNotificationCenter with a "Your computer has detected a potential problem" alert if EFI Firmware is out-of-date.
-					if (application "/System/Library/CoreServices/UserNotificationCenter.app" is running) then
-						tell application "System Events" to tell application process "UserNotificationCenter"
+					if (application id "com.apple.UserNotificationCenter" is running) then
+						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
 							repeat 60 times
 								set clickedDontSendButton to false
 								repeat with thisUNCWindow in windows
@@ -1683,7 +1635,7 @@ on checkEFIfirmwareIsNotInAllowList()
 end checkEFIfirmwareIsNotInAllowList
 
 on doShellScriptAsAdmin(command)
-	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_ & https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_4/RN-10_4.html#//apple_ref/doc/uid/TP40000982-CH104-SW10
 	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
 	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
 	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.12-1
+-- Version: 2022.11.30-1
 
 -- Build Flag: LSUIElement
 
@@ -45,8 +45,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -149,7 +149,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 									doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: Successfully Mounted Reset Snapshot\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 								end try
 							on error mountErrorMessage number mountErrorNumber
-								set snapshotMountError to ("FAILED to Mount Reset Snapshot (Error Code " & (mountErrorNumber as string) & ": " & mountErrorMessage & ")")
+								set snapshotMountError to ("FAILED to Mount Reset Snapshot (Error Code " & (mountErrorNumber as text) & ": " & mountErrorMessage & ")")
 								try
 									doShellScriptAsAdmin("echo \"$(date '+%D %T')	Snapshot Helper: " & snapshotMountError & "\" >> '/Users/Shared/.fg-snapshot-preserver/log.txt'")
 								end try
@@ -239,7 +239,7 @@ This should not have happened, please inform and deliver this Mac to Free Geek I
 		end try
 		
 		if (shouldShutDownAfterError) then
-			tell application "System Events" to shut down with state saving preference
+			tell application id "com.apple.systemevents" to shut down with state saving preference
 			quit
 			delay 10
 		end if
@@ -261,7 +261,7 @@ else
 end if
 
 on doShellScriptAsAdmin(command)
-	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_ & https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_4/RN-10_4.html#//apple_ref/doc/uid/TP40000982-CH104-SW10
 	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
 	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
 	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.

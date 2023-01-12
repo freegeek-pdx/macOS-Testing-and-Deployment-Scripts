@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # MIT License
@@ -97,7 +98,7 @@ mtb_dmg_path="$(ls -t "${PROJECT_DIR}/../../MacLand Images/FreeGeek-MacTestBoot-
 echo -e "\nMounting MTB Source DMG \"${mtb_dmg_path##*/}\" to Get Version..."
 mtb_source_volume="$(hdiutil attach "${mtb_dmg_path}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
 if [[ -d "${mtb_source_volume}" ]]; then
-	mtb_source_version="$(cat "${mtb_source_volume}/private/var/root/.mtbVersion")"
+	mtb_source_version="$(< "${mtb_source_volume}/private/var/root/.mtbVersion")"
 	echo "MTB Source Version: ${mtb_source_version}"
 	echo "Unmounting MTB Source DMG at \"${mtb_source_volume}\"..."
 	hdiutil detach "${mtb_source_volume}" &> /dev/null || hdiutil detach "${mtb_source_volume}" -force &> /dev/null || >&2 echo "ERROR: Failed to unmount DMG at \"${mtb_source_volume}\"."
@@ -106,7 +107,7 @@ if [[ -d "${mtb_source_volume}" ]]; then
 	for this_mtb_volume in '/Volumes/Mac Test Boot'*; do
 		if [[ -d "${this_mtb_volume}" ]]; then
 			found_connected_mtb=true
-			this_connected_mtb_version="$(cat "${this_mtb_volume}/private/var/root/.mtbVersion")"
+			this_connected_mtb_version="$(< "${this_mtb_volume}/private/var/root/.mtbVersion")"
 			if [[ "${this_connected_mtb_version}" != "${mtb_source_version}" ]]; then
 				echo "Updating Connected MTB at \"${this_mtb_volume}\"..."
 				asr restore --source "${mtb_dmg_path}" --target "${this_mtb_volume}" --erase --noprompt &
@@ -124,7 +125,7 @@ if [[ -d "${mtb_source_volume}" ]]; then
 	else
 		for this_mtb_volume in '/Volumes/Mac Test Boot'*; do
 			if [[ -d "${this_mtb_volume}" ]]; then
-				this_connected_mtb_version="$(cat "${this_mtb_volume}/private/var/root/.mtbVersion")"
+				this_connected_mtb_version="$(< "${this_mtb_volume}/private/var/root/.mtbVersion")"
 				if [[ "${this_connected_mtb_version}" != "${mtb_source_version}" ]]; then
 					>&2 echo "ERROR: Failed to update connected MTB at \"${this_mtb_volume}\"."
 					some_mtb_failed=true

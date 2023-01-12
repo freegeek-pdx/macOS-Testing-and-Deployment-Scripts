@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # Created by Pico Mitchell (of Free Geek) on 8/9/22.
@@ -32,29 +33,25 @@ all_mac_identification_pages+=( 'HT201634' ) # iMac
 every_truetone_model=''
 
 for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
-    this_mac_idenification_page_source="$(curl -m 5 -sL "https://support.apple.com/${this_mac_idenification_page}")"
-    #this_mac_support_urls="$(echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur)"
-    
-    this_mac_support_model_ids_and_urls="$(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ {  gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')"
-    this_model_identifier=''
+	this_mac_idenification_page_source="$(curl -m 5 -sfL "https://support.apple.com/${this_mac_idenification_page}")"
 
-    IFS=$'\n'
-    for this_model_id_or_specs_url in ${this_mac_support_model_ids_and_urls}; do
-        if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
-            echo " (${this_model_id_or_specs_url}):"
-            truetone_element_from_page="$(curl -m 5 -sL "${this_model_id_or_specs_url}" | xmllint --html --xpath '//*[contains(text(),"True Tone")]/text()' - 2> /dev/null)"
-            if [[ -n "${truetone_element_from_page}" ]]; then
-                echo "Supports True Tone"
-                every_truetone_model+="${this_model_identifier}+"
-            else
-                echo "DOES NOT SUPPORT True Tone"
-            fi
-        else
-            this_model_identifier="${this_model_id_or_specs_url}"
-            echo -en "\n${this_model_identifier}"
-        fi
-    done
-    unset IFS
+	this_model_identifier=''
+	while IFS='' read -r this_model_id_or_specs_url; do
+		if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
+			echo " (${this_model_id_or_specs_url}):"
+			truetone_element_from_page="$(curl -m 5 -sfL "${this_model_id_or_specs_url}" | xmllint --html --xpath '//*[contains(text(),"True Tone")]/text()' - 2> /dev/null)"
+			if [[ -n "${truetone_element_from_page}" ]]; then
+				echo "Supports True Tone"
+				every_truetone_model+="${this_model_identifier}+"
+			else
+				echo "DOES NOT SUPPORT True Tone"
+			fi
+		else
+			this_model_identifier="${this_model_id_or_specs_url}"
+			echo -en "\n${this_model_identifier}"
+		fi
+	done < <(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')
+	# echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur
 done
 
 echo -e "\n\nSupports True Tone"

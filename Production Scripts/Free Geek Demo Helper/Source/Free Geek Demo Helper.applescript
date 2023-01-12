@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.26-1
+-- Version: 2023.1.9-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -46,8 +46,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -144,12 +144,12 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			end try
 			display alert ("CRITICAL “" & (name of me) & "” TCC ERROR:
 
-" & tccErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research if checking again does not work." buttons {"Shut Down", "Check Again"} cancel button 1 default button 2 as critical
+" & tccErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research if checking again does not work." buttons {"Shut Down", "Check Again"} cancel button 1 default button 2 as critical giving up after 10
 			try
 				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		on error
-			tell application "System Events" to shut down with state saving preference
+			tell application id "com.apple.systemevents" to shut down with state saving preference
 		end try
 		quit
 		delay 10
@@ -171,7 +171,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		end try
 		
 		-- Set desktop app icon positions since they can lose their positions a restart.
-		tell application "Finder"
+		tell application id "com.apple.finder"
 			try
 				set desktop position of alias file "QA Helper.app" of desktop to {100, 110}
 			end try
@@ -230,18 +230,18 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		
 		try
 			set AppleScript's text item delimiters to ""
-			set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+			set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 			set hardwareInfoPath to tmpPath & "hardwareInfo.plist"
 			repeat 30 times
 				try
 					do shell script "system_profiler -xml SPHardwareDataType > " & (quoted form of hardwareInfoPath)
-					tell application "System Events" to tell property list file hardwareInfoPath
+					tell application id "com.apple.systemevents" to tell property list file hardwareInfoPath
 						set hardwareItems to (first property list item of property list item "_items" of first property list item)
-						set modelID to ((value of property list item "machine_model" of hardwareItems) as string)
-						set serialNumber to ((value of property list item "serial_number" of hardwareItems) as string)
+						set modelID to ((value of property list item "machine_model" of hardwareItems) as text)
+						set serialNumber to ((value of property list item "serial_number" of hardwareItems) as text)
 						if (serialNumber is equal to "Not Available") then
 							try
-								set serialNumber to ((value of property list item "riser_serial_number" of hardwareItems) as string)
+								set serialNumber to ((value of property list item "riser_serial_number" of hardwareItems) as text)
 								set serialNumber to (do shell script "echo '" & serialNumber & "' | tr -d '[:space:]'")
 							on error
 								set serialNumber to "UNKNOWNSERIAL-" & (random number from 100 to 999)
@@ -316,7 +316,7 @@ defaults write NSGlobalDomain AppleTextDirection -bool false
 					repeat with thisLocalSnapshot in (paragraphs of allLocalSnapshots)
 						try
 							-- Have to delete each Snapshot individually on High Sierra
-							do shell script ("tmutil deletelocalsnapshots " & (quoted form of (thisLocalSnapshot as string)))
+							do shell script ("tmutil deletelocalsnapshots " & (quoted form of (thisLocalSnapshot as text)))
 						end try
 					end repeat
 				end try
@@ -385,7 +385,7 @@ defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false
 		end try
 		
 		-- DO NOT SHOW INTERNAL/BOOT DRIVE ON DESKTOP AND SET NEW FINDER WINDOWS TO COMPUTER
-		tell application "Finder" to tell Finder preferences
+		tell application id "com.apple.finder" to tell Finder preferences
 			set desktop shows hard disks to false
 			set desktop shows external hard disks to true
 			set desktop shows removable media to true
@@ -411,7 +411,7 @@ defaults write com.apple.universalaccess closeViewPanningMode -int 0
 					set currentMouseButton to (do shell script ("defaults read com.apple.driver.AppleHIDMouse Button" & buttonNumber))
 				end try
 				
-				if (currentMouseButton is not equal to (buttonNumber as string)) then
+				if (currentMouseButton is not equal to (buttonNumber as text)) then
 					try
 						do shell script ("defaults write com.apple.driver.AppleHIDMouse Button" & buttonNumber & " -int " & buttonNumber)
 					end try
@@ -419,11 +419,13 @@ defaults write com.apple.universalaccess closeViewPanningMode -int 0
 			end repeat
 		end try
 		
-		-- HIDE ANY SYSTEM PREFERENCES BADGES FOR ANY UPDATES (such as Big Sur)
+		-- HIDE ANY SYSTEM PREFERENCES BADGES FOR ANY OS UPDATES
 		try
-			if ((do shell script "defaults read com.apple.systempreferences AttentionPrefBundleIDs") is not equal to "0") then
-				do shell script "defaults write com.apple.systempreferences AttentionPrefBundleIDs 0; killall Dock"
-			end if
+			do shell script "defaults delete com.apple.systempreferences AttentionPrefBundleIDs"
+			-- NOTE: Can just delete the "AttentionPrefBundleIDs" without checking if it exists since it will just error if not which will get caught by the try block.
+			-- Also, NOT running "killall Dock" after deleting since the badge will never show in the Dock anyways since "dock-extra" has been set to "false" for
+			-- System Preferences/Settings in "fg-prepare-os.sh" so no badges will ever be shown in the Dock: https://lapcatsoftware.com/articles/badge.html
+			-- But still deleting the key so that the "Update" tag is not shown in the Apple menu (and so the badge is not shown WITHIN System Preferences in the prefPane icon).
 		end try
 		
 		-- SET TOUCH BAR SETTINGS TO *NOT* BE "App Controls" (because AppleScript alert buttons don't update properly)
@@ -490,7 +492,7 @@ killall ControlStrip
 				set AppleScript's text item delimiters to {",", space}
 				set newLocalHostNameParts to (every text item of newLocalHostName)
 				set AppleScript's text item delimiters to ""
-				set newLocalHostName to (newLocalHostNameParts as string)
+				set newLocalHostName to (newLocalHostNameParts as text)
 				doShellScriptAsAdmin("
 scutil --set ComputerName " & (quoted form of intendedComputerName) & "
 scutil --set LocalHostName " & (quoted form of newLocalHostName))
@@ -521,7 +523,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 		end try
 		
 		
-		tell application "System Events"
+		tell application id "com.apple.systemevents"
 			try
 				set intendedDriveName to "Macintosh HD"
 				set currentDriveName to (name of startup disk)
@@ -567,8 +569,8 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 				set AppleScript's text item delimiters to ""
 				tell current location of network preferences
 					repeat with thisActiveNetworkService in (every service whose active is true)
-						if (((name of interface of thisActiveNetworkService) as string) is equal to "Wi-Fi") then
-							set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as string)
+						if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
+							set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as text)
 							try
 								set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & thisWiFiInterfaceID)))
 								try
@@ -580,7 +582,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 								end try
 								repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
 									if (thisPreferredWirelessNetwork starts with "	") then
-										set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as string)
+										set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 										if ((thisPreferredWirelessNetwork is not equal to "FG Reuse") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
 											try
 												do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
@@ -657,7 +659,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 		
 		-- EMPTY THE TRASH (in case it's full)
 		try
-			tell application "Finder"
+			tell application id "com.apple.finder"
 				set warns before emptying of trash to false
 				try
 					empty the trash
@@ -667,39 +669,28 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 		end try
 		
 		try
+			(("/Applications/fgreset" as POSIX file) as alias)
 			doShellScriptAsAdmin("chflags hidden /Applications/fgreset")
 		end try
 		
 		-- DISABLE NOTIFICATIONS
 		if (isBigSurOrNewer) then
 			try
-				-- In macOS 11 Big Sur, the Do Not Distrub data is stored as binary of a plist within the "dnd_prefs" of "com.apple.ncprefs": 
-				-- https://www.reddit.com/r/osx/comments/ksbmay/big_sur_how_to_test_do_not_disturb_status_in/gjb72av/?utm_source=reddit&utm_medium=web2x&context=3
-				do shell script "defaults write com.apple.ncprefs dnd_prefs -data \"$(echo '<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">
-<dict>
-	<key>dndDisplayLock</key>
-	<true/>
-	<key>dndDisplaySleep</key>
-	<true/>
-	<key>dndMirrored</key>
-	<true/>
-	<key>facetimeCanBreakDND</key>
-	<false/>
-	<key>repeatedFacetimeCallsBreaksDND</key>
-	<false/>
-	<key>scheduledTime</key>
-	<dict>
-		<key>enabled</key>
-		<true/>
-		<key>end</key>
-		<real>1439</real>
-		<key>start</key>
-		<real>0.0</real>
-	</dict>
-</dict>
-</plist>' | plutil -convert binary1 - -o - | xxd -p | tr -d '[:space:]')\""
+				-- In macOS 11 Big Sur, the Do Not Distrub data is stored as binary of a plist within the "dnd_prefs" of "com.apple.ncprefs":
+				-- https://www.reddit.com/r/osx/comments/ksbmay/big_sur_how_to_test_do_not_disturb_status_in/gjb72av/
+				do shell script "
+defaults write com.apple.ncprefs dnd_prefs -data \"$(echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to create an empty plist with root type of dictionary. This is effectively same as starting with 'plutil -create xml1 -' (which can be verified by comparing the output to 'echo '<dict/>' | plutil -convert xml1 -o - -') but the 'plutil -create' option is only available on macOS 12 Monterey and newer.
+	plutil -insert 'dndDisplayLock' -bool true -o - - | # Using a pipeline of 'plutil' commands reading from stdin and outputting to stdout is a clean way of creating a plist string without needing to hardcode the plist contents and without creating a file (which would be required if PlistBuddy was used).
+	plutil -insert 'dndDisplaySleep' -bool true -o - - | # Even though doing this is technically less efficient vs just hard coding a plist string, it makes for cleaner and smaller code.
+	plutil -insert 'dndMirrored' -bool true -o - - |
+	plutil -insert 'facetimeCanBreakDND' -bool false -o - - |
+	plutil -insert 'repeatedFacetimeCallsBreaksDND' -bool false -o - - |
+	plutil -insert 'scheduledTime' -xml '<dict/>' -o - - | # The '-dictionary' type option is only available on macOS 12 Monterey and newer, so use the '-xml' type option with a '<dict/>' plist fragment instead for maximum compatibility with the same effect.
+	plutil -insert 'scheduledTime.enabled' -bool true -o - - |
+	plutil -insert 'scheduledTime.end' -float 1439 -o - - |
+	plutil -insert 'scheduledTime.start' -float 0 -o - - |
+	plutil -convert binary1 -o - - | xxd -p | tr -d '[:space:]')\"
+" -- "xxd" converts the binary data into hex, which is what "defaults" needs.
 			end try
 		else
 			do shell script "
@@ -716,7 +707,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end try
 		try
 			with timeout of 1 second
-				tell application "NotificationCenter" to quit
+				tell application id "com.apple.notificationcenterui" to quit
 			end timeout
 		end try
 		
@@ -759,7 +750,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end try
 		
 		try
-			tell application "System Events"
+			tell application id "com.apple.systemevents"
 				-- Turn Brightness all the way up.
 				repeat 50 times
 					-- Undocumented key code to turn up brightness that works on 10.13+
@@ -776,11 +767,9 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end try
 		
 		try
-			if (application "/System/Library/CoreServices/KeyboardSetupAssistant.app" is running) then
-				with timeout of 1 second
-					tell application "KeyboardSetupAssistant" to quit
-				end timeout
-			end if
+			with timeout of 1 second
+				tell application id "com.apple.KeyboardSetupAssistant" to quit
+			end timeout
 		end try
 		
 		try
@@ -788,11 +777,12 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			
 			try
 				set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
+				set securityAgentID to (id of application securityAgentPath)
 				repeat 60 times
 					if (application securityAgentPath is running) then
 						delay 1
 						with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-							tell application "System Events" to tell application process "SecurityAgent"
+							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 								set frontmost to true
 								key code 53 -- Cannot reliably get SecurityAgent windows, so if it's running (for decryption prompts) just hit escape until it quits (or until 60 seconds passes)
 							end tell
@@ -805,11 +795,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end try
 		
 		try
-			if (application "/System/Library/CoreServices/UserNotificationCenter.app" is running) then
+			if (application id "com.apple.UserNotificationCenter" is running) then
 				repeat 60 times
 					set clickedIgnoreCancelDontSendButton to false
 					with timeout of 2 seconds -- Adding timeout because maybe this could be where things are getting hung sometimes.
-						tell application "System Events" to tell application process "UserNotificationCenter"
+						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
 							repeat with thisUNCWindow in windows
 								if ((count of buttons of thisUNCWindow) ≥ 2) then
 									repeat with thisUNCButton in (buttons of thisUNCWindow)
@@ -830,11 +820,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end try
 		
 		try
-			if (application "/System/Library/CoreServices/backupd.bundle/Contents/Resources/TMHelperAgent.app" is running) then
+			if (application id "com.apple.TMHelperAgent" is running) then
 				repeat 60 times
 					set clickedDontUseButton to false
 					with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-						tell application "System Events" to tell application process "TMHelperAgent"
+						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.TMHelperAgent")
 							repeat with thisTMHAWindow in windows
 								if ((count of buttons of thisTMHAWindow) ≥ 2) then
 									repeat with thisTMHAButton in (buttons of thisTMHAWindow)
@@ -858,7 +848,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			-- If "loginwindow" has any windows open, it would be an erroneous scheduled shut down prompt since if the date is set back to a reset Snapshot date during boot,
 			-- and then set back to actual time when a reset Snapshot is mounted, macOS triggers the shutdown schedule since it thinks the shutdown date has just passed.
 			-- So, just click the Cancel button to dismiss this window and not shut down (the shut down schedule will still take effect when the actual time arrives).
-			tell application "System Events" to tell application process "loginwindow"
+			tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.loginwindow")
 				repeat with thisLoginwindowWindow in windows
 					if ((count of buttons of thisLoginwindowWindow) ≥ 2) then
 						repeat with thisLoginwindowButton in (buttons of thisLoginwindowWindow)
@@ -884,7 +874,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		
 		try
 			-- Previous brightness key codes may end with a file on the Desktop selected, so clear it
-			tell application "Finder" to set selection to {} of desktop
+			tell application id "com.apple.finder" to set selection to {} of desktop
 		end try
 		
 		try
@@ -895,14 +885,14 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 					((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
 				on error
 					try
-						tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Setup") and (short name is not "QA Helper") and (short name is not (name of me))))
-						if ((count of listOfRunningApps) > 0) then
+						tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Free-Geek-Setup") and (bundle identifier is not "org.freegeek.QA-Helper") and (bundle identifier is not (id of me))))
+						if ((count of listOfRunningAppIDs) > 0) then
 							try
-								repeat with thisAppName in listOfRunningApps
+								repeat with thisAppID in listOfRunningAppIDs
 									try
-										if (application thisAppName is running) then
+										if (application id thisAppID is running) then
 											with timeout of 1 second
-												tell application thisAppName to quit
+												tell application id thisAppID to quit without saving
 											end timeout
 										end if
 									end try
@@ -910,14 +900,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 							end try
 							delay 3
 							try
-								tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Setup") and (short name is not "QA Helper") and (short name is not (name of me))))
-								repeat with thisAppName in listOfRunningApps
-									repeat 2 times
-										try
-											do shell script "pkill -f " & (quoted form of thisAppName)
-										end try
-									end repeat
-								end repeat
+								set AppleScript's text item delimiters to space
+								tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Free-Geek-Setup") and (bundle identifier is not "org.freegeek.QA-Helper") and (bundle identifier is not (id of me)))) as text)
+								if (allRunningAppPIDs is not equal to "") then
+									do shell script ("kill " & allRunningAppPIDs)
+								end if
 							end try
 						end if
 					end try
@@ -926,7 +913,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			
 			
 			-- Wait for internet before launching QA Helper to ensure that QA Helper can always update itself to the latest version.
-			repeat 60 times
+			repeat 20 times
 				try
 					do shell script "ping -c 1 www.google.com"
 					exit repeat
@@ -946,7 +933,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 					end if
 					
 					try
-						display alert (linebreakOrNot & "📡" & tabOrLinebreaks & "Waiting for Internet") message ("Connect to Wi-Fi or Ethernet…" & linebreakOrNot) buttons {"Continue Without Internet", "Try Again"} cancel button 1 default button 2 giving up after 5
+						display alert (linebreakOrNot & "📡" & tabOrLinebreaks & "Waiting for Internet") message ("Connect to Wi-Fi or Ethernet…" & linebreakOrNot) buttons {"Continue Without Internet", "Try Again"} cancel button 1 default button 2 giving up after 15
 					on error
 						exit repeat
 					end try
@@ -968,7 +955,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 					end if
 				on error
 					try
-						tell application "System Events" to click menu item "About This Mac" of menu 1 of menu bar item "Apple" of menu bar 1 of application process "Finder"
+						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to click menu item 1 of menu 1 of menu bar item 1 of menu bar 1
 					end try
 				end try
 			end try
@@ -993,7 +980,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			if (isAwake and isUnlocked) then
 				exit repeat
 			else
-				tell application "System Events"
+				tell application id "com.apple.systemevents"
 					if (running of screen saver preferences) then key code 53 -- If screen saver is active, simulate Escape key to end it.
 				end tell
 				
@@ -1001,7 +988,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			end if
 		end repeat
 		
-		tell application "System Events"
+		tell application id "com.apple.systemevents"
 			try
 				if (running of screen saver preferences) then key code 53 -- simulate Escape key because "stop current screen saver" seems to not always work and doesn't reset the system idle time?
 			end try
@@ -1011,14 +998,14 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end tell
 		
 		try
-			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Setup") and (short name is not (name of me))))
-			if ((count of listOfRunningApps) > 0) then
+			tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Free-Geek-Setup") and (bundle identifier is not (id of me))))
+			if ((count of listOfRunningAppIDs) > 0) then
 				try
-					repeat with thisAppName in listOfRunningApps
+					repeat with thisAppID in listOfRunningAppIDs
 						try
-							if (application thisAppName is running) then
+							if (application id thisAppID is running) then
 								with timeout of 1 second
-									tell application thisAppName to quit
+									tell application id thisAppID to quit without saving
 								end timeout
 							end if
 						end try
@@ -1026,14 +1013,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 				end try
 				delay 3
 				try
-					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Setup") and (short name is not (name of me))))
-					repeat with thisAppName in listOfRunningApps
-						repeat 2 times
-							try
-								do shell script "pkill -f " & (quoted form of thisAppName)
-							end try
-						end repeat
-					end repeat
+					set AppleScript's text item delimiters to space
+					tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Free-Geek-Setup") and (bundle identifier is not (id of me)))) as text)
+					if (allRunningAppPIDs is not equal to "") then
+						do shell script ("kill " & allRunningAppPIDs)
+					end if
 				end try
 			end if
 		end try
@@ -1056,7 +1040,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end try
 		try
 			set isConnectedToInternet to false
-			repeat 60 times
+			repeat 20 times
 				try
 					do shell script "ping -c 1 www.google.com"
 					set isConnectedToInternet to true
@@ -1077,7 +1061,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 					end if
 					
 					try
-						display alert (linebreakOrNot & "📡" & tabOrLinebreaks & "Waiting for Internet") message ("Connect to Wi-Fi or Ethernet…" & linebreakOrNot) buttons {"Continue Without Internet", "Try Again"} cancel button 1 default button 2 giving up after 5
+						display alert (linebreakOrNot & "📡" & tabOrLinebreaks & "Waiting for Internet") message ("Connect to Wi-Fi or Ethernet…" & linebreakOrNot) buttons {"Continue Without Internet", "Try Again"} cancel button 1 default button 2 giving up after 15
 					on error
 						exit repeat
 					end try
@@ -1091,11 +1075,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			on error
 				if (isConnectedToInternet) then
 					try
-						tell application "System Events" to tell current location of network preferences
+						tell application id "com.apple.systemevents" to tell current location of network preferences
 							repeat with thisActiveNetworkService in (every service whose active is true)
-								if (((name of interface of thisActiveNetworkService) as string) is equal to "Wi-Fi") then
+								if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
 									try
-										set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & ((id of interface of thisActiveNetworkService) as string))
+										set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & ((id of interface of thisActiveNetworkService) as text))
 										set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 										if (getWiFiNetworkColonOffset > 0) then
 											set currentWiFiNetwork to (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput)
@@ -1133,7 +1117,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 					if (isAwake and isUnlocked) then
 						exit repeat
 					else
-						tell application "System Events"
+						tell application id "com.apple.systemevents"
 							if (running of screen saver preferences) then key code 53 -- If screen saver is active, simulate Escape key to end it.
 						end tell
 						
@@ -1141,7 +1125,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 					end if
 				end repeat
 				
-				tell application "System Events"
+				tell application id "com.apple.systemevents"
 					try
 						if (running of screen saver preferences) then key code 53 -- simulate Escape key because "stop current screen saver" seems to not always work and doesn't reset the system idle time?
 					end try
@@ -1151,14 +1135,14 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 				end tell
 				
 				try
-					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Setup") and (short name is not (name of me))))
-					if ((count of listOfRunningApps) > 0) then
+					tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Free-Geek-Setup") and (bundle identifier is not (id of me))))
+					if ((count of listOfRunningAppIDs) > 0) then
 						try
-							repeat with thisAppName in listOfRunningApps
+							repeat with thisAppID in listOfRunningAppIDs
 								try
-									if (application thisAppName is running) then
+									if (application id thisAppID is running) then
 										with timeout of 1 second
-											tell application thisAppName to quit
+											tell application id thisAppID to quit without saving
 										end timeout
 									end if
 								end try
@@ -1166,14 +1150,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 						end try
 						delay 3
 						try
-							tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Setup") and (short name is not (name of me))))
-							repeat with thisAppName in listOfRunningApps
-								repeat 2 times
-									try
-										do shell script "pkill -f " & (quoted form of thisAppName)
-									end try
-								end repeat
-							end repeat
+							set AppleScript's text item delimiters to space
+							tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Free-Geek-Setup") and (bundle identifier is not (id of me)))) as text)
+							if (allRunningAppPIDs is not equal to "") then
+								do shell script ("kill " & allRunningAppPIDs)
+							end if
 						end try
 					end if
 				end try
@@ -1206,7 +1187,7 @@ You SHOULD NOT USE this Mac until you've contacted Free Geek so that we can guid
 
 The reset process is only a few steps and will take less than 10 minutes." buttons {contactFreeGeekDialogButton} default button 1 with title (name of me) with icon caution
 				
-				tell application "System Events" to shut down with state saving preference
+				tell application id "com.apple.systemevents" to shut down with state saving preference
 				
 				quit
 				delay 10
@@ -1215,7 +1196,7 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 		
 		set screenSaverRunning to false
 		try
-			tell application "System Events"
+			tell application id "com.apple.systemevents"
 				if (running of screen saver preferences) then set screenSaverRunning to true
 			end tell
 		end try
@@ -1225,9 +1206,9 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 			set hasILifeSlideshows to false
 			set photoFolders to {}
 			
-			tell application "System Events"
+			tell application id "com.apple.systemevents"
 				repeat with thisScreenSaverName in (get name of screen savers)
-					set thisScreenSaverName to (thisScreenSaverName as string)
+					set thisScreenSaverName to (thisScreenSaverName as text)
 					if (thisScreenSaverName is equal to "iLifeSlideshows") then
 						set hasILifeSlideshows to true
 					else if ((thisScreenSaverName is not equal to "FloatingMessage") and (thisScreenSaverName is not equal to "Computer Name") and (thisScreenSaverName is not equal to "iTunes Artwork") and (thisScreenSaverName is not equal to "Album Artwork") and (thisScreenSaverName is not equal to "Random") and (thisScreenSaverName is not equal to "screensaver.shuffle")) then
@@ -1243,15 +1224,15 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 				end try
 			end if
 			
-			tell application "Finder"
+			tell application id "com.apple.finder"
 				try
 					repeat with thisPhotoCollectionFolder in (get folders of (folder (("/Library/Screen Savers/Default Collections/" as POSIX file) as alias)))
-						set end of photoFolders to (POSIX path of (thisPhotoCollectionFolder as string))
+						set end of photoFolders to (POSIX path of (thisPhotoCollectionFolder as text))
 					end repeat
 				on error (getPhotoCollectionsErrorMessage)
 					try -- For Catalina
 						repeat with thisPhotoCollectionFolder in (get folders of (folder (("/System/Library/Screen Savers/Default Collections/" as POSIX file) as alias)))
-							set end of photoFolders to (POSIX path of (thisPhotoCollectionFolder as string))
+							set end of photoFolders to (POSIX path of (thisPhotoCollectionFolder as text))
 						end repeat
 					on error (getPhotoCollectionsErrorMessage)
 						tell me to log getPhotoCollectionsErrorMessage
@@ -1290,12 +1271,12 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 			end if
 			
 			if ((count of shuffleScreenSaversList) > 0) then
-				tell application "System Events"
+				tell application id "com.apple.systemevents"
 					if (running of screen saver preferences) then key code 53 -- simulate Escape key because "stop current screen saver" seems to not always work and doesn't reset the system idle time?
 				end tell
 				
 				try
-					set randomScreenSaverName to ((text item (random number from 1 to (count of shuffleScreenSaversList)) of shuffleScreenSaversList) as string)
+					set randomScreenSaverName to ((text item (random number from 1 to (count of shuffleScreenSaversList)) of shuffleScreenSaversList) as text)
 					
 					set AppleScript's text item delimiters to "{iLS}"
 					set randomScreenSaverNameParts to (every text item of randomScreenSaverName)
@@ -1303,7 +1284,7 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 						set randomScreenSaverName to (first item of randomScreenSaverNameParts)
 						set iLifeSlideShowStyleKey to (item 2 of randomScreenSaverNameParts)
 						
-						set photoFolderPath to ((text item (random number from 1 to (count of photoFolders)) of photoFolders) as string)
+						set photoFolderPath to ((text item (random number from 1 to (count of photoFolders)) of photoFolders) as text)
 						if ((last character of photoFolderPath) is equal to "/") then set photoFolderPath to (text 1 thru -2 of photoFolderPath)
 						
 						do shell script ("
@@ -1313,8 +1294,8 @@ defaults -currentHost write com.apple.ScreenSaverPhotoChooser SelectedFolderPath
 						
 						set AppleScript's text item delimiters to "/"
 						set photoFolderPathParts to (every text item of photoFolderPath)
-						set photoFolderName to ((last text item of photoFolderPathParts) as string)
-						set photoParentFolderName to ((text item -2 of photoFolderPathParts) as string)
+						set photoFolderName to ((last text item of photoFolderPathParts) as text)
+						set photoParentFolderName to ((text item -2 of photoFolderPathParts) as text)
 						try
 							if (photoParentFolderName is equal to "Default Collections") then
 								do shell script "
@@ -1324,12 +1305,9 @@ defaults -currentHost delete com.apple.ScreenSaverPhotoChooser CustomFolderDict
 							else
 								do shell script "
 defaults -currentHost write com.apple.ScreenSaverPhotoChooser SelectedSource -int 4
-defaults -currentHost write com.apple.ScreenSaverPhotoChooser CustomFolderDict '<dict>
-	<key>name</key>
-	<string>" & photoFolderName & "</string>
-	<key>identifier</key>
-	<string>" & photoFolderPath & "</string>
-</dict>'
+defaults -currentHost write com.apple.ScreenSaverPhotoChooser CustomFolderDict \"$(echo '<dict/>' | # Search for '<dict/>' above in this script for comments about creating the plist this way.
+	plutil -insert 'name' -string " & (quoted form of photoFolderName) & " -o - - |
+	plutil -insert 'identifier' -string " & (quoted form of photoFolderPath) & " -o - -)\"
 "
 							end if
 						end try
@@ -1339,7 +1317,7 @@ defaults -currentHost write com.apple.ScreenSaverPhotoChooser CustomFolderDict '
 					end if
 					
 					try
-						tell application "System Events"
+						tell application id "com.apple.systemevents"
 							tell screen saver preferences
 								if (running is true) then key code 53 -- make sure screen saver is stopped
 								if (show clock is true) then set show clock to false
@@ -1350,19 +1328,15 @@ defaults -currentHost write com.apple.ScreenSaverPhotoChooser CustomFolderDict '
 								-- For some reason iLifeSlideshows is not in the list of screen savers in Catalina and therefore cannot be set with AppleScript.
 								-- So lets set the preferences manually.
 								do shell script "
-defaults -currentHost write com.apple.screensaver moduleDict '<dict>
-	<key>moduleName</key>
-	<string>iLifeSlideshows</string>
-	<key>path</key>
-	<string>/System/Library/Frameworks/ScreenSaver.framework/PlugIns/iLifeSlideshows.appex</string>
-	<key>type</key>
-	<string>0</string>
-</dict>'
+defaults -currentHost write com.apple.screensaver moduleDict \"$(echo '<dict/>' | # Search for '<dict/>' above in this script for comments about creating the plist this way.
+	plutil -insert 'moduleName' -string 'iLifeSlideshows' -o - - |
+	plutil -insert 'path' -string '/System/Library/Frameworks/ScreenSaver.framework/PlugIns/iLifeSlideshows.appex' -o - - |
+	plutil -insert 'type' -string '0' -o - -)\"
 "
 								set screenSaverDescription to randomScreenSaverName
 							else
 								set current screen saver to (screen saver named randomScreenSaverName)
-								set screenSaverDescription to ((get name of current screen saver) as string)
+								set screenSaverDescription to ((get name of current screen saver) as text)
 							end if
 							
 							if (upTenMinsOrLess or (idleTime ≥ 900)) then
@@ -1381,7 +1355,7 @@ defaults -currentHost write com.apple.screensaver moduleDict '<dict>
 									if (wasDarkMode is not equal to (get dark mode of appearance preferences)) then
 										-- Need to un-focus and then re-focus QA Helper for it to switch it's theme to the newly changed dark or light theme.
 										try
-											tell application "Finder" to activate
+											tell application id "com.apple.finder" to activate
 										end try
 										try -- Instead of just activating QA Helper, re-launch it in case it was quit, which will also just activate it if it's already running.
 											-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited to this will not actually ever open a new instance.
@@ -1407,7 +1381,7 @@ defaults -currentHost write com.apple.screensaver moduleDict '<dict>
 		end if
 	else
 		try
-			tell application "System Events" to set delay interval of screen saver preferences to 0
+			tell application id "com.apple.systemevents" to set delay interval of screen saver preferences to 0
 		end try
 		
 		try
@@ -1426,7 +1400,7 @@ else
 end if
 
 on doShellScriptAsAdmin(command)
-	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_ & https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_4/RN-10_4.html#//apple_ref/doc/uid/TP40000982-CH104-SW10
 	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
 	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
 	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.

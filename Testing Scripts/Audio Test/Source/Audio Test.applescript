@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.24-1
+-- Version: 2022.11.29-1
 
 -- App Icon is “Loudspeaker” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -62,8 +62,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -119,7 +119,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -147,11 +147,11 @@ end considering
 
 if (isMojaveOrNewer) then
 	try
-		tell application "System Events" to every window -- To prompt for Automation access on Mojave
+		tell application id "com.apple.systemevents" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences" to activate
+				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
 				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -187,14 +187,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 end if
 
 try
-	tell application "System Events" to tell application process "Finder" to (get windows)
+	tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.finder") to (get windows)
 on error (assistiveAccessTestErrorMessage)
 	if ((offset of "not allowed assistive" in assistiveAccessTestErrorMessage) > 0) then
 		try
-			tell application "Finder" to reveal (path to me)
+			tell application id "com.apple.finder" to reveal (path to me)
 		end try
 		try
-			tell application "System Preferences"
+			tell application id "com.apple.systempreferences"
 				try
 					activate
 				end try
@@ -282,7 +282,7 @@ You do not hear each phrase out of the correct speakers or they don't sound cris
 		if (shouldTestAudio) then
 			repeat with thisAudioTest in {{0, "Left speaker"}, {1, "Right speaker"}, {0.5, "Both speakers"}}
 				repeat 60 times -- Wait for Sound pane to load
-					tell application "System Preferences"
+					tell application id "com.apple.systempreferences"
 						try
 							activate
 						end try
@@ -290,7 +290,7 @@ You do not hear each phrase out of the correct speakers or they don't sound cris
 					end tell
 					
 					try
-						tell application "System Events" to tell application process "System Preferences"
+						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 							if ((title of window 1) is equal to "Sound") then
 								exit repeat
 							else
@@ -304,11 +304,11 @@ You do not hear each phrase out of the correct speakers or they don't sound cris
 				
 				set isTestingHeadphones to false
 				try
-					tell application "System Events" to tell application process "System Preferences"
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 						set allAudioOutputRows to (every row of table 1 of scroll area 1 of tab group 1 of window 1)
 						set didSelectAudioOutputRow to false
 						repeat with thisAudioOutputRow in allAudioOutputRows
-							set thisAudioOutputType to ((value of text field 2 of thisAudioOutputRow) as string)
+							set thisAudioOutputType to ((value of text field 2 of thisAudioOutputRow) as text)
 							if ((thisAudioOutputType is equal to "Built-In") or (thisAudioOutputType is equal to "Headphone port")) then
 								select thisAudioOutputRow
 								set didSelectAudioOutputRow to true
@@ -333,11 +333,11 @@ You do not hear each phrase out of the correct speakers or they don't sound cris
 					set volume alert volume 100
 				end try
 				try
-					tell application "System Events" to tell application process "System Preferences"
+					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 						set value of (slider 1 of group 1 of tab group 1 of window 1) to ((first item of thisAudioTest) as number)
 					end tell
 					delay 0.25
-					say ((last item of thisAudioTest) as string)
+					say ((last item of thisAudioTest) as text)
 					delay 0.25
 				on error
 					say "Single speaker"
@@ -346,11 +346,11 @@ You do not hear each phrase out of the correct speakers or they don't sound cris
 				end try
 			end repeat
 			try
-				tell application "System Events" to tell application process "System Preferences"
+				tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 					set allAudioOutputRows to (every row of table 1 of scroll area 1 of tab group 1 of window 1)
 					repeat with thisAudioOutputRow in allAudioOutputRows
 						if (selected of thisAudioOutputRow) then
-							set thisAudioOutputType to ((value of text field 2 of thisAudioOutputRow) as string)
+							set thisAudioOutputType to ((value of text field 2 of thisAudioOutputRow) as text)
 							if (thisAudioOutputType is equal to "Built-In") then
 								set testInternalSpeakersCount to (testInternalSpeakersCount + 1)
 							else if (thisAudioOutputType is equal to "Headphone port") then
@@ -363,7 +363,7 @@ You do not hear each phrase out of the correct speakers or they don't sound cris
 			end try
 			try
 				with timeout of 1 second
-					tell application "System Preferences" to quit
+					tell application id "com.apple.systempreferences" to quit
 				end timeout
 			end try
 		else
@@ -380,7 +380,7 @@ if ((testInternalSpeakersCount > 0) and (testHeadphonesCount > 0)) then
 	if ((shortModelName is not equal to "Mac Pro") and (shortModelName is not equal to "Mac mini") and (shortModelName is not equal to "Mac Studio")) then
 		try
 			(("/Applications/Microphone Test.app" as POSIX file) as alias)
-			if (application ("Microphone" & " Test") is not running) then
+			if (application id ("org.freegeek." & "Microphone-Test") is not running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 				try
 					activate
 				end try

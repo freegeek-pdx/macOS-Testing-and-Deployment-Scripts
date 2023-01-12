@@ -1,9 +1,10 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # Created by Pico Mitchell on 4/19/21.
 # For MacLand @ Free Geek
-# Version: 2022.10.17-1
+# Version: 2023.1.9-1
 #
 # MIT License
 #
@@ -32,7 +33,7 @@ launch_daemon_path='/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist'
 
 launch_login_progress_app() {
 	if [[ -f "${SCRIPT_DIR}/Tools/Free-Geek-Login-Progress.zip" && ! -d "${SCRIPT_DIR}/Tools/Free Geek Login Progress.app" ]]; then
-		ditto -x -k --noqtn "${SCRIPT_DIR}/Tools/Free-Geek-Login-Progress.zip" "${SCRIPT_DIR}/Tools" &> /dev/null
+		ditto -xk --noqtn "${SCRIPT_DIR}/Tools/Free-Geek-Login-Progress.zip" "${SCRIPT_DIR}/Tools" &> /dev/null
 		touch "${SCRIPT_DIR}/Tools/Free Geek Login Progress.app"
 	fi
 
@@ -58,7 +59,7 @@ launch_login_progress_app() {
 		launchctl load -S LoginWindow "${login_progress_launch_agent_path}"
 
 		for (( wait_for_progress_app_seconds = 0; wait_for_progress_app_seconds < 15; wait_for_progress_app_seconds ++ )); do
-			if pgrep -q 'Free Geek Login Progress'; then
+			if pgrep -qx 'Free Geek Login Progress'; then
 				break
 			else
 				sleep 1
@@ -70,7 +71,7 @@ launch_login_progress_app() {
 	fi
 }
 
-if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-error-occurred' && -f "${launch_daemon_path}" && -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && \
+if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-error-occurred' && -f "${launch_daemon_path}" && -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' &&
 	  ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && -f '/Users/Shared/Build Info/Prepare OS Log.txt' ]] && grep -qF $'\tERROR:' '/Users/Shared/Build Info/Prepare OS Log.txt'; then
 	# Do not run if fg-install-packages LaunchDaemon exists since that will do since it same error display on its own when rebooting after an error occurred.
 	# The fg-install-packages LaunchDaemon needs to do its own identical error handling like this in case an error occurs before or after this was created or deleted by fg-prepare-os package.
@@ -93,7 +94,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-error-occurred' && -f "${launch_daemo
 	# Since LaunchDaemons start so early on boot, always wait for full boot before continuing so that everything is run in a consistent state and all system services have been started.
 	# Through investigation, I found that "coreauthd" is consistently the last, or nearly the last, root process to be started before the login window is displayed.
 
-	until pgrep -q 'coreauthd'; do
+	until pgrep -qx 'coreauthd'; do
 		sleep 2
 	done
 	

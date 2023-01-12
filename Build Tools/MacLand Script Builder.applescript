@@ -24,15 +24,15 @@ try
 	((infoPlistPath as POSIX file) as alias)
 	
 	set AppleScript's text item delimiters to "-"
-	set correctBundleIdentifier to bundleIdentifierPrefix & ((words of (name of me)) as string)
+	set correctBundleIdentifier to bundleIdentifierPrefix & ((words of (name of me)) as text)
 	try
-		set currentBundleIdentifier to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath)) as string)
+		set currentBundleIdentifier to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath)) as text)
 		if (currentBundleIdentifier is not equal to correctBundleIdentifier) then error "INCORRECT Bundle Identifier"
 	on error
 		do shell script "plutil -replace CFBundleIdentifier -string " & (quoted form of correctBundleIdentifier) & " " & (quoted form of infoPlistPath)
 		
 		try
-			set currentCopyright to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' " & (quoted form of infoPlistPath)) as string)
+			set currentCopyright to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' " & (quoted form of infoPlistPath)) as text)
 			if (currentCopyright does not contain "Twemoji") then error "INCORRECT Copyright"
 		on error
 			do shell script "plutil -replace NSHumanReadableCopyright -string " & (quoted form of ("Copyright © " & (year of (current date)) & " Free Geek
@@ -40,7 +40,7 @@ Designed and Developed by Pico Mitchell")) & " " & (quoted form of infoPlistPath
 		end try
 		
 		try
-			set minSystemVersion to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' " & (quoted form of infoPlistPath)) as string)
+			set minSystemVersion to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' " & (quoted form of infoPlistPath)) as text)
 			if (minSystemVersion is not equal to "10.13") then error "INCORRECT Minimum System Version"
 		on error
 			do shell script "plutil -remove LSMinimumSystemVersionByArchitecture " & (quoted form of infoPlistPath) & "; plutil -replace LSMinimumSystemVersion -string '10.13' " & (quoted form of infoPlistPath)
@@ -61,23 +61,23 @@ Designed and Developed by Pico Mitchell")) & " " & (quoted form of infoPlistPath
 		end try
 		
 		try
-			set currentAppleEventsUsageDescription to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :NSAppleEventsUsageDescription' " & (quoted form of infoPlistPath)) as string)
+			set currentAppleEventsUsageDescription to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :NSAppleEventsUsageDescription' " & (quoted form of infoPlistPath)) as text)
 			if (currentAppleEventsUsageDescription does not contain (name of me)) then error "INCORRECT AppleEvents Usage Description"
 		on error
 			do shell script "plutil -replace NSAppleEventsUsageDescription -string " & (quoted form of ("You MUST click the “OK” button for “" & (name of me) & "” to be able to function.")) & " " & (quoted form of infoPlistPath)
 		end try
 		
 		try
-			set currentVersion to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' " & (quoted form of infoPlistPath)) as string)
+			set currentVersion to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' " & (quoted form of infoPlistPath)) as text)
 			if (currentVersion is equal to "1.0") then error "INCORRECT Version"
 		on error
-			tell application "System Events" to set myCreationDate to (creation date of (path to me))
-			set shortCreationDateString to (short date string of myCreationDate)
+			set shortCreationDateString to (short date string of (creation date of (info for (path to me))))
 			set AppleScript's text item delimiters to "/"
 			set correctVersion to ((text item 3 of shortCreationDateString) & "." & (text item 1 of shortCreationDateString) & "." & (text item 2 of shortCreationDateString))
 			do shell script "plutil -remove CFBundleVersion " & (quoted form of infoPlistPath) & "; plutil -replace CFBundleShortVersionString -string " & (quoted form of correctVersion) & " " & (quoted form of infoPlistPath)
 		end try
 		
+		-- The "main.scpt" must NOT be writable to prevent the code signature from being invalidated: https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_8/RN-10_8.html#//apple_ref/doc/uid/TP40000982-CH108-SW8
 		do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'try' -e 'do shell script \"chmod a-w \\\"" & ((POSIX path of (path to me)) & "Contents/Resources/Scripts/main.scpt") & "\\\"\"' -e 'do shell script \"codesign -fs \\\"Developer ID Application\\\" --strict \\\"" & (POSIX path of (path to me)) & "\\\"\"' -e 'on error codeSignError' -e 'activate' -e 'display alert \"Code Sign Error\" message codeSignError' -e 'end try' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 		quit
 		delay 10
@@ -86,25 +86,25 @@ end try
 
 global obfuscateCharactersShiftCount
 
-set currentYear to ((year of (current date)) as string)
+set currentYear to ((year of (current date)) as text)
 set shortCurrentDateString to (short date string of (current date))
 
 repeat
 	set buildResultsOutput to {}
 	
-	tell application "Finder"
+	tell application id "com.apple.finder"
 		set parentFolder to (container of (path to me))
 		
 		set fgPasswordsPlistPath to ((POSIX path of (parentFolder as alias)) & "Free Geek Passwords.plist")
 		
 		set adminPassword to ""
 		try
-			set adminPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :admin_password' " & (quoted form of fgPasswordsPlistPath)) as string)
+			set adminPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :admin_password' " & (quoted form of fgPasswordsPlistPath)) as text)
 		end try
 		
 		set wiFiPassword to ""
 		try
-			set wiFiPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :wifi_password' " & (quoted form of fgPasswordsPlistPath)) as string)
+			set wiFiPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :wifi_password' " & (quoted form of fgPasswordsPlistPath)) as text)
 		end try
 		
 		if (adminPassword is equal to "") then
@@ -121,38 +121,42 @@ repeat
 			end try
 			set scriptTypeFolders to (get folders of macLandFolder)
 			repeat with thisScriptTypeFolder in scriptTypeFolders
-				if (((name of thisScriptTypeFolder) as string) is equal to "ZIPs for Auto-Update") then
+				if (((name of thisScriptTypeFolder) as text) is equal to "ZIPs for Auto-Update") then
 					set latestVersionsFilePath to ((POSIX path of (thisScriptTypeFolder as alias)) & "latest-versions.txt")
 					do shell script "rm -f " & (quoted form of latestVersionsFilePath) & "; touch " & (quoted form of latestVersionsFilePath)
 					
 					set zipFilesForAutoUpdate to (every file of thisScriptTypeFolder whose name extension is "zip")
 					repeat with thisScriptZip in zipFilesForAutoUpdate
-						if (((name of thisScriptZip) as string) is equal to "fgreset.zip") then
-							do shell script ("ditto -x -k --noqtn " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/")
-							
+						-- NOTE: The "fgreset" script is no longer installed since we are no longer installing older than macOS 10.15 Catalina.
+						-- So, this code to include it for auto-updating is now commented out, but it is being left in place in case it is useful in the future.
+						(*
+						if (((name of thisScriptZip) as text) is equal to "fgreset.zip") then
+							do shell script ("ditto -xk --noqtn " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/")
+													
 							set thisScriptVersionLine to (do shell script "grep -m 1 '# Version: ' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/*.sh")
-							
+													
 							if (thisScriptVersionLine contains "# Version: ") then
-								do shell script "echo '" & (text 1 thru -5 of ((name of thisScriptZip) as string)) & ": " & ((text 12 thru -1 of thisScriptVersionLine) as string) & "' >> " & (quoted form of latestVersionsFilePath)
+								do shell script "echo '" & (text 1 thru -5 of ((name of thisScriptZip) as text)) & ": " & ((text 12 thru -1 of thisScriptVersionLine) as text) & "' >> " & (quoted form of latestVersionsFilePath)
 							end if
-							
+													
 							do shell script "rm -f ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/*.sh"
 						else
-							do shell script "unzip -jo " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " */Contents/Info.plist -d ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
-							set thisAppName to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleName' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
-							set thisAppVersion to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
-							do shell script "echo '" & thisAppName & ": " & thisAppVersion & "' >> " & (quoted form of latestVersionsFilePath)
-						end if
+						*)
+						do shell script "unzip -jo " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " '*/Contents/Info.plist' -d ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
+						set thisAppName to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleName' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
+						set thisAppVersion to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
+						do shell script "echo '" & thisAppName & ": " & thisAppVersion & "' >> " & (quoted form of latestVersionsFilePath)
+						--end if
 					end repeat
 					do shell script "rm -rf ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
-				else if ((((name of thisScriptTypeFolder) as string) is not equal to "Build Tools") and (((name of thisScriptTypeFolder) as string) is not equal to "fgMIB Resources") and (((name of thisScriptTypeFolder) as string) is not equal to "Other Scripts")) then
+				else if ((((name of thisScriptTypeFolder) as text) is not equal to "Build Tools") and (((name of thisScriptTypeFolder) as text) is not equal to "fgMIB Resources") and (((name of thisScriptTypeFolder) as text) is not equal to "Other Scripts")) then
 					set scriptFoldersForThisScriptType to (get folders of thisScriptTypeFolder)
 					repeat with thisScriptFolder in scriptFoldersForThisScriptType
-						set thisScriptName to ((name of thisScriptFolder) as string)
+						set thisScriptName to ((name of thisScriptFolder) as text)
 						set thisScriptFolderPath to (POSIX path of (thisScriptFolder as alias))
 						
 						set AppleScript's text item delimiters to "-"
-						set thisScriptHyphenatedName to ((words of thisScriptName) as string)
+						set thisScriptHyphenatedName to ((words of thisScriptName) as text)
 						
 						-- Only build if .app doesn't exit and Source folder does exist
 						set thisScriptAppPath to (thisScriptFolderPath & thisScriptName & ".app")
@@ -186,7 +190,7 @@ repeat
 											set thisScriptSourcePartsSplitAtObfuscatedAdminPasswordPlaceholder to (every text item of thisScriptSource)
 											
 											set AppleScript's text item delimiters to "x(\"" & obfuscatedAdminPassword & "\")"
-											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedAdminPasswordPlaceholder as string)
+											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedAdminPasswordPlaceholder as text)
 										end if
 										
 										if (thisScriptSource contains obfuscatedWiFiPasswordPlaceholder) then
@@ -196,7 +200,7 @@ repeat
 											set thisScriptSourcePartsSplitAtObfuscatedWiFiPasswordPlaceholder to (every text item of thisScriptSource)
 											
 											set AppleScript's text item delimiters to "x(\"" & obfuscatedWiFiPassword & "\")"
-											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedWiFiPasswordPlaceholder as string)
+											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedWiFiPasswordPlaceholder as text)
 										end if
 										
 										set thisScriptSource to thisScriptSource & "
@@ -245,8 +249,8 @@ plutil -replace NSAppleEventsUsageDescription -string " & (quoted form of ("You 
 										set thisScriptAppVersion to (currentYear & "." & (word 1 of shortCurrentDateString) & "." & (word 2 of shortCurrentDateString))
 										if (thisScriptSource contains "-- Version: ") then
 											set AppleScript's text item delimiters to "-- Version: "
-											set thisScriptAppVersionPart to ((text item 2 of thisScriptSource) as string)
-											set thisScriptAppVersion to ((first paragraph of thisScriptAppVersionPart) as string)
+											set thisScriptAppVersionPart to ((text item 2 of thisScriptSource) as text)
+											set thisScriptAppVersion to ((first paragraph of thisScriptAppVersionPart) as text)
 										end if
 										do shell script "plutil -replace CFBundleShortVersionString -string " & (quoted form of thisScriptAppVersion) & " " & (quoted form of thisScriptAppInfoPlistPath)
 										
@@ -263,7 +267,7 @@ plutil -replace CFBundleIconFile -string " & (quoted form of thisScriptName) & "
 										set thisScriptAppIconTwemojiAttribution to ""
 										if (thisScriptSource contains "App Icon is “") then
 											set AppleScript's text item delimiters to {"App Icon is “", "” from Twemoji"}
-											set thisScriptAppIconEmojiName to ((text item 2 of thisScriptSource) as string)
+											set thisScriptAppIconEmojiName to ((text item 2 of thisScriptSource) as text)
 											set thisScriptAppIconTwemojiAttribution to "
 
 App Icon is “" & thisScriptAppIconEmojiName & "” from Twemoji by Twitter licensed under CC-BY 4.0"
@@ -279,7 +283,7 @@ plutil -replace CFBundleIdentifier -string " & (quoted form of thisScriptAppBund
 # Add custom FGBuiltByMacLandScriptBuilder key VERY LAST for scripts to check to alert if not built correctly.
 plutil -replace FGBuiltByMacLandScriptBuilder -bool true " & (quoted form of thisScriptAppInfoPlistPath) & "
 
-chmod a-w " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Scripts/main.scpt")))
+chmod a-w " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Scripts/main.scpt"))) -- The "main.scpt" must NOT be writable to prevent the code signature from being invalidated: https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_8/RN-10_8.html#//apple_ref/doc/uid/TP40000982-CH108-SW8
 										
 										try
 											(((thisScriptFolderPath & "Source/Resources/") as POSIX file) as alias)
@@ -314,7 +318,7 @@ codesign -fs 'Developer ID Application' --strict " & (quoted form of thisScriptA
 
 touch " & (quoted form of thisScriptAppPath) & "
 	
-ditto -c -k --keepParent --sequesterRsrc --zlibCompressionLevel 9 " & (quoted form of thisScriptAppPath) & " " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")))
+ditto -ck --keepParent --sequesterRsrc --zlibCompressionLevel 9 " & (quoted form of thisScriptAppPath) & " " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")))
 										on error codeSignError
 											do shell script "rm -rf " & (quoted form of thisScriptAppPath)
 											tell me
@@ -360,6 +364,9 @@ tccutil reset All " & (quoted form of ("com.randomapplications." & thisScriptHyp
 									set (end of buildResultsOutput) to "⚠️		" & (name of thisScriptTypeFolder) & " > FAILED TO BUILD " & thisScriptName
 								end try
 							on error
+								-- NOTE: The "fgreset" script is no longer installed since we are no longer installing older than macOS 10.15 Catalina.
+								-- So, this code to include it for installation and auto-updating is now commented out, but it is being left in place in case it is useful in the future.
+								(*
 								try
 									set thisFGresetSourcePath to (thisScriptFolderPath & "fgreset.sh")
 									((thisFGresetSourcePath as POSIX file) as alias)
@@ -367,7 +374,7 @@ tccutil reset All " & (quoted form of ("com.randomapplications." & thisScriptHyp
 									set thisScriptVersion to "UNKNOWN VERSION"
 									try
 										set thisScriptVersionLine to (do shell script ("grep -m 1 '# Version: ' " & (quoted form of thisFGresetSourcePath)))
-										if (thisScriptVersionLine contains "# Version: ") then set thisScriptVersion to ((text 12 thru -1 of thisScriptVersionLine) as string)
+										if (thisScriptVersionLine contains "# Version: ") then set thisScriptVersion to ((text 12 thru -1 of thisScriptVersionLine) as text)
 									end try
 									
 									do shell script ("
@@ -382,7 +389,7 @@ sed \"s/'\\[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED
 chmod +x ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh
 									
 # DO NOT '--keepParent' WHEN DITTO ZIPPING A SINGLE FILE!
-ditto -c -k --sequesterRsrc --zlibCompressionLevel 9 ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh " & (quoted form of (zipsForAutoUpdateFolderPath & "fgreset.zip")) & "
+ditto -ck --sequesterRsrc --zlibCompressionLevel 9 ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh " & (quoted form of (zipsForAutoUpdateFolderPath & "fgreset.zip")) & "
 									
 rm -rf ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset
 									
@@ -397,12 +404,13 @@ ditto " & (quoted form of (zipsForAutoUpdateFolderPath & "fgreset.zip")) & " " &
 										set (end of buildResultsOutput) to "⚠️		" & (name of thisScriptTypeFolder) & " > FAILED TO ZIP " & thisScriptName & " " & thisScriptVersion
 									end try
 								on error
-									set (end of buildResultsOutput) to "❌		" & (name of thisScriptTypeFolder) & " > " & thisScriptName & " NOT APPLESCRIPT APP"
-								end try
+								*)
+								set (end of buildResultsOutput) to "❌		" & (name of thisScriptTypeFolder) & " > " & thisScriptName & " NOT APPLESCRIPT APP"
+								--end try
 							end try
 						end try
 						
-						if ((((name of thisScriptTypeFolder) as string) is equal to "Production Scripts") or (thisScriptName is equal to "Free Geek Updater")) then
+						if ((((name of thisScriptTypeFolder) as text) is equal to "Production Scripts") or (thisScriptName is equal to "Free Geek Updater")) then
 							try
 								(((zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip") as POSIX file) as alias)
 								
@@ -419,7 +427,7 @@ ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedNam
 mkdir -p " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/fg-snapshot-reset/Tools/")) & "
 rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/fg-snapshot-reset/Tools/" & thisScriptHyphenatedName & ".zip")) & "
 ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")) & " " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/fg-snapshot-reset/Tools/")))
-								else if (thisScriptName does not start with "FGreset") then
+								else -- if (thisScriptName does not start with "FGreset") then
 									do shell script ("
 mkdir -p " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/")) & "
 rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/" & thisScriptHyphenatedName & ".zip")) & "

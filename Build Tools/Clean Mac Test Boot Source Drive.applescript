@@ -24,15 +24,15 @@ try
 	((infoPlistPath as POSIX file) as alias)
 	
 	set AppleScript's text item delimiters to "-"
-	set correctBundleIdentifier to bundleIdentifierPrefix & ((words of (name of me)) as string)
+	set correctBundleIdentifier to bundleIdentifierPrefix & ((words of (name of me)) as text)
 	try
-		set currentBundleIdentifier to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath)) as string)
+		set currentBundleIdentifier to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath)) as text)
 		if (currentBundleIdentifier is not equal to correctBundleIdentifier) then error "INCORRECT Bundle Identifier"
 	on error
 		do shell script "plutil -replace CFBundleIdentifier -string " & (quoted form of correctBundleIdentifier) & " " & (quoted form of infoPlistPath)
 		
 		try
-			set currentCopyright to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' " & (quoted form of infoPlistPath)) as string)
+			set currentCopyright to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' " & (quoted form of infoPlistPath)) as text)
 			if (currentCopyright does not contain "Twemoji") then error "INCORRECT Copyright"
 		on error
 			do shell script "plutil -replace NSHumanReadableCopyright -string " & (quoted form of ("Copyright © " & (year of (current date)) & " Free Geek
@@ -40,7 +40,7 @@ Designed and Developed by Pico Mitchell")) & " " & (quoted form of infoPlistPath
 		end try
 		
 		try
-			set minSystemVersion to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' " & (quoted form of infoPlistPath)) as string)
+			set minSystemVersion to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' " & (quoted form of infoPlistPath)) as text)
 			if (minSystemVersion is not equal to "10.13") then error "INCORRECT Minimum System Version"
 		on error
 			do shell script "plutil -remove LSMinimumSystemVersionByArchitecture " & (quoted form of infoPlistPath) & "; plutil -replace LSMinimumSystemVersion -string '10.13' " & (quoted form of infoPlistPath)
@@ -61,23 +61,23 @@ Designed and Developed by Pico Mitchell")) & " " & (quoted form of infoPlistPath
 		end try
 		
 		try
-			set currentAppleEventsUsageDescription to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :NSAppleEventsUsageDescription' " & (quoted form of infoPlistPath)) as string)
+			set currentAppleEventsUsageDescription to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :NSAppleEventsUsageDescription' " & (quoted form of infoPlistPath)) as text)
 			if (currentAppleEventsUsageDescription does not contain (name of me)) then error "INCORRECT AppleEvents Usage Description"
 		on error
 			do shell script "plutil -replace NSAppleEventsUsageDescription -string " & (quoted form of ("You MUST click the “OK” button for “" & (name of me) & "” to be able to function.")) & " " & (quoted form of infoPlistPath)
 		end try
 		
 		try
-			set currentVersion to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' " & (quoted form of infoPlistPath)) as string)
+			set currentVersion to ((do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' " & (quoted form of infoPlistPath)) as text)
 			if (currentVersion is equal to "1.0") then error "INCORRECT Version"
 		on error
-			tell application "System Events" to set myCreationDate to (creation date of (path to me))
-			set shortCreationDateString to (short date string of myCreationDate)
+			set shortCreationDateString to (short date string of (creation date of (info for (path to me))))
 			set AppleScript's text item delimiters to "/"
 			set correctVersion to ((text item 3 of shortCreationDateString) & "." & (text item 1 of shortCreationDateString) & "." & (text item 2 of shortCreationDateString))
 			do shell script "plutil -remove CFBundleVersion " & (quoted form of infoPlistPath) & "; plutil -replace CFBundleShortVersionString -string " & (quoted form of correctVersion) & " " & (quoted form of infoPlistPath)
 		end try
 		
+		-- The "main.scpt" must NOT be writable to prevent the code signature from being invalidated: https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_8/RN-10_8.html#//apple_ref/doc/uid/TP40000982-CH108-SW8
 		do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'try' -e 'do shell script \"chmod a-w \\\"" & ((POSIX path of (path to me)) & "Contents/Resources/Scripts/main.scpt") & "\\\"\"' -e 'do shell script \"codesign -fs \\\"Developer ID Application\\\" --strict \\\"" & (POSIX path of (path to me)) & "\\\"\"' -e 'on error codeSignError' -e 'activate' -e 'display alert \"Code Sign Error\" message codeSignError' -e 'end try' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 		quit
 		delay 10
@@ -89,7 +89,7 @@ end try
 -- Delete user caches ??
 
 set AppleScript's text item delimiters to ""
-set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 
 try -- CLEAN MAC TEST BOOT
 	(("/Volumes/Mac Test Boot/" as POSIX file) as alias)
@@ -141,7 +141,7 @@ try -- CLEAN MAC TEST BOOT
 		"'/Volumes/Mac Test Boot/Users/'*'/Pictures/GPU Stress Test/' " & ¬
 		"'/Volumes/Mac Test Boot/Users/'*'/Music/iTunes/'")
 	
-	tell application "Terminal"
+	tell application id "com.apple.Terminal"
 		activate
 		do script "find '/Volumes/Mac Test Boot' -name '.DS_Store' -type f -print -delete"
 		activate

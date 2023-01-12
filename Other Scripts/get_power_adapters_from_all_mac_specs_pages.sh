@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # Created by Pico Mitchell (of Free Geek) on 8/9/22.
@@ -46,7 +47,7 @@ every_30w_usbc_model=''
 every_29w_usbc_model=''
 
 # NOTE: The newer Apple Silicon Macs with MagSafe 3 tend to support multiple different wattages with and without fast
-# charge capabilites so their descriptions are not as clear and clean to analyze in code as the past power adapter types
+# charge capabilities so their descriptions are not as clear and clean to analyze in code as the past power adapter types
 # since the MagSafe 3 capability is listed on a separate line as just the cable and not the power adapter itself.
 # So, instead of trying, just manually check the outputs and come up with more concise descriptions and pre-add them to their respective lists instead.
 every_140w_magsafe3_model='MacBookPro18,1+MacBookPro18,2+'
@@ -56,111 +57,107 @@ every_30w_or_35W_dp_or_67w_magsafe3_model='Mac14,2+'
 every_unknown_model=''
 
 for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
-    this_mac_idenification_page_source="$(curl -m 5 -sL "https://support.apple.com/${this_mac_idenification_page}")"
-    #this_mac_support_urls="$(echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur)"
-    
-    this_mac_support_model_ids_and_urls="$(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ {  gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')"
-    this_model_identifier=''
+	this_mac_idenification_page_source="$(curl -m 5 -sfL "https://support.apple.com/${this_mac_idenification_page}")"
 
-    IFS=$'\n'
-    for this_model_id_or_specs_url in ${this_mac_support_model_ids_and_urls}; do
-        if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
-            echo " (${this_model_id_or_specs_url}):"
-            power_adapter_elements_from_page="$(curl -m 5 -sL "${this_model_id_or_specs_url}" | xmllint --html --xpath '//*[contains(text(),"Power Adapter") or contains(text(),"MagSafe")]' - 2> /dev/null)"
-            power_adapter_elements_from_page="${power_adapter_elements_from_page//></>$'\n'<}"
-            power_adapter_elements_from_page="${power_adapter_elements_from_page//; /$'\n'}"
+	this_model_identifier=''
+	while IFS='' read -r this_model_id_or_specs_url; do
+		if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
+			echo " (${this_model_id_or_specs_url}):"
+			power_adapter_elements_from_page="$(curl -m 5 -sfL "${this_model_id_or_specs_url}" | xmllint --html --xpath '//*[contains(text(),"Power Adapter") or contains(text(),"MagSafe")]' - 2> /dev/null)"
+			power_adapter_elements_from_page="${power_adapter_elements_from_page//></>$'\n'<}"
+			power_adapter_elements_from_page="${power_adapter_elements_from_page//; /$'\n'}"
 
-            # Suppress ShellCheck warning to use bash string replacement since it cannot do this regex style replacement.
-            # shellcheck disable=SC2001
-            power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page}" | sed 's/<[^>]*>//g')"
+			# Suppress ShellCheck warning to use bash string replacement since it cannot do this regex style replacement.
+			# shellcheck disable=SC2001
+			power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page}" | sed 's/<[^>]*>//g')"
 
-            if [[ "${power_adapter_elements_from_page}" == *'with cable management'* ]]; then
-                power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page}" | grep 'with cable management')" # Remove extraneous lines for MagSafe 2 and MagSafe 1 that aren't for the actual power adapter.
-                power_adapter_elements_from_page="${power_adapter_elements_from_page% with cable management*}"
-            else
-                power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page}" | grep -v 'USB-C power port\|Power Adapter Extension Cable')" # Remove extraneous lines for some USB-C adapters.
-                power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page}" | grep -v 'MagSafe 3 port\|MagSafe 3 charging port\|USB-C to MagSafe 3 Cable (2 m)')" # Remove extraneous lines for some MagSafe 3 adapters.
-            fi
+			if [[ "${power_adapter_elements_from_page}" == *'with cable management'* ]]; then
+				power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page}" | grep 'with cable management')" # Remove extraneous lines for MagSafe 2 and MagSafe 1 that aren't for the actual power adapter.
+				power_adapter_elements_from_page="${power_adapter_elements_from_page% with cable management*}"
+			else
+				power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page}" | grep -v 'USB-C power port\|Power Adapter Extension Cable')" # Remove extraneous lines for some USB-C adapters.
+				power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page}" | grep -v 'MagSafe 3 port\|MagSafe 3 charging port\|USB-C to MagSafe 3 Cable (2 m)')" # Remove extraneous lines for some MagSafe 3 adapters.
+			fi
 
-            power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page//‑/-}" | sort -u)"
-            echo -e "\t${power_adapter_elements_from_page//$'\n'/$'\n\t'}"
+			power_adapter_elements_from_page="$(echo "${power_adapter_elements_from_page//‑/-}" | sort -u)"
+			echo -e "\t${power_adapter_elements_from_page//$'\n'/$'\n\t'}"
 
-            power_adapter_elements_from_page_lowercase="$(echo "${power_adapter_elements_from_page}" | tr '[:upper:]' '[:lower:]')"
-            case "${power_adapter_elements_from_page_lowercase}" in
-                '85w magsafe power adapter')
-                    every_85w_magsafe1_model+="${this_model_identifier}+"
-                    ;;
-                '60w magsafe power adapter')
-                    every_60w_magsafe1_model+="${this_model_identifier}+"
-                    ;;
-                '60w or 85w magsafe power adapter')
-                    if [[ "${this_model_identifier}" == 'MacBookPro5,3' || "${this_model_identifier}" == 'MacBookPro5,4' ]]; then
-                        # The specs pages (https://support.apple.com/kb/SP544?locale=en_US) combine MacBookPro5,3 and MacBookPro5,4 (which isn't even listed, but check for it just in case),
-                        # and list them both as MacBookPro5,3 even though "MacBook Pro (15-inch, 2.53 GHz, Mid 2009)" is actually MacBookPro5,4 (and not MacBookPro5,3)
-                        # and state "60W or 85W MagSafe Power Adapter" in the "Battery and power" section, but the table in the "15-inch Configurations" section properly shows
-                        # that the "2.53GHz MacBook Pro (MC118LL/A)" model (which is actually MacBookPro5,4), takes the 60W MagSafe Power Adapter while the other configurations
-                        # (which are the MacBookPro5,3 models) take the 85W MagSafe Power Adapter rather than both of these models being able to take either/or power adapter wattage.
-                        # 60W = MacBookPro5,4 / MC118LL/A: https://everymac.com/systems/apple/macbook_pro/specs/macbook-pro-core-2-duo-2.53-aluminum-15-mid-2009-sd-unibody-specs.html
-                        # 85W = MacBookPro5,3 / MB985LL/A: https://everymac.com/systems/apple/macbook_pro/specs/macbook-pro-core-2-duo-2.66-aluminum-15-mid-2009-sd-unibody-specs.html
-                        # 85W = MacBookPro5,3 / MB986LL/A: https://everymac.com/systems/apple/macbook_pro/specs/macbook-pro-core-2-duo-2.8-aluminum-15-mid-2009-sd-unibody-specs.html
-                        
-                        echo -e '\tMANUAL CORRECTION: MacBookPro5,4 = 60W MagSafe 1\n\tMANUAL CORRECTION: MacBookPro5,3 = 85W MagSafe 1'
-                        every_85w_magsafe1_model+="MacBookPro5,3+"
-                        every_60w_magsafe1_model+="MacBookPro5,4+"
-                    else
-                        echo -e '\tERROR: UNKNOWN Power Adater'
-                        every_unknown_model+="${this_model_identifier}+"
-                    fi
-                    ;;
-                '45w magsafe power adapter')
-                    every_45w_magsafe1_model+="${this_model_identifier}+"
-                    ;;
-                '85w magsafe 2 power adapter')
-                    every_85w_magsafe2_model+="${this_model_identifier}+"
-                    ;;
-                '60w magsafe 2 power adapter')
-                    every_60w_magsafe2_model+="${this_model_identifier}+"
-                    ;;
-                '45w magsafe 2 power adapter')
-                    every_45w_magsafe2_model+="${this_model_identifier}+"
-                    ;;
-                '96w usb-c power adapter')
-                    every_96w_usbc_model+="${this_model_identifier}+"
-                    ;;
-                '87w usb-c power adapter')
-                    every_87w_usbc_model+="${this_model_identifier}+"
-                    ;;
-                '67w usb-c power adapter')
-                    every_67w_usbc_model+="${this_model_identifier}+"
-                    ;;
-                '61w usb-c power adapter')
-                    every_61w_usbc_model+="${this_model_identifier}+"
-                    ;;
-                '30w usb-c power adapter')
-                    every_30w_usbc_model+="${this_model_identifier}+"
-                    ;;
-                '29w usb-c power adapter')
-                    every_29w_usbc_model+="${this_model_identifier}+"
-                    ;;
-                *)
-                    if [[ "+${every_140w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
-                        echo -e '\tMANUAL CONCISE DESCRIPTION: 140W USB-C/MagSafe 3'
-                    elif [[ "+${every_67w_or_96w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
-                        echo -e '\tMANUAL CONCISE DESCRIPTION: 67W or 96W USB-C/MagSafe 3'
-                    elif [[ "+${every_30w_or_35W_dp_or_67w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
-                        echo -e '\tMANUAL CONCISE DESCRIPTION: 30W or 35W Dual Port or 67W USB-C/MagSafe 3'
-                    else
-                        echo -e '\tERROR: UNKNOWN Power Adater'
-                        every_unknown_model+="${this_model_identifier}+"
-                    fi
-                    ;;
-            esac
-        else
-            this_model_identifier="${this_model_id_or_specs_url}"
-            echo -en "\n${this_model_identifier}"
-        fi
-    done
-    unset IFS
+			power_adapter_elements_from_page_lowercase="$(echo "${power_adapter_elements_from_page}" | tr '[:upper:]' '[:lower:]')"
+			case "${power_adapter_elements_from_page_lowercase}" in
+				'85w magsafe power adapter')
+					every_85w_magsafe1_model+="${this_model_identifier}+"
+					;;
+				'60w magsafe power adapter')
+					every_60w_magsafe1_model+="${this_model_identifier}+"
+					;;
+				'60w or 85w magsafe power adapter')
+					if [[ "${this_model_identifier}" == 'MacBookPro5,3' || "${this_model_identifier}" == 'MacBookPro5,4' ]]; then
+						# The specs pages (https://support.apple.com/kb/SP544?locale=en_US) combine MacBookPro5,3 and MacBookPro5,4 (which isn't even listed, but check for it just in case),
+						# and list them both as MacBookPro5,3 even though "MacBook Pro (15-inch, 2.53 GHz, Mid 2009)" is actually MacBookPro5,4 (and not MacBookPro5,3)
+						# and state "60W or 85W MagSafe Power Adapter" in the "Battery and power" section, but the table in the "15-inch Configurations" section properly shows
+						# that the "2.53GHz MacBook Pro (MC118LL/A)" model (which is actually MacBookPro5,4), takes the 60W MagSafe Power Adapter while the other configurations
+						# (which are the MacBookPro5,3 models) take the 85W MagSafe Power Adapter rather than both of these models being able to take either/or power adapter wattage.
+						# 60W = MacBookPro5,4 / MC118LL/A: https://everymac.com/systems/apple/macbook_pro/specs/macbook-pro-core-2-duo-2.53-aluminum-15-mid-2009-sd-unibody-specs.html
+						# 85W = MacBookPro5,3 / MB985LL/A: https://everymac.com/systems/apple/macbook_pro/specs/macbook-pro-core-2-duo-2.66-aluminum-15-mid-2009-sd-unibody-specs.html
+						# 85W = MacBookPro5,3 / MB986LL/A: https://everymac.com/systems/apple/macbook_pro/specs/macbook-pro-core-2-duo-2.8-aluminum-15-mid-2009-sd-unibody-specs.html
+
+						echo -e '\tMANUAL CORRECTION: MacBookPro5,4 = 60W MagSafe 1\n\tMANUAL CORRECTION: MacBookPro5,3 = 85W MagSafe 1'
+						every_85w_magsafe1_model+="MacBookPro5,3+"
+						every_60w_magsafe1_model+="MacBookPro5,4+"
+					else
+						echo -e '\tERROR: UNKNOWN Power Adater'
+						every_unknown_model+="${this_model_identifier}+"
+					fi
+					;;
+				'45w magsafe power adapter')
+					every_45w_magsafe1_model+="${this_model_identifier}+"
+					;;
+				'85w magsafe 2 power adapter')
+					every_85w_magsafe2_model+="${this_model_identifier}+"
+					;;
+				'60w magsafe 2 power adapter')
+					every_60w_magsafe2_model+="${this_model_identifier}+"
+					;;
+				'45w magsafe 2 power adapter')
+					every_45w_magsafe2_model+="${this_model_identifier}+"
+					;;
+				'96w usb-c power adapter')
+					every_96w_usbc_model+="${this_model_identifier}+"
+					;;
+				'87w usb-c power adapter')
+					every_87w_usbc_model+="${this_model_identifier}+"
+					;;
+				'67w usb-c power adapter')
+					every_67w_usbc_model+="${this_model_identifier}+"
+					;;
+				'61w usb-c power adapter')
+					every_61w_usbc_model+="${this_model_identifier}+"
+					;;
+				'30w usb-c power adapter')
+					every_30w_usbc_model+="${this_model_identifier}+"
+					;;
+				'29w usb-c power adapter')
+					every_29w_usbc_model+="${this_model_identifier}+"
+					;;
+				*)
+					if [[ "+${every_140w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
+						echo -e '\tMANUAL CONCISE DESCRIPTION: 140W USB-C/MagSafe 3'
+					elif [[ "+${every_67w_or_96w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
+						echo -e '\tMANUAL CONCISE DESCRIPTION: 67W or 96W USB-C/MagSafe 3'
+					elif [[ "+${every_30w_or_35W_dp_or_67w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
+						echo -e '\tMANUAL CONCISE DESCRIPTION: 30W or 35W Dual Port or 67W USB-C/MagSafe 3'
+					else
+						echo -e '\tERROR: UNKNOWN Power Adater'
+						every_unknown_model+="${this_model_identifier}+"
+					fi
+					;;
+			esac
+		else
+			this_model_identifier="${this_model_id_or_specs_url}"
+			echo -en "\n${this_model_identifier}"
+		fi
+	done < <(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')
+	# echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur
 done
 
 echo -e '\n\n85W MagSafe 1'

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.24-1
+-- Version: 2022.11.29-1
 
 -- App Icon is “Movie Camera” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -62,8 +62,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -119,7 +119,7 @@ try
 	end try
 	try
 		set AppleScript's text item delimiters to "-"
-		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as string)))) user name adminUsername password adminPassword with administrator privileges
+		do shell script ("touch " & (quoted form of (buildInfoPath & ".fgLaunchAfterSetup-org.freegeek." & ((words of (name of me)) as text)))) user name adminUsername password adminPassword with administrator privileges
 	end try
 	
 	if (not freeGeekUpdaterIsRunning) then
@@ -147,11 +147,11 @@ end considering
 
 if (isMojaveOrNewer) then
 	try
-		tell application ("QuickTime" & " Player") to every window -- To prompt for Automation access on Mojave
+		tell application id "com.apple.QuickTimePlayerX" to every window -- To prompt for Automation access on Mojave
 	on error automationAccessErrorMessage number automationAccessErrorNumber
 		if (automationAccessErrorNumber is equal to -1743) then
 			try
-				tell application "System Preferences" to activate
+				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
 				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
@@ -186,7 +186,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 	end try
 	try
 		with timeout of 1 second
-			tell application ("QuickTime" & " Player") to quit
+			tell application id "com.apple.QuickTimePlayerX" to quit
 		end timeout
 	end try
 end if
@@ -240,7 +240,7 @@ try
 		end try
 		
 		if (shouldTestCamera) then
-			tell application "QuickTime Player"
+			tell application id "com.apple.QuickTimePlayerX"
 				try
 					activate
 				end try
@@ -249,6 +249,7 @@ try
 					close every window without saving
 				end try
 				set newMovieRecording to new movie recording
+				delay 1
 				try
 					if (newMovieRecording is not presenting) then present newMovieRecording
 				end try
@@ -257,11 +258,11 @@ try
 				end try
 			end tell
 			repeat cameraTestDuration times
-				if (application ("QuickTime" & " Player") is not running) then exit repeat
+				if (application id "com.apple.QuickTimePlayerX" is not running) then exit repeat
 				delay 1
 			end repeat
-			if (application ("QuickTime" & " Player") is running) then
-				tell application "QuickTime Player"
+			if (application id "com.apple.QuickTimePlayerX" is running) then
+				tell application id "com.apple.QuickTimePlayerX"
 					try
 						stop newMovieRecording
 					end try
@@ -285,7 +286,7 @@ end try
 if (testCount ≥ 1) then
 	try
 		(("/Applications/Screen Test.app" as POSIX file) as alias)
-		if (application ("Screen" & " Test") is not running) then
+		if (application id ("org.freegeek." & "Screen-Test") is not running) then -- Break up App ID or else build will fail if not found during compilation when app is not installed.
 			try
 				activate
 			end try

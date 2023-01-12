@@ -1,10 +1,15 @@
 # THIS IS NOT A SCRIPT.
 # THE FOLLOWING COMMANDS ARE INTENDED TO BE COPIED-AND-PASTED INTO TERMINAL WHEN NEEDED.
 
-# Command to Create Mac Test Boot
+# Command to CREATE Mac Test Boot DISK IMAGE from SOURCE drive:
 
-cd "$HOME/Documents/Programming/Free Geek/MacLand Images/" && read "?'Mac Test Boot' Device Name (Probably $(diskutil list | grep "Mac Test Boot" | head -1 | awk '{ print $NF }')): " DEVICE_NAME && echo "$(date +%Y%m%d)" > '/Volumes/Mac Test Boot/private/var/root/.mtbVersion' && diskutil unmountDisk $DEVICE_NAME || diskutil unmountDisk force $DEVICE_NAME; sudo hdiutil create "FreeGeek-MacTestBoot-HighSierra-$(date +%Y%m%d).dmg" -srcdevice $DEVICE_NAME && sudo asr imagescan --source "FreeGeek-MacTestBoot-HighSierra-$(date +%Y%m%d).dmg"
+cd "${HOME}/Documents/Programming/Free Geek/MacLand Images/" && read "?'Mac Test Boot' Device Name (Probably $(diskutil list | awk '/Mac Test Boot/ { print $NF; exit }')): " device_name && echo "$(date '+%Y%m%d')" > '/Volumes/Mac Test Boot/private/var/root/.mtbVersion' && diskutil unmountDisk "${device_name}" || diskutil unmountDisk force "${device_name}"; sudo hdiutil create "FreeGeek-MacTestBoot-HighSierra-$(date +%Y%m%d).dmg" -srcdevice "${device_name}" && sudo asr imagescan --source "FreeGeek-MacTestBoot-HighSierra-$(date +%Y%m%d).dmg"
 
+
+# Command to FORMAT & PARTITION fgMIB + macOS Installers + Mac Test Boot:
+# NOTE: For some reason (at least as of macOS 12.6.1 Monterey) each desired size need 0.13G added to it to result in the correct desired size. The sizes (plus 0.13G) being used for each installer are specified in the "Create macOS USB Installer Commands.txt" based on testing to find the minimum required size for each macOS version installer.
+
+read '?Enter Disk ID to Format and Partition for fgMIB + macOS Installers + Mac Test Boot: disk' disk_id && diskutil partitionDisk "disk${disk_id}" 6 GPT JHFS+ 'fgMIB' 2.13G JHFS+ 'Install macOS Catalina' 9.13G JHFS+ 'Install macOS Big Sur' 14.13G JHFS+ 'Install macOS Monterey' 14.73G JHFS+ 'Install macOS Ventura' 14.63G JHFS+ 'Mac Test Boot' 0B
 
 
 

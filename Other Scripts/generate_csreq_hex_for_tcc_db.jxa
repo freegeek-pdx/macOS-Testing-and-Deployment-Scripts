@@ -84,6 +84,9 @@ ObjC.import('AppKit') // Only needed for "NSPasteboard".
 
 function run(argv) {
 	const pathToApp = argv[0]
+	if (!pathToApp) return 'ERROR: APP PATH ARGUMENT REQUIRED'
+
+	let csreqsOutput = `APP PATH: ${pathToApp}`
 
 	// "csreq" source reference: https://opensource.apple.com/source/security_systemkeychain/security_systemkeychain-55202/src/csreq.cpp.auto.html
 
@@ -102,7 +105,7 @@ function run(argv) {
 	// @ts-ignore: JXA-ObjC
 	$.SecRequirementCopyData(csreqRef, $.kSecCSDefaultFlags, csreqDataRef)
 
-	let csreqsOutput = '\nCSREQ HEX FROM APP ON DISK (this is what is written to TCC.db by macOS and what *SHOULD BE USED* for AppleEvents TCC to work on Mojave & Catalina):\n'
+	csreqsOutput += '\n\nCSREQ HEX FROM APP ON DISK (this is what is written to TCC.db by macOS and what *SHOULD BE USED* for AppleEvents TCC to work on Mojave & Catalina):\n'
 	let csreqHexFromAppOnDisk = ''
 	for (let thisByteIndex = 0, csreqBytesArray = csreqDataRef.bytes, csreqBytesLength = csreqDataRef.length; thisByteIndex < csreqBytesLength; thisByteIndex ++)
 		csreqHexFromAppOnDisk += csreqBytesArray[thisByteIndex].toString(16).padStart(2, 0)

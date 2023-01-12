@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # Created by Pico Mitchell (of Free Geek) on 8/9/22.
@@ -35,65 +36,65 @@ every_bluetooth_5_model=''
 every_bluetooth_4dot2_model=''
 every_bluetooth_4_model='Macmini5,3+' # Mid 2011 Mac mini Server (Macmini5,3) is not listed in the Specs pages.
 every_bluetooth_2dot1plusEDR_model=''
+every_bluetooth_other_version_model=''
 every_error_model=''
 
 for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
-    this_mac_idenification_page_source="$(curl -m 5 -sL "https://support.apple.com/${this_mac_idenification_page}")"
-    #this_mac_support_urls="$(echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur)"
-    
-    this_mac_support_model_ids_and_urls="$(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ {  gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')"
-    this_model_identifier=''
+	this_mac_idenification_page_source="$(curl -m 5 -sfL "https://support.apple.com/${this_mac_idenification_page}")"
 
-    IFS=$'\n'
-    for this_model_id_or_specs_url in ${this_mac_support_model_ids_and_urls}; do
-        if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
-            echo " (${this_model_id_or_specs_url}):"
-            specs_page_source="$(curl -m 5 -sL "${this_model_id_or_specs_url}")"
-            bluetooth_element_from_page="$(echo "${specs_page_source}" | xmllint --html --xpath '//li[contains(text(),"Bluetooth")]/text()' - 2> /dev/null)"
+	this_model_identifier=''
+	while IFS='' read -r this_model_id_or_specs_url; do
+		if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
+			echo " (${this_model_id_or_specs_url}):"
+			specs_page_source="$(curl -m 5 -sfL "${this_model_id_or_specs_url}")"
+			bluetooth_element_from_page="$(echo "${specs_page_source}" | xmllint --html --xpath '//li[contains(text(),"Bluetooth")]/text()' - 2> /dev/null)"
 
-            if [[ -z "${bluetooth_element_from_page}" ]]; then
-                bluetooth_element_from_page="$(echo "${specs_page_source}" | xmllint --html --xpath '//p[contains(text(),"Bluetooth")]/text()' - 2> /dev/null)"
-            fi
+			if [[ -z "${bluetooth_element_from_page}" ]]; then
+				bluetooth_element_from_page="$(echo "${specs_page_source}" | xmllint --html --xpath '//p[contains(text(),"Bluetooth")]/text()' - 2> /dev/null)"
+			fi
 
-            if [[ -z "${bluetooth_element_from_page}" ]]; then
-                echo 'ERROR DETECTING BLUETOOTH FOR MODEL'
-                every_error_model+="${this_model_identifier}+"
-            else
-                bluetooth_version="$(echo "${bluetooth_element_from_page}" | tr -dc '[:digit:].')"
+			if [[ -z "${bluetooth_element_from_page}" ]]; then
+				echo 'ERROR DETECTING BLUETOOTH FOR MODEL'
+				every_error_model+="${this_model_identifier}+"
+			else
+				bluetooth_version="$(echo "${bluetooth_element_from_page}" | tr -dc '[:digit:].')"
 
-                if [[ "${bluetooth_version}" == '.'* ]]; then
-                    bluetooth_version="${bluetooth_version#.}"
-                fi
+				if [[ "${bluetooth_version}" == '.'* ]]; then
+					bluetooth_version="${bluetooth_version#.}"
+				fi
 
-                if [[ "${bluetooth_element_from_page}" == *'EDR'* ]]; then
-                    bluetooth_version+=' + EDR'
-                fi
+				if [[ "${bluetooth_element_from_page}" == *'EDR'* ]]; then
+					bluetooth_version+=' + EDR'
+				fi
 
-                case "${bluetooth_version}" in
-                    '5.0')
-                        every_bluetooth_5_model+="${this_model_identifier}+"
-                        ;;
-                    '4.2')
-                        every_bluetooth_4dot2_model+="${this_model_identifier}+"
-                        ;;
-                    '4.0')
-                        every_bluetooth_4_model+="${this_model_identifier}+"
-                        ;;
-                    '2.1 + EDR')
-                        every_bluetooth_2dot1plusEDR_model+="${this_model_identifier}+"
-                        ;;
-                esac
+				case "${bluetooth_version}" in
+					'5.0')
+						every_bluetooth_5_model+="${this_model_identifier}+"
+						;;
+					'4.2')
+						every_bluetooth_4dot2_model+="${this_model_identifier}+"
+						;;
+					'4.0')
+						every_bluetooth_4_model+="${this_model_identifier}+"
+						;;
+					'2.1 + EDR')
+						every_bluetooth_2dot1plusEDR_model+="${this_model_identifier}+"
+						;;
+					*)
+						every_bluetooth_other_version_model+="${this_model_identifier}+"
+						;;
+				esac
 
-                every_bluetooth_version+=$'\n'"${bluetooth_version}"
+				every_bluetooth_version+=$'\n'"${bluetooth_version}"
 
-                echo "Bluetooth ${bluetooth_version}"
-            fi
-        else
-            this_model_identifier="${this_model_id_or_specs_url}"
-            echo -en "\n${this_model_identifier}"
-        fi
-    done
-    unset IFS
+				echo "Bluetooth ${bluetooth_version}"
+			fi
+		else
+			this_model_identifier="${this_model_id_or_specs_url}"
+			echo -en "\n${this_model_identifier}"
+		fi
+	done < <(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')
+	# echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur
 done
 
 echo -e "\n\nEvery Bluetooth Verison"
@@ -115,13 +116,17 @@ echo -e "\nBluetooth 2.1 + EDR"
 every_bluetooth_2dot1plusEDR_model="$(echo "${every_bluetooth_2dot1plusEDR_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_bluetooth_2dot1plusEDR_model//$'\n'/", "}\""
 
+echo -e "\nBluetooth OTHER VERSION"
+every_bluetooth_other_version_model="$(echo "${every_bluetooth_other_version_model%+}" | tr '+' '\n' | sort -uV)"
+echo "\"${every_bluetooth_other_version_model//$'\n'/", "}\""
+
 echo -e "\nERROR DETECTING BLUETOOTH"
 every_error_model="$(echo "${every_error_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_error_model//$'\n'/", "}\""
 
 echo ''
 
-# Example output from 8/15/22:
+# Example output from 1/9/23:
 
 # Every Bluetooth Verison
 # 5.0
@@ -140,6 +145,9 @@ echo ''
 
 # Bluetooth 2.1 + EDR
 # "MacBook5,2", "MacBook6,1", "MacBook7,1", "MacBookAir2,1", "MacBookAir3,1", "MacBookAir3,2", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro5,5", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro7,1", "MacBookPro8,1", "MacBookPro8,2", "MacBookPro8,3", "MacPro4,1", "MacPro5,1", "Macmini3,1", "Macmini4,1", "iMac9,1", "iMac10,1", "iMac11,2", "iMac11,3", "iMac12,1", "iMac12,2"
+
+# Bluetooth OTHER VERSION
+# ""
 
 # ERROR DETECTING BLUETOOTH
 # ""

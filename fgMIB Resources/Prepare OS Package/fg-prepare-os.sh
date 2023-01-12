@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck enable=add-default-case,avoid-nullary-conditions,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets
 
 #
 # Created by Pico Mitchell on 2/15/21.
@@ -29,7 +30,7 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2022.10.26-1'
+readonly SCRIPT_VERSION='2023.1.12-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -40,7 +41,7 @@ TMPDIR="$([[ -d "${TMPDIR}" && -w "${TMPDIR}" ]] && echo "${TMPDIR%/}/" || echo 
 
 critical_error_occurred=false
 
-if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone' || -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]] && \
+if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone' || -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' ]] &&
 	[[ "$3" == '/' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant.
 
 	log_path='/Users/Shared/Build Info/Prepare OS Log.txt'
@@ -111,7 +112,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 	fi
 
 
-	if [[ -f '/private/var/db/dslocal_orig.cpgz' || -n "$(find '/private/var/db' -type f -name 'PreviousSystem*' -maxdepth 1 -print -quit 2> /dev/null)" ]]; then
+	if [[ -f '/private/var/db/dslocal_orig.cpgz' || -n "$(find '/private/var/db' -maxdepth 1 -type f -name 'PreviousSystem*' -print -quit 2> /dev/null)" ]]; then
 
 		# DELETE FILES LEFTOVER FROM THE "UPGRADE/RE-INSTALL TRICK"
 		# Search for "UPGRADE/RE-INSTALL TRICK" in the "fg-install-os" script for more information about that process.
@@ -159,51 +160,76 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		# INSTALL GLOBAL APPS
 		# Do this before creating reset Snapshot since we want the customer to have these Apps pre-installed.
 
-		for this_global_app_installer in "$2/Global/Apps/all-versions/"*'.'* "$2/Global/Apps/darwin-${DARWIN_MAJOR_VERSION}/"*'.'*; do
-			if [[ -f "${this_global_app_installer}" ]]; then
-				this_global_app_name="${this_global_app_installer##*/}"
-				this_global_app_name="${this_global_app_name%.*}"
+		for this_darwin_folder_path in "$2/Global/Apps/darwin-"*; do
+			should_install_apps_in_this_darwin_folder=false
+			this_darwin_folder_name="${this_darwin_folder_path##*/}"
 
-				if [[ "${this_global_app_installer}" == *'.zip' ]]; then
-					write_to_log "Installing Global App \"${this_global_app_name}\""
+			if [[ "${this_darwin_folder_name}" == 'darwin-all-versions' ]]; then
+				should_install_apps_in_this_darwin_folder=true
+			else
+				IFS='-' read -rd '' -a this_darwin_folder_name_parts < <(echo -n "${this_darwin_folder_name}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value.
+				this_darwin_comparison="$(echo "${this_darwin_folder_name_parts[1]}" | tr '[:upper:]' '[:lower:]')"
+				this_darwin_version="${this_darwin_folder_name_parts[2]}"
 
-					rm -rf "/Applications/${this_global_app_name}.app" # Delete app if it already exist from previous customization before reset.
-					ditto -x -k --noqtn "${this_global_app_installer}" '/Applications' &> /dev/null
-
-					if [[ -d "/Applications/${this_global_app_name}.app" ]]; then
-						touch "/Applications/${this_global_app_name}.app"
-						chown -R 501:20 "/Applications/${this_global_app_name}.app" # Make sure the customer user account ends up owning the pre-installed apps.
-					fi
-				elif [[ "${this_global_app_installer}" == *'.dmg' ]]; then
-					#write_to_log "Mounting \"${this_global_app_name}\" Disk Image for Global Apps"
-
-					dmg_mount_path="$(hdiutil attach "${this_global_app_installer}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
-
-					if [[ -d "${dmg_mount_path}" ]]; then
-						for this_dmg_app in "${dmg_mount_path}/"*'.app'; do
-							if [[ -d "${this_dmg_app}" ]]; then
-								this_global_app_name="${this_dmg_app##*/}"
-								this_global_app_name="${this_global_app_name%.*}"
-
-								write_to_log "Installing Global App \"${this_global_app_name}\""
-
-								rm -rf "/Applications/${this_global_app_name}.app" # Delete app if it already exist from previous customization before reset.
-								ditto "${this_dmg_app}" "/Applications/${this_global_app_name}.app" &> /dev/null
-
-								if [[ -d "/Applications/${this_global_app_name}.app" ]]; then
-									xattr -drs com.apple.quarantine "/Applications/${this_global_app_name}.app"
-									touch "/Applications/${this_global_app_name}.app"
-									chown -R 501:20 "/Applications/${this_global_app_name}.app" # Make sure the customer user account ends up owning the pre-installed apps.
-								fi
-							fi
-						done
-
-						#write_to_log "Unmounting \"${this_global_app_name}\" Disk Image for Global Apps"
-						hdiutil detach "${dmg_mount_path}" &> /dev/null
-					fi
-				else
-					write_to_log "Skipping Unrecognized Global App Installer (${this_user_app_installer})"
+				if [[ -n "${this_darwin_comparison}" && "${this_darwin_version}" =~ ^[[:digit:]]+$ ]] && {
+						{ [[ "${this_darwin_comparison}" == 'eq' ]] && (( DARWIN_MAJOR_VERSION == this_darwin_version )); } ||
+						{ [[ "${this_darwin_comparison}" == 'lt' ]] && (( DARWIN_MAJOR_VERSION < this_darwin_version )); } ||
+						{ [[ "${this_darwin_comparison}" == 'le' ]] && (( DARWIN_MAJOR_VERSION <= this_darwin_version )); } ||
+						{ [[ "${this_darwin_comparison}" == 'gt' ]] && (( DARWIN_MAJOR_VERSION > this_darwin_version )); } ||
+						{ [[ "${this_darwin_comparison}" == 'ge' ]] && (( DARWIN_MAJOR_VERSION >= this_darwin_version )); }
+					}; then
+					should_install_apps_in_this_darwin_folder=true
 				fi
+			fi
+
+			if $should_install_apps_in_this_darwin_folder; then
+				for this_global_app_installer in "${this_darwin_folder_path}/"*'.'*; do
+					if [[ -f "${this_global_app_installer}" ]]; then
+						this_global_app_name="${this_global_app_installer##*/}"
+						this_global_app_name="${this_global_app_name%.*}"
+
+						if [[ "${this_global_app_installer}" == *'.zip' ]]; then
+							write_to_log "Installing Global App \"${this_global_app_name}\""
+
+							rm -rf "/Applications/${this_global_app_name}.app" # Delete app if it already exist from previous customization before reset.
+							ditto -xk --noqtn "${this_global_app_installer}" '/Applications' &> /dev/null
+
+							if [[ -d "/Applications/${this_global_app_name}.app" ]]; then
+								touch "/Applications/${this_global_app_name}.app"
+								chown -R 501:20 "/Applications/${this_global_app_name}.app" # Make sure the customer user account ends up owning the pre-installed apps.
+							fi
+						elif [[ "${this_global_app_installer}" == *'.dmg' ]]; then
+							#write_to_log "Mounting \"${this_global_app_name}\" Disk Image for Global Apps"
+
+							dmg_mount_path="$(hdiutil attach "${this_global_app_installer}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
+
+							if [[ -d "${dmg_mount_path}" ]]; then
+								for this_dmg_app in "${dmg_mount_path}/"*'.app'; do
+									if [[ -d "${this_dmg_app}" ]]; then
+										this_global_app_name="${this_dmg_app##*/}"
+										this_global_app_name="${this_global_app_name%.*}"
+
+										write_to_log "Installing Global App \"${this_global_app_name}\""
+
+										rm -rf "/Applications/${this_global_app_name}.app" # Delete app if it already exist from previous customization before reset.
+										ditto "${this_dmg_app}" "/Applications/${this_global_app_name}.app" &> /dev/null
+
+										if [[ -d "/Applications/${this_global_app_name}.app" ]]; then
+											xattr -drs com.apple.quarantine "/Applications/${this_global_app_name}.app"
+											touch "/Applications/${this_global_app_name}.app"
+											chown -R 501:20 "/Applications/${this_global_app_name}.app" # Make sure the customer user account ends up owning the pre-installed apps.
+										fi
+									fi
+								done
+
+								#write_to_log "Unmounting \"${this_global_app_name}\" Disk Image for Global Apps"
+								hdiutil detach "${dmg_mount_path}" &> /dev/null
+							fi
+						else
+							write_to_log "Skipping Unrecognized Global App Installer (${this_user_app_installer})"
+						fi
+					fi
+				done
 			fi
 		done
 
@@ -287,7 +313,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 				if [[ -f '/Users/Shared/fg-customization-resources/actual-snapshot-time.txt' ]]; then
 					# If time was already set back by fg-install-packages, then save that actual time for Snapshot reset, and set back to it after reset Snapshot is created.
-					actual_snapshot_time="$(cat /Users/Shared/fg-customization-resources/actual-snapshot-time.txt)"
+					actual_snapshot_time="$(< '/Users/Shared/fg-customization-resources/actual-snapshot-time.txt')"
 				fi
 
 				echo "${actual_snapshot_time}" > "${snapshot_reset_resources_install_path}/actual-snapshot-time.txt" # Save actual_snapshot_time to be used during Snapshot reset.
@@ -496,53 +522,52 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		wifi_ssid='FG Reuse'
 		wifi_password='[BUILD PACKAGE SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]'
 
-		network_interfaces="$(networksetup -listallhardwareports 2> /dev/null | awk -F ': ' '($1 == "Device") { print $NF }')"
-		IFS=$'\n'
-		for this_network_interface in ${network_interfaces}; do
-			if getairportnetwork_output="$(networksetup -getairportnetwork "${this_network_interface}" 2> /dev/null)" && [[ "${getairportnetwork_output}" != *'disabled.' ]]; then
-				write_to_log "Connecting \"${this_network_interface}\" to \"${wifi_ssid}\" Wi-Fi"
+		while read -ra this_network_hardware_ports_line_elements; do
+			if [[ "${this_network_hardware_ports_line_elements[0]}" == 'Device:' ]] && getairportnetwork_output="$(networksetup -getairportnetwork "${this_network_hardware_ports_line_elements[1]}" 2> /dev/null)" && [[ "${getairportnetwork_output}" != *'disabled.' ]]; then
+				write_to_log "Connecting \"${this_network_hardware_ports_line_elements[1]}\" to \"${wifi_ssid}\" Wi-Fi"
 
-				if networksetup -getairportpower "${this_network_interface}" 2> /dev/null | grep -q '): Off$'; then
-					networksetup -setairportpower "${this_network_interface}" on &> /dev/null
+				if networksetup -getairportpower "${this_network_hardware_ports_line_elements[1]}" 2> /dev/null | grep -q '): Off$'; then
+					networksetup -setairportpower "${this_network_hardware_ports_line_elements[1]}" on &> /dev/null
 				fi
 
-				networksetup -setairportnetwork "${this_network_interface}" "${wifi_ssid}" "${wifi_password}" &> /dev/null
+				networksetup -setairportnetwork "${this_network_hardware_ports_line_elements[1]}" "${wifi_ssid}" "${wifi_password}" &> /dev/null
 			fi
-		done
-		unset IFS
+		done < <(networksetup -listallhardwareports 2> /dev/null)
 
 
 		# INSTALL GLOBAL SCRIPTS
+		# NOTE: The "fgreset" global script is no longer installed since we are no longer installing older than macOS 10.15 Catalina.
+		# So, this code to install it is now commented out, but it is being left in place in case it is useful in the future.
 
-		for this_global_script_zip in "$2/Global/Scripts/"*'.zip'; do
-			if [[ -f "${this_global_script_zip}" ]]; then
-				this_global_script_name="${this_global_script_zip##*/}"
-				this_global_script_name="${this_global_script_name%.*}"
+		# for this_global_script_zip in "$2/Global/Scripts/"*'.zip'; do
+		# 	if [[ -f "${this_global_script_zip}" ]]; then
+		# 		this_global_script_name="${this_global_script_zip##*/}"
+		# 		this_global_script_name="${this_global_script_name%.*}"
 
-				write_to_log "Installing Global Script \"${this_global_script_name}\""
+		# 		write_to_log "Installing Global Script \"${this_global_script_name}\""
 
-				ditto -x -k --noqtn "${this_global_script_zip}" '/Applications' &> /dev/null
+		# 		ditto -xk --noqtn "${this_global_script_zip}" '/Applications' &> /dev/null
 
-				if [[ -f "/Applications/${this_global_script_name}.sh" ]]; then
-					mv -f "/Applications/${this_global_script_name}.sh" "/Applications/${this_global_script_name}"
+		# 		if [[ -f "/Applications/${this_global_script_name}.sh" ]]; then
+		# 			mv -f "/Applications/${this_global_script_name}.sh" "/Applications/${this_global_script_name}"
 
-					xattr -c "/Applications/${this_global_script_name}"
-					chmod +x "/Applications/${this_global_script_name}"
-					chflags hidden "/Applications/${this_global_script_name}"
+		# 			xattr -c "/Applications/${this_global_script_name}"
+		# 			chmod +x "/Applications/${this_global_script_name}"
+		# 			chflags hidden "/Applications/${this_global_script_name}"
 
-					if [[ ! -d '/usr/local/bin' ]]; then
-						mkdir -p '/usr/local/bin'
-					fi
+		# 			if [[ ! -d '/usr/local/bin' ]]; then
+		# 				mkdir -p '/usr/local/bin'
+		# 			fi
 
-					ln -s "/Applications/${this_global_script_name}" '/usr/local/bin'
-				fi
-			fi
-		done
+		# 			ln -s "/Applications/${this_global_script_name}" '/usr/local/bin'
+		# 		fi
+		# 	fi
+		# done
 
-		if [[ ! -f '/Applications/fgreset' ]]; then
-			write_to_log 'ERROR: Failed to Install "fgreset" Global Script'
-			critical_error_occurred=true
-		fi
+		# if [[ ! -f '/Applications/fgreset' ]]; then
+		# 	write_to_log 'ERROR: Failed to Install "fgreset" Global Script'
+		# 	critical_error_occurred=true
+		# fi
 
 
 		fg_user_picture_path="$2/Global/Users/Free Geek User Picture.png"
@@ -708,38 +733,24 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 
 						# SET KEYBOARD SHORTCUT SETTINGS
-						# This disables the default F11 action to Show Desktop so that the keyboard can be fully tested without activating the Show Desktop action.
+						# This disables the default F11 action to Show Desktop so that the keyboard can be fully tested without activating the Show Desktop action (not sure why this requires 2 keys/values to be set to disable a single action, but it does).
+						# The following keys/values have been confirmed to be the same on macOS 10.13 High Sierra, macOS 10.14 Mojave, macOS 10.15 Catalina, macOS 11 Big Sur, macOS 12 Monterey, and macOS 13 Ventura.
 
-						# Use "default export" to make a copy of the current "com.apple.symbolichotkeys" preferences to a location that is safe to manually edit by non-cfprefsd means since "defaults" cannot modify nested dictionaries.
-						# This "com.apple.symbolichotkeys.plist" exists in the "User Template" folder so it will always exist right when the user's home folder is created, and we just need to add the "36" and "37" keys that we are setting here since they do not exist in the default plist.
+						symbolic_hot_key_base_dict="$(echo '<dict/>' | # NOTE: Starting with this plist fragment "<dict/>" is a way to create an empty plist with root type of dictionary. This is effectively same as starting with "plutil -create xml1 -" (which can be verified by comparing the output to "echo '<dict/>' | plutil -convert xml1 -o - -") but the "plutil -create" option is only available on macOS 12 Monterey and newer.
+							plutil -insert 'enabled' -bool false -o - - | # Using a pipeline of "plutil" commands reading from stdin and outputting to stdout is a clean way of creating a plist string without needing to hardcode the plist contents and without creating a file (which would be required if PlistBuddy was used) even though doing this is technically less efficient vs just hard coding a plist string, it makes for cleaner and smaller code.
+							plutil -insert 'value' -xml '<dict/>' -o - - | # The "-dictionary" type option is only available on macOS 12 Monterey and newer, so use the "-xml" type option with a "<dict/>" plist fragment instead for maximum compatibility with the same effect.
+							plutil -insert 'value.parameters' -xml '<array/>' -o - - | # The "-array" type option is also only available on macOS 12 Monterey and newer, so use the "-xml" type option with an "<array/>" plist fragment instead for maximum compatibility with the same effect.
+							plutil -insert 'value.parameters.0' -integer '65535' -o - - |
+							plutil -insert 'value.parameters.1' -integer '103' -o - - |
+							plutil -insert 'value.type' -string 'standard' -o - -)"
 
-						temp_symbolichotkeys_plist="/private/tmp/fg-prepare-os-com.apple.symbolichotkeys.plist" # MUST use "/private/tmp/" instead of "TMPDIR" since the latter will be the root owned package-specific temporary directoy which "this_username" won't be able to write to or read from since "defaults export" and "defaults import" are being run as that user, not root.
-						rm -rf "${temp_symbolichotkeys_plist}"
-
-						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults export 'com.apple.symbolichotkeys' "${temp_symbolichotkeys_plist}"
-
-						# The following values have been confirmed to be the same on macOS 10.13 High Sierra, macOS 10.14 Mojave, macOS 10.15 Catalina, macOS 11 Big Sur, and macOS 12 Monterey
-						PlistBuddy \
-							-c 'Add :AppleSymbolicHotKeys:36 dict' \
-							-c 'Add :AppleSymbolicHotKeys:36:enabled bool false' \
-							-c 'Add :AppleSymbolicHotKeys:36:value dict' \
-							-c 'Add :AppleSymbolicHotKeys:36:value:parameters array' \
-							-c 'Add :AppleSymbolicHotKeys:36:value:parameters: integer 65535' \
-							-c 'Add :AppleSymbolicHotKeys:36:value:parameters: integer 103' \
-							-c 'Add :AppleSymbolicHotKeys:36:value:parameters: integer 8388608' \
-							-c 'Add :AppleSymbolicHotKeys:36:value:type string standard' \
-							-c 'Add :AppleSymbolicHotKeys:37 dict' \
-							-c 'Add :AppleSymbolicHotKeys:37:enabled bool false' \
-							-c 'Add :AppleSymbolicHotKeys:37:value dict' \
-							-c 'Add :AppleSymbolicHotKeys:37:value:parameters array' \
-							-c 'Add :AppleSymbolicHotKeys:37:value:parameters: integer 65535' \
-							-c 'Add :AppleSymbolicHotKeys:37:value:parameters: integer 103' \
-							-c 'Add :AppleSymbolicHotKeys:37:value:parameters: integer 8519680' \
-							-c 'Add :AppleSymbolicHotKeys:37:value:type string standard' \
-							"${temp_symbolichotkeys_plist}" &> /dev/null
-
-						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults import 'com.apple.symbolichotkeys' "${temp_symbolichotkeys_plist}" # Use "default import" to write our manually modified plist so that the values are properly updated through cfprefsd.
-						rm -f "${temp_symbolichotkeys_plist}"
+						# "defaults write" can take plists (or plist fragments) as input instead of only single values.
+						# So, we can pass a plist dictionary structure to add the desired nested dictionaries for newly added keys of the "AppleSymbolicHotKeys" top-level dictionary.
+						# The plist created above is the base dictionary for the value of both of the keys we are adding, but the last element of the
+						# "parameters" array is different for each value so those are added into the base dictionary before the value is set below.
+						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.symbolichotkeys' AppleSymbolicHotKeys -dict-add \
+							36 "$(echo "${symbolic_hot_key_base_dict}" | plutil -insert 'value.parameters.2' -integer '8388608' -o - -)" \
+							37 "$(echo "${symbolic_hot_key_base_dict}" | plutil -insert 'value.parameters.2' -integer '8519680' -o - -)"
 
 
 						# DISABLE SCREEN SAVER
@@ -750,33 +761,21 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 						# DISABLE NOTIFICATIONS
 
 						if (( DARWIN_MAJOR_VERSION >= 20 )); then
-							# In macOS 11 Big Sur, the Do Not Distrub data is stored as binary of a plist within the "dnd_prefs" of "com.apple.ncprefs":
-							# https://www.reddit.com/r/osx/comments/ksbmay/big_sur_how_to_test_do_not_disturb_status_in/gjb72av/
-							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' dnd_prefs -data "$(echo '<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>dndDisplayLock</key>
-	<true/>
-	<key>dndDisplaySleep</key>
-	<true/>
-	<key>dndMirrored</key>
-	<true/>
-	<key>facetimeCanBreakDND</key>
-	<false/>
-	<key>repeatedFacetimeCallsBreaksDND</key>
-	<false/>
-	<key>scheduledTime</key>
-	<dict>
-		<key>enabled</key>
-		<true/>
-		<key>end</key>
-		<real>1439</real>
-		<key>start</key>
-		<real>0.0</real>
-	</dict>
-</dict>
-</plist>' | plutil -convert binary1 - -o - | xxd -p | tr -d '[:space:]')" # "xxd" converts the binary data into hex, which is what "defaults" needs.
+							# On macOS 11 Big Sur, the Do Not Distrub data is stored as an encoded binary plist within the "dnd_prefs" key of "com.apple.ncprefs": https://www.reddit.com/r/osx/comments/ksbmay/big_sur_how_to_test_do_not_disturb_status_in/gjb72av/
+							# On macOS 12 Monterey and newer, the DND Schedule settings have moved to being stored in "~/Library/DoNotDisturb/DB/ModeConfigurations.json" (within data[0].modeConfigurations["com.apple.donotdisturb.mode.default"].triggers),
+							# but these old settings are migrated (a "migratedLegacySchedule" key is set to "true" in the "com.apple.ncprefs" preferences) and still properly take effect (even on macOS 13 Ventura) so continue only setting these for simplicity.
+
+							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' dnd_prefs -data "$(echo '<dict/>' | # Search for "<dict/>" above in this script for comments about creating the plist this way.
+								plutil -insert 'dndDisplayLock' -bool true -o - - |
+								plutil -insert 'dndDisplaySleep' -bool true -o - - |
+								plutil -insert 'dndMirrored' -bool true -o - - |
+								plutil -insert 'facetimeCanBreakDND' -bool false -o - - |
+								plutil -insert 'repeatedFacetimeCallsBreaksDND' -bool false -o - - |
+								plutil -insert 'scheduledTime' -xml '<dict/>' -o - - | # The "-dictionary" type option is only available on macOS 12 Monterey and newer, so use the "-xml" type option with a "<dict/>" plist fragment instead for maximum compatibility with the same effect.
+								plutil -insert 'scheduledTime.enabled' -bool true -o - - |
+								plutil -insert 'scheduledTime.end' -float 1439 -o - - |
+								plutil -insert 'scheduledTime.start' -float 0 -o - - |
+								plutil -convert binary1 -o - - | xxd -p | tr -d '[:space:]')" # "xxd" converts the binary data into hex, which is what "defaults" needs.
 						else
 							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults -currentHost write 'com.apple.notificationcenterui' dndEnabledDisplayLock -bool true
 							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults -currentHost write 'com.apple.notificationcenterui' dndEnabledDisplaySleep -bool true
@@ -796,7 +795,10 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 						if (( DARWIN_MAJOR_VERSION >= 22 )) && [[ -d '/System/Library/UserNotifications/Bundles/com.apple.BTMNotificationAgent.bundle' ]]; then
 							write_to_log "Disabling \"Background Task Management\" Notifications for \"${this_username}\" User"
-							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "<dict><key>bundle-id</key><string>com.apple.BTMNotificationAgent</string><key>flags</key><integer>${notification_center_disable_all_flags}</integer><key>path</key><string>/System/Library/UserNotifications/Bundles/com.apple.BTMNotificationAgent.bundle</string></dict>"
+							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "$(echo '<dict/>' | # Search for "<dict/>" above in this script for comments about creating the plist this way.
+								plutil -insert 'bundle-id' -string 'com.apple.BTMNotificationAgent' -o - - |
+								plutil -insert 'flags' -integer "${notification_center_disable_all_flags}" -o - - |
+								plutil -insert 'path' -string '/System/Library/UserNotifications/Bundles/com.apple.BTMNotificationAgent.bundle' -o - -)"
 						fi
 
 
@@ -835,7 +837,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 									if [[ -f "${this_pics_zip}" ]]; then
 										write_to_log "Installing Screen Saver Promo Pics for \"${this_username}\" User"
 
-										ditto -x -k --noqtn "${this_pics_zip}" "${this_user_pictures_folder}" &> /dev/null
+										ditto -xk --noqtn "${this_pics_zip}" "${this_user_pictures_folder}" &> /dev/null
 									fi
 								done
 
@@ -857,12 +859,12 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 										if [[ "${this_user_app_installer}" == *'.zip' ]]; then
 											this_user_app_name="${this_user_app_name//-/ }"
 
-											if [[ "${this_user_app_name}" != 'Free Geek Snapshot Helper' ]] || (( DARWIN_MAJOR_VERSION >= 20 )); then # Don't install "Free Geek Snapshot Helper" on macOS 10.15 Catalina and older since IS NOT used on those version (it's only used on macOS 11 Big Sur and newer), since mounting the Snapshot on macOS 10.15 Catalina does not help (see CAVEAT notes in "fg-snapshot-preserver" script) and no reset Snapshot is created on macOS 10.14 Mojave and older (where the "fgreset" script is used instead).
+											if [[ "${this_user_app_name}" != 'Free Geek Snapshot Helper' ]] || (( DARWIN_MAJOR_VERSION >= 19 )); then # Only install "Free Geek Snapshot Helper" on macOS 10.15 Catalina and newer which do the Snapshot reset technique (macOS 10.14 Mojave and older use the "fgreset" script instead).
 												if [[ "${this_user_app_name}" == 'QAHelper'* ]]; then this_user_app_name='QA Helper'; fi
 
 												write_to_log "Installing User App \"${this_user_app_name}\" for \"${this_username}\" User"
 
-												ditto -x -k --noqtn "${this_user_app_installer}" "${this_user_apps_folder}" &> /dev/null
+												ditto -xk --noqtn "${this_user_app_installer}" "${this_user_apps_folder}" &> /dev/null
 											fi
 										elif [[ "${this_user_app_installer}" == *'.dmg' ]]; then
 											#write_to_log "Mounting \"${this_user_app_name}\" Disk Image for \"${this_username}\" User Apps"
@@ -884,20 +886,20 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 												#write_to_log "Unmounting \"${this_user_app_name}\" Disk Image for \"${this_username}\" User Apps"
 												hdiutil detach "${dmg_mount_path}" &> /dev/null
 											fi
-										elif [[ "${this_user_app_installer}" != *'.driveDxLicense' ]]; then
+										elif [[ "${this_user_app_installer}" != *'.driveDxLicense' && "${this_user_app_installer}" != *'.preferences' ]]; then
 											write_to_log "Skipping Unrecognized \"${this_username}\" User App Installer (${this_user_app_installer})"
 										fi
 									fi
 								done
 
-								xattr -drs com.apple.quarantine "${this_user_apps_folder}/"*'.app' &> /dev/null # Still remove all Quarantine flags in case app came from DMG instead of unzipped with "ditto -x -k --noqtn".
+								xattr -drs com.apple.quarantine "${this_user_apps_folder}/"*'.app' &> /dev/null # Still remove all Quarantine flags in case app came from DMG instead of unzipped with "ditto -xk --noqtn".
 								touch "${this_user_apps_folder}/"*'.app' &> /dev/null
 
 								chown -R "${this_username}" "${this_user_apps_folder}"
 
 
-								# DISABLE NOTIFICATIONS FOR QA HELPER AND DRIVEDX (AND SET PREFERENCES AND LICENSE FOR DRIVEDX)
-								# Disable notifications so that notification approval is not prompted for the technician to have to dismiss (even though QA Helper does not send any notifications and DriveDx will have all notifications disabled).
+								# SET PREFERENCES (AND LICENSES AND DISABLE NOTIFICATIONS) FOR USER APPS
+								# Notifications are disabled so that notification approval is not prompted for the technician to have to dismiss (even though QA Helper does not send any notifications and DriveDx will have all notifications disabled).
 								# Doing this because the notification approval prompt is not hidden with Do Not Disturb enabled on macOS 11 Big Sur like it is on macOS 10.15 Catalina and older (but went ahead and disabled notifications for all versions of macOS anyway).
 
 								if (( DARWIN_MAJOR_VERSION == 18 || DARWIN_MAJOR_VERSION == 19 )); then
@@ -908,38 +910,63 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 								if [[ -d "${this_user_apps_folder}/QA Helper.app" ]]; then
 									write_to_log "Disabling \"QA Helper\" App Notifications for \"${this_username}\" User"
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "<dict><key>bundle-id</key><string>org.freegeek.QA-Helper</string><key>flags</key><integer>${notification_center_disable_all_flags}</integer><key>path</key><string>${this_user_apps_folder}/QA Helper.app</string></dict>"
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "$(echo '<dict/>' | # Search for "<dict/>" above in this script for comments about creating the plist this way.
+										plutil -insert 'bundle-id' -string 'org.freegeek.QA-Helper' -o - - |
+										plutil -insert 'flags' -integer "${notification_center_disable_all_flags}" -o - - |
+										plutil -insert 'path' -string "${this_user_apps_folder}/QA Helper.app" -o - -)"
+								fi
+
+								if [[ -d "${this_user_apps_folder}/DriveDx.app" ]]; then
+									if [[ -f "${this_user_resources_folder}/Apps/DriveDx.driveDxLicense" ]]; then
+										write_to_log "Disabling \"DriveDx\" App Notifications for \"${this_username}\" User"
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "$(echo '<dict/>' | # Search for "<dict/>" above in this script for comments about creating the plist this way.
+											plutil -insert 'bundle-id' -string 'com.binaryfruit.DriveDx' -o - - |
+											plutil -insert 'flags' -integer "${notification_center_disable_all_flags}" -o - - |
+											plutil -insert 'path' -string "${this_user_apps_folder}/DriveDx.app" -o - -)"
+
+										write_to_log "Setting Preferences for \"DriveDx\" App for \"${this_username}\" User"
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' App_UIMode -int 1 # Only show in Dock (not Menu Bar).
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_AutoCheck -bool false # Do not check drive health periodically.
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_Notifications_ShowDiskStatus -bool false # Do not show drive health notifications.
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_Tests_ShowNotification -bool false # Do not show notification when self-test is complete.
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_DisplayTemperatureInFahrenheit -bool true # Show temps in Fahrenheit.
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDx_OS_Mode -bool true # Sync diagnostics KB online.
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' App_Updater_CheckForUpdates -bool false # Do not check for updates.
+
+										ditto "${this_user_resources_folder}/Apps/DriveDx.driveDxLicense" "${this_home_folder}/Library/Application Support/DriveDx/DriveDx.driveDxLicense" &> /dev/null # Do not need to "mkdir" first since "ditto" takes care of that automatically.
+
+										if [[ "$(sysctl -in hw.optional.arm64)" == '1' && "$(file "${this_user_apps_folder}/DriveDx.app/Contents/MacOS/DriveDx")" != *'executable arm64'* ]] && ! arch -x86_64 /usr/bin/true 2> /dev/null; then # https://mostlymac.blog/2022/01/13/detecting-if-rosetta-2-is-installed-on-an-apple-silicon-mac/
+											# If is running on Apple Silicon and DriveDx isn't native (as version 1.11.0 is not) and Rosetta isn't aleady installed (which it will never be),
+											# install Rosetta (which requires internet and if it fails then the tech will just be prompted to install Rosetta when DriveDx is launched).
+
+											write_to_log "Installing Rosetta for \"DriveDx\" App"
+											softwareupdate --install-rosetta --agree-to-license &> /dev/null
+										fi
+									else
+										write_to_log "WARNING: Uninstalling \"DriveDx\" App for \"${this_username}\" User Because License Not Found"
+										rm -rf "${this_user_apps_folder}/DriveDx.app"
+									fi
+								fi
+
+								if [[ -d "${this_user_apps_folder}/Geekbench 5.app" ]]; then
+									if [[ -f "${this_user_resources_folder}/Apps/Geekbench 5.preferences" ]]; then
+										write_to_log "Setting Preferences for \"Geekbench\" App for \"${this_username}\" User"
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.primatelabs.Geekbench5' AgreedToEULA -bool true
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.primatelabs.Geekbench5' SUEnableAutomaticChecks -bool false
+
+										geekbench_license_json="$(< "${this_user_resources_folder}/Apps/Geekbench 5.preferences")" # This file could be placed in the "this_user_apps_folder" alongside the app to license it automatically, but instead read it to manually set the values in the preferences so that it's not as easily seen by technicians.
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.primatelabs.Geekbench5' LicenseEmail -string "$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).license_user' -- "${geekbench_license_json}")"
+										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.primatelabs.Geekbench5' LicenseKey -string "$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).license_key' -- "${geekbench_license_json}")"
+										# NOTE: Could also pass this user and key to the "geekbench_x86_64" or "geekbench_aarch64" binary (within "Geekbench 5.app/Contents/Resources") with the "--unlock" option, but that just sets these preferences so just do that directly instead.
+									else
+										write_to_log "WARNING: Uninstalling \"Geekbench\" App for \"${this_username}\" User Because License Not Found"
+										rm -rf "${this_user_apps_folder}/Geekbench 5.app"
+									fi
 								fi
 
 								if [[ -d "${this_user_apps_folder}/KeyboardCleanTool.app" ]]; then
 									write_to_log "Setting Preferences for \"KeyboardCleanTool\" App for \"${this_username}\" User"
 									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.hegenberg.KeyboardCleanTool' startAfterStart -bool true # Start cleaning mode (disabling keyboard) upon app launch.
-								fi
-
-								if [[ -d "${this_user_apps_folder}/DriveDx.app" ]]; then
-									write_to_log "Disabling \"DriveDx\" App Notifications for \"${this_username}\" User"
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "<dict><key>bundle-id</key><string>com.binaryfruit.DriveDx</string><key>flags</key><integer>${notification_center_disable_all_flags}</integer><key>path</key><string>${this_user_apps_folder}/DriveDx.app</string></dict>"
-
-									write_to_log "Setting Preferences for \"DriveDx\" App for \"${this_username}\" User"
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' App_UIMode -int 1 # Only show in Dock (not Menu Bar).
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_AutoCheck -bool false # Do not check drive health periodically.
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_Notifications_ShowDiskStatus -bool false # Do not show drive health notifications.
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_Tests_ShowNotification -bool false # Do not show notification when self-test is complete.
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDiagnostics_DisplayTemperatureInFahrenheit -bool true # Show temps in Fahrenheit.
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDx_OS_Mode -bool true # Sync diagnostics KB online.
-									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' App_Updater_CheckForUpdates -bool false # Do not check for updates.
-
-									if [[ -f "${this_user_resources_folder}/Apps/DriveDx.driveDxLicense" ]]; then
-										ditto "${this_user_resources_folder}/Apps/DriveDx.driveDxLicense" "${this_home_folder}/Library/Application Support/DriveDx/DriveDx.driveDxLicense" &> /dev/null # Do not need to "mkdir" first since "ditto" takes care of that automatically.
-									fi
-
-									if [[ "$(sysctl -in hw.optional.arm64)" == '1' && "$(file "${this_user_apps_folder}/DriveDx.app/Contents/MacOS/DriveDx")" != *'executable arm64'* ]] && ! arch -x86_64 /usr/bin/true 2> /dev/null; then # https://mostlymac.blog/2022/01/13/detecting-if-rosetta-2-is-installed-on-an-apple-silicon-mac/
-										# If is running on Apple Silicon and DriveDx isn't native (as version 1.11.0 is not) and Rosetta isn't aleady installed (which it will never be),
-										# install Rosetta (which requires internet and if it fails then the tech will just be prompted to install Rosetta when DriveDx is launched).
-
-										write_to_log "Installing Rosetta for \"DriveDx\" App"
-										softwareupdate --install-rosetta --agree-to-license &> /dev/null
-									fi
 								fi
 
 
@@ -979,7 +1006,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 									# It's also worth noting that the following "open" command will fail because the app cannot be launched before login during this setup phase.
 									# But, whatever "open" is doing internally before failing to actually launch to app makes the icon and name show correctly for the LaunchDaemon.
 
-									OSASCRIPT_ENV_APP_PATH="${this_user_apps_folder}/Free Geek Setup.app" osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); $.LSRegisterURL($.NSURL.fileURLWithPath($.NSProcessInfo.processInfo.environment.objectForKey("OSASCRIPT_ENV_APP_PATH")), true)' &> /dev/null
+									osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); run = argv => $.LSRegisterURL($.NSURL.fileURLWithPath(argv[0]), true)' -- "${this_user_apps_folder}/Free Geek Setup.app" &> /dev/null
 									launchctl asuser "${this_uid}" sudo -u "${this_username}" open -na "${this_user_apps_folder}/Free Geek Setup.app"
 
 									PlistBuddy \
@@ -1023,9 +1050,18 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 									# NOTE: See comments above in "Free Geek Setup" LaunchAgent setup about setting up this app with "AssociatedBundleIdentifiers" to properly display in the Login Items section in macOS 13 Ventura (including the following two commands being necessary).
 									# This also requires the "fg-snapshot-preserver.sh" script being SIGNED with the same Team ID as the app of the AssociatedBundleIdentifiers, so that script is signed in the "build-fg-prepare-os-pkg.sh" script.
 
-									OSASCRIPT_ENV_APP_PATH="${this_user_apps_folder}/Free Geek Snapshot Helper.app" osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); $.LSRegisterURL($.NSURL.fileURLWithPath($.NSProcessInfo.processInfo.environment.objectForKey("OSASCRIPT_ENV_APP_PATH")), true)' &> /dev/null
+									osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); run = argv => $.LSRegisterURL($.NSURL.fileURLWithPath(argv[0]), true)' -- "${this_user_apps_folder}/Free Geek Snapshot Helper.app" &> /dev/null
 									launchctl asuser "${this_uid}" sudo -u "${this_username}" open -na "${this_user_apps_folder}/Free Geek Snapshot Helper.app"
 
+									# NOTE: These values are written by passing the commands to PlistBuddy via stdin instead of using "-c" args like is usually done.
+									# One reason is because the contents are created dynamically using a loop instead of needing to hard code each 5 minute interval value which is clean and simple to do by creating a single string to be passed via stdin.
+									# But, it would still be pretty trivial to create an array of "-c" commands dynamically to be passed to PlistBuddy all at once.
+									# The more important reason is because there seems to be a bug in PlistBuddy where if you pass more than 14 "-c" args at once, it will crash with an "Abort trap: 6" error.
+									# That is a big issue for *reading* values since when that crash happens none of the output can be piped or captured with command subtitution.
+									# But, in the case of writing (like is being done below), the entire plist seems to still get created properly even though PlistBuddy will crash with the "Abort trap: 6" error.
+									# So, to be extra safe and avoid crashing PlistBuddy, pass all the "Add" commands via stdin instead which seems to not ever crash PlistBuddy with any amount of commands that I've tested.
+									# The only difference vs using "-c" args is that we have to end the set of "Add" commands with a "Save" command or else the plist will not be created
+									# See more info about this testing on the MacAdmins Slack: https://macadmins.slack.com/archives/CGXNNJXJ9/p1669083521933659?thread_ts=1668984083.421349&cid=CGXNNJXJ9
 									echo "
 Add :Label string org.freegeek.fg-snapshot-preserver
 Add :Program string ${snapshot_preserver_resources_install_path}/fg-snapshot-preserver.sh
@@ -1034,8 +1070,10 @@ Add :RunAtLoad bool true
 Add :StandardOutPath string /dev/null
 Add :StandardErrorPath string /dev/null
 Add :StartCalendarInterval array
-$(for (( start_calendar_interval_minute = 55; start_calendar_interval_minute >= 0; start_calendar_interval_minute -= 5 )); do echo "Add :StartCalendarInterval:0 dict
-Add :StartCalendarInterval:0:Minute integer ${start_calendar_interval_minute}"; done)
+$(for (( start_calendar_interval_minute = 55; start_calendar_interval_minute >= 0; start_calendar_interval_minute -= 5 )); do
+	echo "Add :StartCalendarInterval:0 dict
+Add :StartCalendarInterval:0:Minute integer ${start_calendar_interval_minute}"
+done)
 Save
 " | PlistBuddy '/Library/LaunchDaemons/org.freegeek.fg-snapshot-preserver.plist' &> /dev/null
 
@@ -1048,8 +1086,9 @@ Save
 
 
 						# SETUP DOCK
-						# Add "QA Helper" to the front (if installed), add "KeyboardCleanTool" after "QA Helper" (if installed and is a laptop),
-						# replace "Safari" with "Firefox" (if installed, which it will be on macOS 10.13 High Sierra),
+						# Add "QA Helper" to the front (if installed), add "DriveDx" and "Geekbench" after "QA Helper" (if installed),
+						# and then add "KeyboardCleanTool" after that (if installed and is a laptop),
+						# replace "Safari" with "Firefox" (if installed which it will be on macOS 10.15 Catalina and older),
 						# add "LibreOffice" after "Reminders" (if installed, which it won't be anymore but the code is left in place as an example),
 						# lock contents size and position, and hide recents (on macOS 10.14 Mojave and newer).
 
@@ -1066,43 +1105,51 @@ Save
 						if [[ -f "${default_dock_plist}" ]]; then # Do not try to customize the Dock contents if the default Dock plist is moved in a future version of macOS.
 							declare -a custom_dock_persistent_apps=()
 
-							dock_app_dict_for_path() { # This function will generate a plist dict fragment string that is suitable to be passed to "defaults write ... -array".
+							dock_app_dict_for_path() { # This function will generate a plist dict string that is suitable to be passed to "defaults write ... -array".
 								if [[ "$1" != *'.app' || ! -d "$1" ]]; then # Make sure the specified path is for an app that exists.
 									return 1
 								fi
 
-								# Need to escape any characters in the app path which would be cause an XML/plist syntax error.
-								# There are 5 characters that need to be escaped for XML/plist overall, but only the following 2 need to be escaped for a text value: https://stackoverflow.com/a/1091953
-								# Even though we won't currently be dealing with any paths containing these special characters, I've still included this escaping to be as safe and thorough as possible.
-								local app_path_escaped_for_plist="${1//&/&amp;}"
-								app_path_escaped_for_plist="${app_path_escaped_for_plist//</&lt;}"
-
-								printf '<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>%s</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>' "${app_path_escaped_for_plist}"
+								echo '<dict/>' | # Search for "<dict/>" above in this script for comments about creating the plist this way.
+									plutil -insert 'tile-data' -xml '<dict/>' -o - - | # The "-dictionary" type option is only available on macOS 12 Monterey and newer, so use the "-xml" type option with a "<dict/>" plist fragment instead for maximum compatibility with the same effect.
+									plutil -insert 'tile-data.file-data' -xml '<dict/>' -o - - |
+									plutil -insert 'tile-data.file-data._CFURLString' -string "$1" -o - - | # Another benefit of building the plist this way is that "plutil" will take care of any necessary character escaping for XML/plist (https://stackoverflow.com/a/1091953)
+									plutil -insert 'tile-data.file-data._CFURLStringType' -integer '0' -o - -
 							}
 
-							if dock_app_dict_for_qa_helper="$(dock_app_dict_for_path "${this_user_apps_folder}/QA Helper.app")"; then # Always add "QA Helper" as the first item in the Dock (which will be displayed right after "Finder").
+							if dock_app_dict_for_qa_helper="$(dock_app_dict_for_path "${this_user_apps_folder}/QA Helper.app")"; then
 								custom_dock_persistent_apps+=( "${dock_app_dict_for_qa_helper}" )
 							fi
 
-							if $is_laptop && dock_app_dict_for_keyboard_clean_tool="$(dock_app_dict_for_path "${this_user_apps_folder}/KeyboardCleanTool.app")"; then # Add "KeyboardCleanTool" after "QA Helper" item in the Dock, when the Mac is a laptop.
+							if dock_app_dict_for_drivedx="$(dock_app_dict_for_path "${this_user_apps_folder}/DriveDx.app")"; then
+								custom_dock_persistent_apps+=( "${dock_app_dict_for_drivedx}" )
+							fi
+
+							if dock_app_dict_for_geekbench="$(dock_app_dict_for_path "${this_user_apps_folder}/Geekbench 5.app")"; then
+								custom_dock_persistent_apps+=( "${dock_app_dict_for_geekbench}" )
+							fi
+
+							if $is_laptop && dock_app_dict_for_keyboard_clean_tool="$(dock_app_dict_for_path "${this_user_apps_folder}/KeyboardCleanTool.app")"; then # Add "KeyboardCleanTool" only when the Mac is a laptop.
 								custom_dock_persistent_apps+=( "${dock_app_dict_for_keyboard_clean_tool}" )
 							fi
 
-							dock_app_dict_for_libreoffice="$(dock_app_dict_for_path '/Applications/LibreOffice.app')" # This app dict fragment will be added into the Dock below if the app exists (see comments below for more info).
+							dock_app_dict_for_libreoffice="$(dock_app_dict_for_path '/Applications/LibreOffice.app')" # This app plist dict will be added into the Dock below if the app exists (see comments below for more info).
 
 							# The following loop will iterate through every app path listed in the default Dock and generate a new Dock app list suitable to be passed to "defaults write ... -array" by replacing and adding custom apps as well as removing any defaults that aren't installed (see comments below for more info).
-							for (( this_dock_persistent_app_index = 0; ; this_dock_persistent_app_index ++ )); do # This would loop forever on its own, but we'll manually break out of the loop below when there are no more indexes in the array within the plist (since we can't easily get the count of the array in advance).
-								if ! this_dock_persistent_app_path="$(PlistBuddy -c "Print :persistent-apps:${this_dock_persistent_app_index}:tile-data:file-data:_CFURLString" "${default_dock_plist}" 2> /dev/null)"; then
-									break # Must check if failed to retrieve this_dock_persistent_app_path which indicates there are no more indexes in the array within the plist and we need to break this infinite loop.
-								fi
-
+							declare -i this_dock_persistent_app_index=0 # Since it is not super easy to get the count of the "persistent-apps" array in advance, manually increment the index in a while loop that continues until PlistBuddy exits with an error because the index didn't exist.
+							while this_dock_persistent_app_path="$(PlistBuddy -c "Print :persistent-apps:${this_dock_persistent_app_index}:tile-data:file-data:_CFURLString" "${default_dock_plist}" 2> /dev/null)"; do
 								if dock_app_dict_for_this_app_path="$(dock_app_dict_for_path "${this_dock_persistent_app_path}")"; then
 									# The default Dock contents will include Pages, Numbers, and Keynote which will not be installed, so make sure to only include existing apps to the customized Dock.
 									# If the Dock were allowed to initialize on it's own, these app would be removed from the Dock by macOS when they are not installed.
 
-									if [[ "${this_dock_persistent_app_path}" == *'/Applications/Safari.app' ]] && dock_app_dict_for_firefox="$(dock_app_dict_for_path '/Applications/Firefox.app')"; then # Replace "Safari" with "Firefox" if it has been installed (which will only be done on macOS 10.13 High Sierra).
+									if [[ "${this_dock_persistent_app_path}" == *'/Applications/Safari.app' ]] && dock_app_dict_for_firefox="$(dock_app_dict_for_path '/Applications/Firefox.app')"; then # Replace "Safari" with "Firefox" if it has been installed (which will only be done on macOS 10.15 Catalina and older).
 										custom_dock_persistent_apps+=( "${dock_app_dict_for_firefox}" )
 									else
+										if [[ "${this_dock_persistent_app_path}" == *'/Applications/System Preferences.app' || "${this_dock_persistent_app_path}" == *'/Applications/System Settings.app' ]]; then
+											# Disable the "dock-extra" flag for System Preferences/Settings so that no update badges are ever displayed in the Dock since they should never be run during testing: https://lapcatsoftware.com/articles/badge.html
+											dock_app_dict_for_this_app_path="$(echo "${dock_app_dict_for_this_app_path}" | plutil -insert 'tile-data.dock-extra' -bool false -o - -)"
+										fi
+
 										custom_dock_persistent_apps+=( "${dock_app_dict_for_this_app_path}" )
 
 										if [[ "${this_dock_persistent_app_path}" == *'/Applications/Reminders.app' && -n "${dock_app_dict_for_libreoffice}" ]]; then # Add "LibreOffice" after "Reminders" if it has been installed (which will no longer be done anymore, but leave this here as an example of how to add a new app after an existing app if needed in the future).
@@ -1111,6 +1158,8 @@ Save
 										fi
 									fi
 								fi
+
+								this_dock_persistent_app_index+=1
 							done
 
 							if [[ -n "${dock_app_dict_for_libreoffice}" ]]; then # This should never happen when "LibreOffice" installed (which it will no longer be anymore), but in case "Reminders" was not in the Dock then add "LibreOffice" to the end of the Dock (also still leaving this here as an example fallback for the "add after existing app" code above).

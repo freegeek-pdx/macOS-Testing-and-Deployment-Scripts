@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.10.26-1
+-- Version: 2022.11.30-1
 
 -- App Icon is “Broom” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -64,8 +64,8 @@ try
 	end try
 	
 	set AppleScript's text item delimiters to "-"
-	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as string))
-	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as string)
+	set intendedBundleIdentifier to ("org.freegeek." & ((words of intendedAppName) as text))
+	set currentBundleIdentifier to ((do shell script ("/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & (quoted form of infoPlistPath))) as text)
 	if (currentBundleIdentifier is not equal to intendedBundleIdentifier) then error "“" & (name of me) & "” does not have the correct Bundle Identifier.
 
 
@@ -180,12 +180,12 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			end try
 			display alert ("CRITICAL “" & (name of me) & "” TCC ERROR:
 
-" & tccErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research if checking again does not work." buttons {"Shut Down", "Check Again"} cancel button 1 default button 2 as critical
+" & tccErrorMessage) message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research if checking again does not work." buttons {"Shut Down", "Check Again"} cancel button 1 default button 2 as critical giving up after 10
 			try
 				do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
 			end try
 		on error
-			tell application "System Events" to shut down with state saving preference
+			tell application id "com.apple.systemevents" to shut down with state saving preference
 		end try
 		quit
 		delay 10
@@ -207,20 +207,20 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	set needsTrimEnabled to false
 	
 	set AppleScript's text item delimiters to ""
-	set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as string) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
+	set tmpPath to ((POSIX path of (((path to temporary items) as text) & "::")) & "fg" & ((words of (name of me)) as text) & "-") -- On Catalina, writing to trailing folder "/TemporaryItems/" often fails with "Operation not permitted" for some reason. Also, prefix all files with "fg" and name of script.
 	set driveInfoPath to tmpPath & "driveInfo.plist"
 	repeat 30 times
 		try
 			do shell script "system_profiler -xml SPNVMeDataType SPSerialATADataType > " & (quoted form of driveInfoPath)
-			tell application "System Events" to tell property list file driveInfoPath
+			tell application id "com.apple.systemevents" to tell property list file driveInfoPath
 				repeat with i from 1 to (number of property list items)
 					set thisDataTypeProperties to (item i of property list items)
-					set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as string)
+					set thisDataType to ((value of property list item "_dataType" of thisDataTypeProperties) as text)
 					if ((thisDataType is equal to "SPNVMeDataType") or (thisDataType is equal to "SPSerialATADataType")) then
 						set sataItems to (property list item "_items" of thisDataTypeProperties)
 						repeat with j from 1 to (number of property list items in sataItems)
 							set thisSataController to (property list item j of sataItems)
-							set thisSataControllerName to ((value of property list item "_name" of thisSataController) as string)
+							set thisSataControllerName to ((value of property list item "_name" of thisSataController) as text)
 							if (thisSataControllerName does not contain "Thunderbolt") then
 								set thisSataControllerItems to (property list item "_items" of thisSataController)
 								repeat with k from 1 to (number of property list items in thisSataControllerItems)
@@ -229,10 +229,10 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 										set thisSataItemTrimSupport to "Yes" -- Default to Yes since drive may not be SSD and also don't want to get stuck in reboot loop if there's an error.
 										
 										if (thisDataType is equal to "SPNVMeDataType") then
-											set thisSataItemTrimSupport to ((value of property list item "spnvme_trim_support" of thisSataControllerItem) as string)
+											set thisSataItemTrimSupport to ((value of property list item "spnvme_trim_support" of thisSataControllerItem) as text)
 										else
-											set thisSataItemMediumType to ((value of property list item "spsata_medium_type" of thisSataControllerItem) as string)
-											if (thisSataItemMediumType is equal to "Solid State") then set thisSataItemTrimSupport to ((value of property list item "spsata_trim_support" of thisSataControllerItem) as string)
+											set thisSataItemMediumType to ((value of property list item "spsata_medium_type" of thisSataControllerItem) as text)
+											if (thisSataItemMediumType is equal to "Solid State") then set thisSataItemTrimSupport to ((value of property list item "spsata_trim_support" of thisSataControllerItem) as text)
 										end if
 										
 										if (thisSataItemTrimSupport is not equal to "Yes") then
@@ -287,7 +287,7 @@ This Mac CANNOT BE SOLD in its current state, please set this Mac aside and info
 	set renameInternalDriveNote to ""
 	set nameOfCurrentStartupDisk to "UNKNOWN"
 	try
-		tell application "System Events" to set nameOfCurrentStartupDisk to (name of startup disk)
+		tell application id "com.apple.systemevents" to set nameOfCurrentStartupDisk to (name of startup disk)
 	end try
 	if (nameOfCurrentStartupDisk is not equal to "Macintosh HD") then set renameInternalDriveNote to "
 	⁃ Rename internal drive to “Macintosh HD”."
@@ -410,7 +410,7 @@ to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
 Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
 
 Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform Free Geek I.T." buttons {"Shut Down"} as critical
-					tell application "System Events" to shut down with state saving preference
+					tell application id "com.apple.systemevents" to shut down with state saving preference
 					
 					quit
 					delay 10
@@ -461,7 +461,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 							set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
 							if ((count of remoteManagementOrganizationContactInfo) > 0) then
 								set AppleScript's text item delimiters to (linefeed & tab & tab)
-								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as string)
+								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as text)
 							end if
 							
 							try
@@ -491,7 +491,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 
 
 		    👉 ‼️ INFORM AN INSTRUCTOR OR MANAGER ‼️ 👈" buttons {remoteManagementDialogButton} with title "Remote Management Enabled"
-							tell application "System Events" to shut down with state saving preference
+							tell application id "com.apple.systemevents" to shut down with state saving preference
 							
 							quit
 							delay 10
@@ -520,14 +520,14 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
 	on error
 		try
-			tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Demo Helper") and (short name is not (name of me))))
-			if ((count of listOfRunningApps) > 0) then
+			tell application id "com.apple.systemevents" to set listOfRunningAppIDs to (bundle identifier of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Free-Geek-Demo-Helper") and (bundle identifier is not (id of me))))
+			if ((count of listOfRunningAppIDs) > 0) then
 				try
-					repeat with thisAppName in listOfRunningApps
+					repeat with thisAppID in listOfRunningAppIDs
 						try
-							if (application thisAppName is running) then
+							if (application id thisAppID is running) then
 								with timeout of 1 second
-									tell application thisAppName to quit
+									tell application id thisAppID to quit without saving
 								end timeout
 							end if
 						end try
@@ -535,14 +535,11 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 				end try
 				delay 3
 				try
-					tell application "System Events" to set listOfRunningApps to (short name of every application process where ((background only is false) and (short name is not "Finder") and (short name is not "Free Geek Demo Helper") and (short name is not (name of me))))
-					repeat with thisAppName in listOfRunningApps
-						repeat 2 times
-							try
-								do shell script "pkill -f " & (quoted form of thisAppName)
-							end try
-						end repeat
-					end repeat
+					set AppleScript's text item delimiters to space
+					tell application id "com.apple.systemevents" to set allRunningAppPIDs to ((unix id of every application process where ((background only is false) and (bundle identifier is not "com.apple.finder") and (bundle identifier is not "org.freegeek.Free-Geek-Demo-Helper") and (bundle identifier is not (id of me)))) as text)
+					if (allRunningAppPIDs is not equal to "") then
+						do shell script ("kill " & allRunningAppPIDs)
+					end if
 				end try
 			end if
 		end try
@@ -550,7 +547,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	
 	-- CLEAR THE CLIPBOARD CONTENTS
 	try
-		tell application "System Events" to set the clipboard to ""
+		tell application id "com.apple.systemevents" to set the clipboard to ""
 	end try
 	
 	-- RESET SAFARI & TERMINAL
@@ -654,7 +651,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	
 	-- EMPTY THE TRASH (in case it's full)
 	try
-		tell application "Finder"
+		tell application id "com.apple.finder"
 			set warns before emptying of trash to false
 			try
 				empty the trash
@@ -675,7 +672,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	try
 		set intendedDriveName to "Macintosh HD"
 		set currentDriveName to intendedDriveName
-		tell application "System Events" to set currentDriveName to (name of startup disk)
+		tell application id "com.apple.systemevents" to set currentDriveName to (name of startup disk)
 		if (currentDriveName is not equal to intendedDriveName) then
 			doShellScriptAsAdmin("diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName))
 			if (isCatalinaOrNewer) then doShellScriptAsAdmin("diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")))
@@ -686,10 +683,10 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	set wirelessNetworkPasswordsToDelete to {}
 	try
 		set AppleScript's text item delimiters to ""
-		tell application "System Events" to tell current location of network preferences
+		tell application id "com.apple.systemevents" to tell current location of network preferences
 			repeat with thisActiveNetworkService in (every service whose active is true)
-				if (((name of interface of thisActiveNetworkService) as string) is equal to "Wi-Fi") then
-					set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as string)
+				if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
+					set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as text)
 					try
 						set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & thisWiFiInterfaceID)))
 						try
@@ -701,7 +698,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 						end try
 						repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
 							if (thisPreferredWirelessNetwork starts with "	") then
-								set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as string)
+								set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 								if (thisPreferredWirelessNetwork is not equal to "Free Geek") then
 									try
 										do shell script "networksetup -setairportpower " & thisWiFiInterfaceID & " off"
@@ -797,7 +794,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	After QA Complete" message "
 This Mac will Shut Down in 15 Seconds…" buttons {"Don't Shut Down", "Shut Down Now"} cancel button 1 default button 2 giving up after 15
 		
-		tell application "System Events" to shut down with state saving preference
+		tell application id "com.apple.systemevents" to shut down with state saving preference
 	end try
 	
 	try
@@ -815,7 +812,7 @@ else
 end if
 
 on doShellScriptAsAdmin(command)
-	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_
+	-- "do shell script with administrator privileges" caches authentication for 5 minutes: https://developer.apple.com/library/archive/technotes/tn2065/_index.html#//apple_ref/doc/uid/DTS10003093-CH1-TNTAG1-HOW_DO_I_GET_ADMINISTRATOR_PRIVILEGES_FOR_A_COMMAND_ & https://developer.apple.com/library/archive/releasenotes/AppleScript/RN-AppleScript/RN-10_4/RN-10_4.html#//apple_ref/doc/uid/TP40000982-CH104-SW10
 	-- And, it takes reasonably longer to run "do shell script with administrator privileges" when credentials are passed vs without.
 	-- In testing, 100 iteration with credentials took about 30 seconds while 100 interations without credentials after authenticated in advance took only 2 seconds.
 	-- So, this function makes it easy to call "do shell script with administrator privileges" while only passing credentials when needed.

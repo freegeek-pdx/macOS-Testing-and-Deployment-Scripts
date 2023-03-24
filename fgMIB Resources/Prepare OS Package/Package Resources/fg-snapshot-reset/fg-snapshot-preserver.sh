@@ -46,7 +46,7 @@
 	# It seems that somehow the "deleted" daemon is maybe marking the reset Snapshot as unusable and preventing it from being able to show up in "Restore from Time Machine Backup" in Recovery. This seems to not be an issue on macOS 11 Big Sur though.
 	# So, ALWAYS manipulate the system date (Solution 1) to keep set to the Snapshot date on macOS 10.15 Catalina and do not bother mounting the Snapshot (since knowing the Snapshot got purged is better user feedback than it just not showing in Recovery).
 
-readonly SCRIPT_VERSION='2023.1.9-1'
+readonly SCRIPT_VERSION='2023.3.1-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
@@ -68,7 +68,7 @@ write_to_log() {
 
 write_to_log "Running Snapshot Preserver (version ${SCRIPT_VERSION})"
 
-if pgrep -qf "${BASH_SOURCE[0]}"; then
+if pgrep -qaf "${BASH_SOURCE[0]}"; then
 	# Need to check for an existing instance already running because of how this script could also be executed by a LaunchDaemon as well as
 	# "Free Geek Setup" or "Free Geek Demo Helper" which could conflict with each other and cause multiple instances to be executed at the same time.
 	# But, the LaunchDaemon schedule alone will never execute multiple instances if the previous LaunchDaemon instance is still running.
@@ -90,7 +90,7 @@ manually_sync_time() {
 			actual_time_int="${actual_time//:/}"
 		fi
 
-		if (( 10#$actual_time_int < 10#$1 )); then # "10#" removes any leading zeros to not force octal interpretation: https://github.com/koalaman/shellcheck/wiki/SC2004#rationale ($1 = reset_snapshot_time)
+		if (( 10#${actual_time_int} < 10#$1 )); then # $1 = reset_snapshot_time & casting to base 10 (10#) removes any leading zeros so the numbers are not interpreted as octal: https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale
 			# If the reset Snapshot time is in the future, macOS would purge it if the "deleted" daemon runs.
 			# So, never allow the system time be less that the reset Snapshot time.
 
@@ -124,7 +124,7 @@ attempt_to_mount_reset_snapshot() {
 			# This is done in an app instead of this script since Full Disk Access is required to be able to mount Snapshots. This script could mount the Snapshot if "bash" was granted Full Disk Access, but that is overzealous.
 			# "Free Geek Snapshot Helper" will always be granted Full Disk Access right off the bat during a customized installation by "fg-install-os" (which you can read about in the comments in that script).
 
-			if pgrep -qx 'Finder'; then
+			if pgrep -qax 'Finder'; then
 				# "Free Geek Snapshot Helper" will not be able to mount the reset Snapshot when this global LaunchDaemon is first run very early on boot, so will not try to launch unless logged in (by checking if Finder is running).
 				# But, "Free Geek Demo Helper" will launch this script when it is run on login via user LaunchAgent which will get the reset Snapshot mounted as soon as possible.
 
@@ -205,7 +205,7 @@ secure_token_holder_exists_that_cannot_be_removed="$([[ -n "$(ioreg -rc AppleSEP
 # This way, the technician can be notified of the issue by Snapshot Helper before a Snapshot reset is attempted and fails.
 
 if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/.fgResetSnapshotCreated' && "$(tmutil listlocalsnapshots / | grep 'com.apple.TimeMachine' | head -1)" == "$(head -1 '/Users/Shared/.fgResetSnapshotCreated')" && "$(fdesetup isactive)" == 'false' ]]; then
-	was_logged_in_at_launch="$(pgrep -qx 'Finder' && echo 'true' || echo 'false')"
+	was_logged_in_at_launch="$(pgrep -qax 'Finder' && echo 'true' || echo 'false')"
 	
 	if ! attempt_to_mount_reset_snapshot; then
 		# If "Free Geek Snapshot Helper" has not been granted Full Disk Access yet (or could not mount the Snapshot very early on boot),
@@ -240,7 +240,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 			fi
 		fi
 
-		if (( 10#$(date '+%H%M%S') < 10#$reset_snapshot_time )); then # "10#" removes any leading zeros to not force octal interpretation: https://github.com/koalaman/shellcheck/wiki/SC2004#rationale
+		if (( 10#$(date '+%H%M%S') < 10#${reset_snapshot_time} )); then # Casting to base 10 (10#) removes any leading zeros so the numbers are not interpreted as octal: https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale
 			# If the reset Snapshot time is in the future, macOS would purge it if the "deleted" daemon runs.
 			# So, never allow the system time be less that the reset Snapshot time.
 			
@@ -264,7 +264,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 			# If was not logged in on first attempt to mount reset Snapshot, wait until login to attempt to mount reset Snapshot again before forcing a reboot if necessary.
 			write_to_log 'Waiting for Login to Launch Free Geek Snapshot Helper'
 
-			until pgrep -qx 'Finder'; do
+			until pgrep -qax 'Finder'; do
 				did_wait_for_login=true
 				sleep 2
 
@@ -375,7 +375,7 @@ else
 		tmutil deletelocalsnapshots / &> /dev/null
 	fi
 
-	if pgrep -qx 'Finder'; then
+	if pgrep -qax 'Finder'; then
 		# Launch "Free Geek Snapshot Helper" (if logged in) since it also serves as a GUI to display an alert about the reset Snapshot being lost.
 		launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" open -na "/Users/${DEMO_USERNAME}/Applications/Free Geek Snapshot Helper.app"
 	fi

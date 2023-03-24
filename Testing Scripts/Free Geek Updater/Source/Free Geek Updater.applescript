@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.1.6-1
+-- Version: 2023.1.23-1
 
 -- App Icon is “Counterclockwise Arrows” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -539,7 +539,7 @@ end try
 								
 								if (thisUpdatedScriptVersion is equal to thisScriptLatestVersion) then
 									try
-										do shell script ("xattr -c " & (quoted form of thisScriptUpdateTempFilePath) & "; chmod +x " & (quoted form of thisScriptUpdateTempFilePath))
+										do shell script ("chmod +x " & (quoted form of thisScriptUpdateTempFilePath))
 									end try
 									
 									try

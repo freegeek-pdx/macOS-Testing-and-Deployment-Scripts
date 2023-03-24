@@ -39,11 +39,11 @@ function run(argv) {
 	const latestInstallerDict = JSON.parse(argv[0])[0]
 	return [latestInstallerDict.name, latestInstallerDict.version, latestInstallerDict.build].join("\n")
 }
-' -- "${this_installer_info_json}")
-# NOTE: Because of JavaScript behavior, any "undefined" (or "null") values in an array would be turned into empty strings when using "join", making them empty lines.
-# And, because of bash behaviors with whitespace IFS treating consecutive whitespace as a single delimiter (explained in https://mywiki.wooledge.org/IFS),
-# any empty lines will NOT be included in the bash array being created with this technique to set all lines to an array.
-# So, that means if any of these values are not found, the bash array WILL NOT have a count of exactly 3 which we can check to verify all required values were properly loaded.
+' -- "${this_installer_info_json}" 2> /dev/null)
+	# NOTE: Because of JavaScript behavior, any "undefined" (or "null") values in an array would be turned into empty strings when using "join", making them empty lines.
+	# And, because of bash behaviors with whitespace IFS treating consecutive whitespace as a single delimiter (explained in https://mywiki.wooledge.org/IFS),
+	# any empty lines will NOT be included in the bash array being created with this technique to set all lines to an array.
+	# So, that means if any of these values are not found, the bash array WILL NOT have a count of exactly 3 which we can check to verify all required values were properly loaded.
 
 	if (( ${#this_installer_info[@]} == 3 )); then
 		this_installer_dmg_name="Install ${this_installer_info[0]} ${this_installer_info[1]}-${this_installer_info[2]}.dmg"

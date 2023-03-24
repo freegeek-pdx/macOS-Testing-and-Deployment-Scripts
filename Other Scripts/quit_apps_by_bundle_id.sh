@@ -48,7 +48,7 @@ function run(argv) {
 		}
 	}
 }
-' -- "$@"
+' -- "$@" 2> /dev/null
 }
 
 quit_apps_by_bundle_id "$@"

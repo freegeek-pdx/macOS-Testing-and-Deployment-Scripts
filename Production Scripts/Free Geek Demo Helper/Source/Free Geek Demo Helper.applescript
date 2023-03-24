@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.1.9-1
+-- Version: 2023.2.17-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -946,7 +946,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			on error
 				try
 					if (isVenturaOrNewer) then -- On Ventura, open the new detailed About section in System Settings instead of the now minimal About window.
-						do shell script "open x-apple.systempreferences:com.apple.SystemProfiler.AboutExtension"
+						open location "x-apple.systempreferences:com.apple.SystemProfiler.AboutExtension"
 					else
 						set aboutThisMacAppPath to "/System/Library/CoreServices/Applications/About This Mac.app"
 						((aboutThisMacAppPath as POSIX file) as alias)

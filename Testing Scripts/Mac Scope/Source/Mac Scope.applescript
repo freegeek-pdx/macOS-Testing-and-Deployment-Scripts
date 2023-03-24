@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.1.10-1
+-- Version: 2023.2.17-1
 
 -- App Icon is “Microscope” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -158,7 +158,7 @@ if (isMojaveOrNewer) then
 				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
-				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
+				open location "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 			end try
 			try
 				activate
@@ -622,7 +622,7 @@ repeat
 			
 			set powerAdapterType to "⚠️	UNKNOWN Power Adapter  ⚠️"
 			
-			-- Power Adapter Model IDs Last Updated: 8/11/22
+			-- Power Adapter Model IDs Last Updated: 2/1/23
 			if ({"MacBookPro1,1", "MacBookPro1,2", "MacBookPro2,1", "MacBookPro2,2", "MacBookPro3,1", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro8,2", "MacBookPro8,3", "MacBookPro9,1"} contains modelIdentifier) then
 				set powerAdapterType to "85W MagSafe 1"
 			else if ({"MacBook1,1", "MacBook2,1", "MacBook3,1", "MacBook4,1", "MacBook5,1", "MacBook5,2", "MacBook6,1", "MacBook7,1", "MacBookPro5,4", "MacBookPro5,5", "MacBookPro7,1", "MacBookPro8,1", "MacBookPro9,2"} contains modelIdentifier) then
@@ -647,9 +647,9 @@ repeat
 				set powerAdapterType to "30W USB-C"
 			else if ({"MacBook8,1", "MacBook9,1"} contains modelIdentifier) then
 				set powerAdapterType to "29W USB-C"
-			else if ({"MacBookPro18,1", "MacBookPro18,2"} contains modelIdentifier) then
+			else if ({"Mac14,6", "Mac14,10", "MacBookPro18,1", "MacBookPro18,2"} contains modelIdentifier) then
 				set powerAdapterType to "140W USB-C/MagSafe 3"
-			else if ({"MacBookPro18,3", "MacBookPro18,4"} contains modelIdentifier) then
+			else if ({"Mac14,5", "Mac14,9", "MacBookPro18,3", "MacBookPro18,4"} contains modelIdentifier) then
 				set powerAdapterType to "67W or 96W USB-C/MagSafe 3"
 			else if ({"Mac14,2"} contains modelIdentifier) then
 				set powerAdapterType to "30W or 35W Dual Port or 67W USB-C/MagSafe 3"
@@ -1020,11 +1020,16 @@ repeat
 📊	Loading Memory Information"
 							end tell
 							set memoryInfo to (first property list item of property list item "_items" of thisDataTypeProperties)
-							try
-								set memoryUpgradeable to ((value of property list item "is_memory_upgradeable" of memoryInfo) as text)
-								if (memoryUpgradeable is equal to "No") then set memoryNote to "
+							if (isAppleSilicon) then
+								set memoryNote to "
+	🚫	RAM is Integrated With Chip (NOT Upgradeable)"
+							else
+								try
+									set memoryUpgradeable to ((value of property list item "is_memory_upgradeable" of memoryInfo) as text)
+									if (memoryUpgradeable is equal to "No") then set memoryNote to "
 	🚫	RAM is Soldered Onboard (NOT Upgradeable)"
-							end try
+								end try
+							end if
 							try
 								set memoryType to ((value of property list item "dimm_type" of memoryInfo) as text) -- This top level "Type" (not within any Banks), will only exist when running natively on Apple Silicon.
 								set memoryType to (do shell script "echo " & (quoted form of memoryType) & " | tr -dc '[:alnum:]' | tr '[:lower:]' '[:upper:]'")
@@ -1450,8 +1455,12 @@ repeat
 									-- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
 									-- BUT, I wrote a script (in "Other Scripts/get_bluetooth_from_all_mac_specs_pages.sh") to extract every Bluetooth version from every specs URL to be able to know what version this model has if Bluetooth is detected.
 									
-									-- Bluetooth Model IDs Last Updated: 8/15/22
-									if ({"Mac13,1", "Mac13,2", "Mac14,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"} contains modelIdentifier) then
+									-- Bluetooth Model IDs Last Updated: 2/1/23
+									if ({"Mac14,3", "Mac14,5", "Mac14,6", "Mac14,9", "Mac14,10", "Mac14,12"} contains modelIdentifier) then
+										set bluetoothInfo to "Bluetooth 5.3 Detected"
+										set (end of bluetoothSupportedFeaturesList) to "BLE"
+										set (end of bluetoothSupportedFeaturesList) to "Handoff"
+									else if ({"Mac13,1", "Mac13,2", "Mac14,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"} contains modelIdentifier) then
 										set bluetoothInfo to "Bluetooth 5.0 Detected"
 										set (end of bluetoothSupportedFeaturesList) to "BLE"
 										set (end of bluetoothSupportedFeaturesList) to "Handoff"
@@ -1695,8 +1704,12 @@ repeat
 							-- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
 							-- BUT, I wrote a script (in "Other Scripts/get_bluetooth_from_all_mac_specs_pages.sh") to extract every Bluetooth version from every specs URL to be able to know what version this model has if Bluetooth is detected.
 							
-							-- Bluetooth Model IDs Last Updated: 8/15/22
-							if ({"Mac13,1", "Mac13,2", "Mac14,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"} contains modelIdentifier) then
+							-- Bluetooth Model IDs Last Updated: 2/1/23
+							if ({"Mac14,3", "Mac14,5", "Mac14,6", "Mac14,9", "Mac14,10", "Mac14,12"} contains modelIdentifier) then
+								set bluetoothInfo to "Bluetooth 5.3 Detected"
+								set (end of bluetoothSupportedFeaturesList) to "BLE"
+								set (end of bluetoothSupportedFeaturesList) to "Handoff"
+							else if ({"Mac13,1", "Mac13,2", "Mac14,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"} contains modelIdentifier) then
 								set bluetoothInfo to "Bluetooth 5.0 Detected"
 								set (end of bluetoothSupportedFeaturesList) to "BLE"
 								set (end of bluetoothSupportedFeaturesList) to "Handoff"
@@ -2074,34 +2087,34 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 🔄	Reloading " & (name of me) & ""
 			try
 				if (macBookPro2016and2017RecalledBatteryRecall) then
-					do shell script "open 'https://web.archive.org/web/20220620162055/https://support.apple.com/en-us/HT212163'"
+					open location "https://web.archive.org/web/20220620162055/https://support.apple.com/en-us/HT212163"
 				else if (macBookPro13inch2016PossibleBatteryRecall or macBookPro15inch2015PossibleBatteryRecall or macBookPro13inch2017PossibleSSDRecall) then
 					set the clipboard to serialNumber
 					if (macBookPro13inch2016PossibleBatteryRecall) then
-						do shell script "open 'https://support.apple.com/13inch-macbookpro-battery-replacement'"
+						open location "https://support.apple.com/13inch-macbookpro-battery-replacement"
 					else if (macBookPro13inch2017PossibleSSDRecall) then
-						do shell script "open 'https://support.apple.com/13-inch-macbook-pro-solid-state-drive-service'"
+						open location "https://support.apple.com/13-inch-macbook-pro-solid-state-drive-service"
 					else
-						do shell script "open 'https://support.apple.com/15-inch-macbook-pro-battery-recall'"
+						open location "https://support.apple.com/15-inch-macbook-pro-battery-recall"
 					end if
 					try
 						activate
 					end try
 					display alert "\"" & serialNumber & "\" Copied to Clipboard" message "This computers serial number has been copied to the clipboard to search on Apple's recall page."
 				else if (macBookProPossibleBadGraphics) then
-					do shell script "open 'https://www.macrumors.com/2017/05/20/apple-ends-2011-macbook-pro-repair-program/'"
+					open location "https://www.macrumors.com/2017/05/20/apple-ends-2011-macbook-pro-repair-program/"
 				else if (iMacPossibleBadGraphics) then
-					do shell script "open 'https://www.macrumors.com/2013/08/16/apple-initiates-graphic-card-replacement-program-for-mid-2011-27-inch-imac/'"
+					open location "https://www.macrumors.com/2013/08/16/apple-initiates-graphic-card-replacement-program-for-mid-2011-27-inch-imac/"
 				else if (macProPossibleBadGraphics) then
-					do shell script "open 'https://www.macrumors.com/2016/02/06/late-2013-mac-pro-video-issues-repair-program/'"
+					open location "https://www.macrumors.com/2016/02/06/late-2013-mac-pro-video-issues-repair-program/"
 				else if (macBookPro13inch2016PossibleBacklightRecall) then
-					do shell script "open 'https://support.apple.com/13-inch-macbook-pro-display-backlight-service'"
+					open location "https://support.apple.com/13-inch-macbook-pro-display-backlight-service"
 				else if (macBookProButterflyKeyboardRecall) then
-					do shell script "open 'https://support.apple.com/keyboard-service-program-for-mac-notebooks'"
+					open location "https://support.apple.com/keyboard-service-program-for-mac-notebooks"
 				else if (macBookProScreenDelaminationRecall) then
-					do shell script "open 'https://www.macrumors.com/2017/11/17/apple-extends-free-staingate-repairs/'"
+					open location "https://www.macrumors.com/2017/11/17/apple-extends-free-staingate-repairs/"
 				else if (iMacHingeRecall) then
-					do shell script "open 'https://www.macrumors.com/2016/11/29/imac-broken-hinge-refunds-repair-program/'"
+					open location "https://www.macrumors.com/2016/11/29/imac-broken-hinge-refunds-repair-program/"
 				else if (showSystemInfoAppButton) then
 					try
 						do shell script "open -b com.apple.SystemProfiler"
@@ -2124,7 +2137,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 To open the “About This Mac” window, click the Apple logo in left of the menubar along the top of the screen and select “About This Mac” from the menu." as critical
 					end try
 				else if (showMojaveOnOldMacProButton) then
-					do shell script "open 'https://support.apple.com/HT208898'"
+					open location "https://support.apple.com/HT208898"
 				else
 					try
 						activate

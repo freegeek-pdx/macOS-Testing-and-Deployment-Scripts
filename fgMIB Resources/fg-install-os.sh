@@ -20,7 +20,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-readonly SCRIPT_VERSION='2023.1.10-1'
+readonly SCRIPT_VERSION='2023.2.16-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -43,12 +43,12 @@ fi
 
 current_process_list="$(ps -ax)" # Must use "ps -ax" output to check for running processes since "pgrep" is not available in recoveryOS.
 
-if (( $(echo "${current_process_list}" | grep -v 'grep' | grep -ci 'fg-install-os') > 1 )); then
+if (( $(echo "${current_process_list}" | grep -ci '[f]g-install-os') > 1 )); then # https://mywiki.wooledge.org/ProcessManagement#But_I.27m_on_some_old_legacy_Unix_system_that_doesn.27t_have_pgrep.21__What_do_I_do.3F
 	>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Another \"fg-install-os\" process is already running.${CLEAR_ANSI}\n\n"
 	exit 1
 fi
 
-if echo "${current_process_list}" | grep -v 'grep' | grep -qi 'startosinstall\|InstallAssistant'; then
+if echo "${current_process_list}" | grep -qi '[s]tartosinstall\|[I]nstallAssistant'; then
 	>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Another macOS installation process is already running.${CLEAR_ANSI}\n\n"
 	exit 1
 fi
@@ -69,8 +69,6 @@ BOOTED_BUILD_VERSION="$(sw_vers -buildVersion)"
 readonly BOOTED_BUILD_VERSION
 BOOTED_DARWIN_MAJOR_VERSION="$(echo "${BOOTED_BUILD_VERSION}" | cut -c -2 | tr -dc '[:digit:]')" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc. ("uname -r" is not available in recoveryOS).
 readonly BOOTED_DARWIN_MAJOR_VERSION
-
-caffeinate_pid=''
 
 pmset -a sleep 0 displaysleep 0 # Disable sleep in recoveryOS.
 
@@ -158,8 +156,7 @@ if [[ "${MODEL_ID_NAME}" == 'Mac' && -n "${APPLE_SILICON_MARKETING_MODEL_NAME}" 
 	# So, to get the short model name, we must extract it from the full Marketing Model Name (retreived from "ioreg" since this only affects Apple Silicon Macs) by extracting the first part up to " (".
 	SHORT_MODEL_NAME="$(echo "${APPLE_SILICON_MARKETING_MODEL_NAME}" | awk -F ' [(]' '{ print $1; exit }')"
 else # When the specific model is part of the Model Identifier (on Intel and early Apple Silicon Macs), we can create it by just separating one of these suffixes in the textual part of the Model Identifier with a space.
-	declare -a short_model_name_end_components=( 'Pro' 'Air' 'mini' )
-	for this_short_model_name_end_component in "${short_model_name_end_components[@]}"; do
+	for this_short_model_name_end_component in 'Pro' 'Air' 'mini'; do # These are the only suffixes that will ever exist in this condition since the Mac Studio and and possible future models will be Apple Silicon Macs with "MacXX,Y" Model IDs that will be caught in the condition above.
 		if [[ "${SHORT_MODEL_NAME}" == *"${this_short_model_name_end_component}" ]]; then
 			SHORT_MODEL_NAME="${SHORT_MODEL_NAME/${this_short_model_name_end_component}/ ${this_short_model_name_end_component}}"
 			break
@@ -176,8 +173,7 @@ readonly SPECS_SERIAL="${ANSI_BOLD}Serial:${CLEAR_ANSI} ${SERIAL}"
 
 cpu_model="$(sysctl -n machdep.cpu.brand_string 2> /dev/null)"
 
-declare -a cpu_model_removal_components=( 'Genuine' 'Intel' '(R)' '(TM)' 'CPU' 'processor' )
-for this_cpu_model_removal_components in "${cpu_model_removal_components[@]}"; do
+for this_cpu_model_removal_components in 'Genuine' 'Intel' '(R)' '(TM)' 'CPU' 'processor'; do
 	cpu_model="${cpu_model//${this_cpu_model_removal_components}/ }"
 done
 
@@ -901,10 +897,9 @@ if (( ${#clean_install_choices[@]} > 0 )); then
 		if [[ "${chosen_clean_install_index}" =~ ^[Cc] ]]; then # Do not confirm continuing, just continue.
 			break
 		else
-			chosen_clean_install_index="${chosen_clean_install_index//[^0-9]/}" # Remove all non-digits
+			chosen_clean_install_index="${chosen_clean_install_index//[^0-9]/}" # Remove all non-digits.
 			if [[ "${chosen_clean_install_index}" == '0'* ]]; then
-				chosen_clean_install_index="${chosen_clean_install_index#"${chosen_clean_install_index%%[^0]*}"}" # Remove any leading zeros
-				if [[ -z "${chosen_clean_install_index}" ]]; then chosen_clean_install_index='0'; fi # Catch if the number was all zeros
+				chosen_clean_install_index="$(( 10#${chosen_clean_install_index} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
 			fi
 		fi
 
@@ -914,10 +909,9 @@ if (( ${#clean_install_choices[@]} > 0 )); then
 			echo -en "\n  Enter ${ANSI_BOLD}${chosen_clean_install_index}${CLEAR_ANSI} Again to Confirm Customizing ${ANSI_BOLD}${possible_clean_install_os_name}${CLEAR_ANSI}\n  at ${ANSI_BOLD}\"${possible_clean_install_to_customize_volume}\"${CLEAR_ANSI} on ${ANSI_BOLD}${possible_clean_install_drive_name}${CLEAR_ANSI}: "
 			read -r confirmed_clean_install_index
 
-			confirmed_clean_install_index="${confirmed_clean_install_index//[^0-9]/}" # Remove all non-digits
+			confirmed_clean_install_index="${confirmed_clean_install_index//[^0-9]/}" # Remove all non-digits.
 			if [[ "${confirmed_clean_install_index}" == '0'* ]]; then
-				confirmed_clean_install_index="${confirmed_clean_install_index#"${confirmed_clean_install_index%%[^0]*}"}" # Remove any leading zeros
-				if [[ -z "${confirmed_clean_install_index}" ]]; then confirmed_clean_install_index='0'; fi # Catch if the number was all zeros
+				confirmed_clean_install_index="$(( 10#${confirmed_clean_install_index} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
 			fi
 
 			if [[ "${chosen_clean_install_index}" == "${confirmed_clean_install_index}" ]]; then
@@ -1030,18 +1024,12 @@ readonly SUPPORTS_MONTEREY
 SUPPORTS_VENTURA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '18' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '10' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '14' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
 readonly SUPPORTS_VENTURA
 
-declare -a os_installer_search_group_prefixes=(
-	'/Volumes/Image ' # Always want installers in "Image Volume" to come before any other installers (which is for the booted installer in recoveryOS).
-	'/Volumes/Install ' # Check any other available "Install macOS..." volumes.
-	'/' # A stub installer will always be in the root filesystem in recoveryOS.
-)
-
 declare -a os_installer_choices=()
 os_installer_choices_display=''
 
 declare -a stub_os_installers_info=()
 
-for this_os_installer_search_group_prefixes in "${os_installer_search_group_prefixes[@]}"; do
+for this_os_installer_search_group_prefixes in '/Volumes/Image ' '/Volumes/Install ' '/'; do # Always want installers in "Image Volume" to come before any other installers (which is for the booted installer in recoveryOS). Check any other available "Install macOS..." volumes. A stub installer will always be in the root filesystem in recoveryOS.
 	declare -a this_os_installer_search_group_paths=()
 	if [[ "${this_os_installer_search_group_prefixes}" != *'/' ]]; then
 		this_os_installer_search_group_paths=( "${this_os_installer_search_group_prefixes}"*'/Install '*'.app/Contents/Resources/startosinstall' )
@@ -1193,10 +1181,9 @@ if (( os_installer_choices_count > 0 )); then
 		echo -en "\n  Enter the ${ANSI_BOLD}Index of macOS Version${CLEAR_ANSI} to Install: "
 		read -r chosen_os_installer_index
 
-		chosen_os_installer_index="${chosen_os_installer_index//[^0-9]/}" # Remove all non-digits
+		chosen_os_installer_index="${chosen_os_installer_index//[^0-9]/}" # Remove all non-digits.
 		if [[ "${chosen_os_installer_index}" == '0'* ]]; then
-			chosen_os_installer_index="${chosen_os_installer_index#"${chosen_os_installer_index%%[^0]*}"}" # Remove any leading zeros
-			if [[ -z "${chosen_os_installer_index}" ]]; then chosen_os_installer_index='0'; fi # Catch if the number was all zeros
+			chosen_os_installer_index="$(( 10#${chosen_os_installer_index} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
 		fi
 
 		if [[ -n "${chosen_os_installer_index}" ]] && (( chosen_os_installer_index < os_installer_choices_count )); then
@@ -1208,10 +1195,9 @@ if (( os_installer_choices_count > 0 )); then
 			echo -en "\n  Enter ${ANSI_BOLD}${chosen_os_installer_index}${CLEAR_ANSI} Again to Confirm Installing ${ANSI_BOLD}${os_installer_name}${CLEAR_ANSI}: "
 			read -r confirmed_os_installer_index
 
-			confirmed_os_installer_index="${confirmed_os_installer_index//[^0-9]/}" # Remove all non-digits
+			confirmed_os_installer_index="${confirmed_os_installer_index//[^0-9]/}" # Remove all non-digits.
 			if [[ "${confirmed_os_installer_index}" == '0'* ]]; then
-				confirmed_os_installer_index="${confirmed_os_installer_index#"${confirmed_os_installer_index%%[^0]*}"}" # Remove any leading zeros
-				if [[ -z "${confirmed_os_installer_index}" ]]; then confirmed_os_installer_index='0'; fi # Catch if the number was all zeros
+				confirmed_os_installer_index="$(( 10#${confirmed_os_installer_index} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
 			fi
 
 			if [[ "${chosen_os_installer_index}" == "${confirmed_os_installer_index}" ]]; then
@@ -1638,7 +1624,7 @@ if $IS_APPLE_SILICON; then
 
 			# Suppress ShellCheck suggestion to use "pgrep" since it's not available in recoveryOS.
 			# shellcheck disable=SC2009
-			if ! ps | grep -v 'grep' | grep -q 'InstallAssistant'; then # Do not want to launch a new instance if it's already running.
+			if ! ps -ax | grep -q '[I]nstallAssistant'; then # Do not want to launch a new instance if it's already running.
 				"${os_install_assistant_springboard_path}" &> /dev/null & disown
 				write_to_log 'Displayed Instructions and Launched "InstallAssistant_springboard" for Manual Installation'
 			fi
@@ -1686,7 +1672,7 @@ if $IS_APPLE_SILICON; then
 
 			# Suppress ShellCheck suggestion to use "pgrep" since it's not available in recoveryOS.
 			# shellcheck disable=SC2009
-			if ! ps | grep -v 'grep' | grep -q 'KeyRecoveryAssistant'; then # Do not want to launch a new instance if it's already running.
+			if ! ps -ax | grep -q '[K]eyRecoveryAssistant'; then # Do not want to launch a new instance if it's already running.
 				resetpassword &> /dev/null
 				write_to_log 'Displayed Instructions and Launched "KeyRecoveryAssistant" for Manual "Erase Mac"'
 			fi
@@ -1714,10 +1700,9 @@ else
 
 		chosen_disk_id_number="$(echo "${chosen_disk_id_number}" | tr '[:lower:]' '[:upper:]')"
 		if [[ "${chosen_disk_id_number}" != 'F' ]]; then
-			chosen_disk_id_number="${chosen_disk_id_number//[^0-9]/}" # Remove all non-digits
+			chosen_disk_id_number="${chosen_disk_id_number//[^0-9]/}" # Remove all non-digits.
 			if [[ "${chosen_disk_id_number}" == '0'* ]]; then
-				chosen_disk_id_number="${chosen_disk_id_number#"${chosen_disk_id_number%%[^0]*}"}" # Remove any leading zeros
-				if [[ -z "${chosen_disk_id_number}" ]]; then chosen_disk_id_number='0'; fi # Catch if the number was all zeros
+				chosen_disk_id_number="$(( 10#${chosen_disk_id_number} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
 			fi
 		fi
 
@@ -1731,10 +1716,9 @@ else
 
 			confirmed_disk_id_number="$(echo "${confirmed_disk_id_number}" | tr '[:lower:]' '[:upper:]')"
 			if [[ "${confirmed_disk_id_number}" != 'F' ]]; then
-				confirmed_disk_id_number="${confirmed_disk_id_number//[^0-9]/}" # Remove all non-digits
+				confirmed_disk_id_number="${confirmed_disk_id_number//[^0-9]/}" # Remove all non-digits.
 				if [[ "${confirmed_disk_id_number}" == '0'* ]]; then
-					confirmed_disk_id_number="${confirmed_disk_id_number#"${confirmed_disk_id_number%%[^0]*}"}" # Remove any leading zeros
-					if [[ -z "${confirmed_disk_id_number}" ]]; then confirmed_disk_id_number='0'; fi # Catch if the number was all zeros
+					confirmed_disk_id_number="$(( 10#${confirmed_disk_id_number} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
 				fi
 			fi
 
@@ -2009,11 +1993,6 @@ else
 		# The "forcequitapps" argument is supported on macOS 10.15 Catalina and newer.
 		# This should not be necessary in recoveryOS, but doesn't hurt.
 		os_installer_options+=( '--forcequitapps' )
-	fi
-
-	if [[ -n "${caffeinate_pid}" ]] && grep -qU -e '--pidtosignal, ' "${os_installer_path}"; then
-		# The "pidtosignal" argument (to terminate the specified PID when the prepare phase is complete) is supported on macOS 10.12 Sierra and newer.
-		os_installer_options+=( '--pidtosignal' "${caffeinate_pid}" )
 	fi
 
 	if ! $CLEAN_INSTALL_REQUESTED; then

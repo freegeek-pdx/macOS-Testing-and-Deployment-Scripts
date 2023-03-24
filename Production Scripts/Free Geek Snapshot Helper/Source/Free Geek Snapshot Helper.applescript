@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.11.30-1
+-- Version: 2023.2.17-1
 
 -- Build Flag: LSUIElement
 
@@ -103,7 +103,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			delay 10
 		end if
 	end try
-
+	
 	try
 		(("/Users/Shared/.fg-snapshot-preserver" as POSIX file) as alias)
 		
@@ -189,10 +189,11 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			try
 				(("/Users/Shared/.fgResetSnapshotLost" as POSIX file) as alias)
 				try
-					set resetSnapshotName to (do shell script "head -1 /Users/Shared/.fgResetSnapshotLost")
+					set resetSnapshotLostReason to (do shell script "tail -1 /Users/Shared/.fgResetSnapshotLost")
 				end try
 				try
-					set resetSnapshotLostReason to (do shell script "tail -1 /Users/Shared/.fgResetSnapshotLost")
+					set possibleResetSnapshotName to (do shell script "head -1 /Users/Shared/.fgResetSnapshotLost") -- ".fgResetSnapshotLost" could only have one line if the ".fgResetSnapshotCreated" file was manually deleted (which shouldn't happene except in my testing).
+					if (possibleResetSnapshotName is not equal to resetSnapshotLostReason) then set resetSnapshotName to possibleResetSnapshotName
 				end try
 			end try
 			

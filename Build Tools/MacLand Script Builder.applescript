@@ -378,16 +378,16 @@ tccutil reset All " & (quoted form of ("com.randomapplications." & thisScriptHyp
 									end try
 									
 									do shell script ("
-xattr -c " & (quoted form of thisFGresetSourcePath) & "
-									
 rm -rf ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset
 mkdir -p ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset
-									
+
 # CANNOT directly edit shell script source strings in AppleScript (like we do with AppleScript source) since it messes up escaped characters for ANSI styles. So, we'll use 'sed' instead.
 # DO NOT pass the base64 string to 'base64 -D' using a here-string since that requires writing a temp file to the filesystem which will NOT be writable when the password is decoded. Use echo and pipe instead since piping does not write to the filesystem.
 sed \"s/'\\[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD\\]'/\\\"\\$(echo '$(/bin/echo -n " & (quoted form of adminPassword) & " | base64)' | base64 -D)\\\"/\" " & (quoted form of thisFGresetSourcePath) & " > ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh
+
 chmod +x ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh
-									
+codesign -s 'Developer ID Application' --identifier " & (quoted form of (bundleIdentifierPrefix & "fgreset")) & " --strict ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh
+
 # DO NOT '--keepParent' WHEN DITTO ZIPPING A SINGLE FILE!
 ditto -ck --sequesterRsrc --zlibCompressionLevel 9 ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-fgreset/fgreset.sh " & (quoted form of (zipsForAutoUpdateFolderPath & "fgreset.zip")) & "
 									
@@ -429,9 +429,9 @@ rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Res
 ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")) & " " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/fg-snapshot-reset/Tools/")))
 								else -- if (thisScriptName does not start with "FGreset") then
 									do shell script ("
-mkdir -p " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/")) & "
-rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/" & thisScriptHyphenatedName & ".zip")) & "
-ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")) & " " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/")))
+mkdir -p " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/darwin-all-versions/")) & "
+rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/darwin-all-versions/" & thisScriptHyphenatedName & ".zip")) & "
+ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")) & " " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/darwin-all-versions/")))
 								end if
 							end try
 						end if

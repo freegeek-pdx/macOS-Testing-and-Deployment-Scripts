@@ -20,7 +20,7 @@
 //
 
 
-// Explanation of Code Signing Requirement Strings: https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements
+// Explanation of Code Signing Requirements: https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements
 
 // ABOUT CSREQS *HEX* STRING DIFFERENCES AND THE PURPOSE OF THIS SCRIPT:
 

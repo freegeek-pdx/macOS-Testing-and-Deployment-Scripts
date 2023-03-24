@@ -50,8 +50,8 @@ every_29w_usbc_model=''
 # charge capabilities so their descriptions are not as clear and clean to analyze in code as the past power adapter types
 # since the MagSafe 3 capability is listed on a separate line as just the cable and not the power adapter itself.
 # So, instead of trying, just manually check the outputs and come up with more concise descriptions and pre-add them to their respective lists instead.
-every_140w_magsafe3_model='MacBookPro18,1+MacBookPro18,2+'
-every_67w_or_96w_magsafe3_model='MacBookPro18,3+MacBookPro18,4+'
+every_140w_magsafe3_model='MacBookPro18,1+MacBookPro18,2+Mac14,6+Mac14,10+'
+every_67w_or_96w_magsafe3_model='MacBookPro18,3+MacBookPro18,4+Mac14,5+Mac14,9+'
 every_30w_or_35W_dp_or_67w_magsafe3_model='Mac14,2+'
 
 every_unknown_model=''
@@ -226,7 +226,7 @@ echo "\"${every_unknown_model//$'\n'/", "}\""
 
 echo ''
 
-# Example output from 8/12/22:
+# Example output from 2/1/23:
 
 # 85W MagSafe 1
 # "MacBookPro1,1", "MacBookPro1,2", "MacBookPro2,1", "MacBookPro2,2", "MacBookPro3,1", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro8,2", "MacBookPro8,3", "MacBookPro9,1"
@@ -265,10 +265,10 @@ echo ''
 # "MacBook8,1", "MacBook9,1"
 
 # 140W USB-C/MagSafe 3
-# "MacBookPro18,1", "MacBookPro18,2"
+# "Mac14,6", "Mac14,10", "MacBookPro18,1", "MacBookPro18,2"
 
 # 67W or 96W USB-C/MagSafe 3
-# "MacBookPro18,3", "MacBookPro18,4"
+# "Mac14,5", "Mac14,9", "MacBookPro18,3", "MacBookPro18,4"
 
 # 30W or 35W Dual Port or 67W USB-C/MagSafe 3
 # "Mac14,2"

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.1.9-1
+-- Version: 2023.3.10-1
 
 -- App Icon is “Green Apple” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -164,7 +164,7 @@ if (isMojaveOrNewer) then
 			tell application id "com.apple.systempreferences" to activate
 		end try
 		try
-			do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
+			open location "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 		end try
 		try
 			activate
@@ -208,7 +208,7 @@ on error (assistiveAccessTestErrorMessage)
 						tell application id "com.apple.systempreferences" to activate
 					end try
 					try
-						do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
+						open location "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 					end try
 					try
 						activate
@@ -584,7 +584,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 							reveal (pane id "com.apple.preference.startupdisk")
 						on error
 							try -- As of macOS 13 Ventura, all of the AppleScript capability of the new System Settings apps to reveal anchors and panes no longer works, so use this URL Scheme instead which gets us directly to the same place as before.
-								do shell script "open x-apple.systempreferences:com.apple.preference.startupdisk" -- Ventura adds a new URL Scheme for the same section (com.apple.Startup-Disk-Settings.extension), but this old one still works too (oddly, this old one doesn't seem to work in Monterey, haven't tested on older though but shouldn't matter since Monterey and older should never get here).
+								tell me to open location "x-apple.systempreferences:com.apple.preference.startupdisk" -- Ventura adds a new URL Scheme for the same section (com.apple.Startup-Disk-Settings.extension), but this old one still works too (oddly, this old one doesn't seem to work in Monterey, haven't tested on older though but shouldn't matter since Monterey and older should never get here).
 							end try
 						end try
 						delay 1

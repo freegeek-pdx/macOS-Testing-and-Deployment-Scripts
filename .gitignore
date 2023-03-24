@@ -15,6 +15,7 @@
 *.pxm
 *.iconsproj
 *.driveDxLicense
+*.preferences
 
 # Ignore if name starts with in any location:
 OLD-*

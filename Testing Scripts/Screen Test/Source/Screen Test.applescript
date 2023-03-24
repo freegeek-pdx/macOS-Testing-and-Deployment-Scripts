@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.11.29-1
+-- Version: 2023.2.17-1
 
 -- App Icon is “Mauritian Flag” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -147,7 +147,7 @@ on error
 		activate
 	end try
 	display alert "“Screen Test” requires “PiXel Check”" message "“PiXel Check” must be installed in the “Applications” folder." buttons {"Quit", "Download “PiXel Check”"} cancel button 1 default button 2 as critical
-	do shell script "open 'http://macguitar.me/apps/pixelcheck/'"
+	open location "http://macguitar.me/apps/pixelcheck/"
 	quit
 	delay 10
 end try
@@ -168,7 +168,7 @@ if (isMojaveOrNewer) then
 				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
-				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
+				open location "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 			end try
 			try
 				activate

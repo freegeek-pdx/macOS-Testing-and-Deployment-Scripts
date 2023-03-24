@@ -22,7 +22,7 @@
 
 # NOTICE: This script will only be installed and run via LaunchDaemon when customizing an existing clean install, such as on Apple Silicon Macs.
 
-readonly SCRIPT_VERSION='2023.1.9-1'
+readonly SCRIPT_VERSION='2023.3.1-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -62,7 +62,7 @@ launch_login_progress_app() {
 		launchctl load -S LoginWindow "${login_progress_launch_agent_path}"
 
 		for (( wait_for_progress_app_seconds = 0; wait_for_progress_app_seconds < 15; wait_for_progress_app_seconds ++ )); do
-			if pgrep -qx 'Free Geek Login Progress'; then
+			if pgrep -qax 'Free Geek Login Progress'; then
 				break
 			else
 				sleep 1
@@ -96,14 +96,14 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		# Since LaunchDaemons start so early on boot, always wait for full boot before continuing so that everything is run in a consistent state and all system services have been started.
 		# Through investigation, I found that "coreauthd" is consistently the last, or nearly the last, root process to be started before the login window is displayed.
 
-		until pgrep -qx 'coreauthd'; do
+		until pgrep -qax 'coreauthd'; do
 			sleep 2
 		done
 		
 
 		# DO NOT ALLOW SLEEP
 
-		caffeinate -dimsu -w "$$" &
+		caffeinate -dimsuw "$$" &
 
 
 		# LAUNCH LOGIN PROGRESS APP
@@ -157,7 +157,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 
 		write_to_log 'Waiting for Full Boot'
 
-		until pgrep -qx 'coreauthd'; do
+		until pgrep -qax 'coreauthd'; do
 			sleep 2
 		done
 		
@@ -166,8 +166,8 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 
 		write_to_log 'Preventing Sleep During Process'
 
-		caffeinate -dimsu -w "$$" &
-		caffeinate_pid=$!
+		caffeinate -dimsuw "$$" &
+		caffeinate_pid="$!"
 
 
 		# ANNOUNCE DO NOT DISTURB *AFTER* LOGIN WINDOW IS DISPLAYED (where it may be tempting to click things)
@@ -235,7 +235,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		write_to_log 'Launching Login Progress App'
 		launch_login_progress_app
 
-		if ! pgrep -qx 'Free Geek Login Progress'; then
+		if ! pgrep -qax 'Free Geek Login Progress'; then
 			write_to_log 'Failed to Launch Login Progress App'
 		fi
 

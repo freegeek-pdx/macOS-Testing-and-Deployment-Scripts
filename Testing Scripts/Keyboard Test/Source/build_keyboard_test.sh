@@ -3,7 +3,7 @@
 
 # By: Pico Mitchell
 # For: MacLand @ Free Geek
-# Last Updated: 01/09/23
+# Last Updated: 02/16/23
 #
 # MIT License
 #
@@ -31,7 +31,7 @@ PROJECT_PATH="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)"
 readonly PROJECT_PATH
 readonly BUILD_DIR="${PROJECT_PATH}/.."
 readonly ZIPS_FOR_AUTO_UPDATE_PATH="${BUILD_DIR}/../../ZIPs for Auto-Update"
-readonly FG_MIB_RESOURCES_PATH="${BUILD_DIR}/../../fgMIB Resources"
+readonly fgMIB_USERAPPS_PATH="${BUILD_DIR}/../../fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/darwin-all-versions"
 
 readonly KEYBOARD_TESTER_URL='https://www.keyboardtester.com/tester.html'
 
@@ -109,9 +109,9 @@ rm -f "${BUILD_DIR}/Keyboard-Test.zip"
 rm -f "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip"
 ditto -ck --keepParent --sequesterRsrc --zlibCompressionLevel 9 "${BUILD_DIR}/Keyboard Test.app" "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip"
 
-mkdir -p "${FG_MIB_RESOURCES_PATH}/Prepare OS Package/Package Resources/User/fg-demo/Apps"
-rm -f "${FG_MIB_RESOURCES_PATH}/Prepare OS Package/Package Resources/User/fg-demo/Apps/Keyboard-Test.zip"
-ditto "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip" "${FG_MIB_RESOURCES_PATH}/Prepare OS Package/Package Resources/User/fg-demo/Apps/Keyboard-Test.zip"
+mkdir -p "${fgMIB_USERAPPS_PATH}"
+rm -f "${fgMIB_USERAPPS_PATH}/Keyboard-Test.zip"
+ditto "${ZIPS_FOR_AUTO_UPDATE_PATH}/Keyboard-Test.zip" "${fgMIB_USERAPPS_PATH}/Keyboard-Test.zip"
 
 if grep -qF 'Keyboard Test:' "${ZIPS_FOR_AUTO_UPDATE_PATH}/latest-versions.txt"; then
     sed -i '' "s/Keyboard Test: .*/Keyboard Test: ${APP_VERSION}/" "${ZIPS_FOR_AUTO_UPDATE_PATH}/latest-versions.txt"

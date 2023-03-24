@@ -36,36 +36,75 @@ if ! WIFI_PASSWORD="$(PlistBuddy -c 'Print :wifi_password' "${PROJECT_DIR}/../..
 fi
 readonly WIFI_PASSWORD
 
-latest_firefox_version="$(curl -m 5 -sfi 'https://download.mozilla.org/?product=firefox-latest-ssl&os=osx&lang=en-US' | awk -F '/' '($1 == "Location: https:") { print $7; exit }')"
+latest_firefox_version="$(curl -m 5 -sfw '%{redirect_url}' -o /dev/null 'https://download.mozilla.org/?product=firefox-pkg-latest-ssl&os=osx&lang=en-US' | awk -F '/' '{ print $7; exit }')"
 if [[ -n "${latest_firefox_version}" ]]; then
-	latest_firefox_dmg_path="${PROJECT_DIR}/Package Resources/Global/Apps/darwin-le-19/Firefox ${latest_firefox_version}.dmg"
-	if [[ -f "${latest_firefox_dmg_path}" ]]; then
-		echo "Firefox ${latest_firefox_version} DMG Is Up-to-Date"
+	latest_firefox_pkg_path="${PROJECT_DIR}/Package Resources/Global/Apps/darwin-le-19/Firefox ${latest_firefox_version}.pkg"
+	if [[ -f "${latest_firefox_pkg_path}" ]]; then
+		echo "Firefox ${latest_firefox_version} PKG Is Up-to-Date"
 	else
-		rm -f "${PROJECT_DIR}/Package Resources/Global/Apps/darwin-le-19/Firefox"*'.dmg'
+		rm -f "${PROJECT_DIR}/Package Resources/Global/Apps/darwin-le-19/Firefox"*'.pkg'
 		echo "Downloading Firefox ${latest_firefox_version}..."
-		mkdir -p "${latest_firefox_dmg_path%/*}"
-		curl --connect-timeout 5 --progress-bar -fL 'https://download.mozilla.org/?product=firefox-latest-ssl&os=osx&lang=en-US' -o "${latest_firefox_dmg_path}"
+		mkdir -p "${latest_firefox_pkg_path%/*}"
+		curl --connect-timeout 5 --progress-bar -fL 'https://download.mozilla.org/?product=firefox-pkg-latest-ssl&os=osx&lang=en-US' -o "${latest_firefox_pkg_path}"
 	fi
+else
+	echo 'FAILED TO RETRIEVE LATEST FIREFOX VERSION'
 fi
+
+latest_drivedx_version="$(curl -m 5 -sfL 'https://binaryfruit.com/download/drivedx/mac/1/updates/?appcast&amp;appName=DriveDxMac' | xmllint --xpath 'string(//enclosure/@*[name()="sparkle:shortVersionString"])' -)"
+if [[ -n "${latest_drivedx_version}" ]]; then
+	latest_drivedx_zip_path="${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/darwin-all-versions/DriveDx ${latest_drivedx_version}.zip"
+	if [[ -f "${latest_drivedx_zip_path}" ]]; then
+		echo "DriveDx ${latest_drivedx_version} ZIP Is Up-to-Date"
+	else
+		rm -f "${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/darwin-all-versions/DriveDx"*'.zip'
+		echo "Downloading DriveDx ${latest_drivedx_version}..."
+		mkdir -p "${latest_drivedx_zip_path%/*}"
+		curl --connect-timeout 5 --progress-bar -fL 'https://binaryfruit.com/download/drivedx/mac/1/' -o "${latest_drivedx_zip_path}"
+	fi
+else
+	echo 'FAILED TO RETRIEVE LATEST DRIVEDX VERSION'
+fi
+
+# Download the latest Geekbench 6 for macOS 11 Big Sur and newer.
+geekbench_download_url="$(curl -m 5 -sfL 'https://www.geekbench.com/download/mac/' | xmllint --html --xpath 'string(//a[contains(@href,"Mac.zip")]/@href)' - 2> /dev/null)"
+latest_geekbench_version="$(echo "${geekbench_download_url}" | cut -d '-' -f 2)"
+if [[ -n "${latest_geekbench_version}" ]]; then
+	latest_geekbench_zip_path="${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/darwin-ge-20/Geekbench ${latest_geekbench_version}.zip"
+	if [[ -f "${latest_geekbench_zip_path}" ]]; then
+		echo "Geekbench ${latest_geekbench_version} ZIP Is Up-to-Date"
+	else
+		rm -f "${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/darwin-ge-20/Geekbench"*'.zip'
+		echo "Downloading Geekbench ${latest_geekbench_version}..."
+		mkdir -p "${latest_geekbench_zip_path%/*}"
+		curl --connect-timeout 5 --progress-bar -fL "${geekbench_download_url}" -o "${latest_geekbench_zip_path}"
+	fi
+else
+	echo 'FAILED TO RETRIEVE LATEST GEEKBENCH VERSION'
+fi
+
+# AND ALSO download Geekbench 5 for macOS 10.15 Catalina and older (not sure if any update beyond v5.5.1 will ever be released now that v6 is out, but doesn't hurt to check).
+geekbench5_download_url="$(curl -m 5 -sfL 'https://www.geekbench.com/legacy/' | xmllint --html --xpath 'string(//a[contains(@href,"Geekbench-5") and contains(@href,"Mac.zip")]/@href)' - 2> /dev/null)"
+latest_geekbench5_version="$(echo "${geekbench5_download_url}" | cut -d '-' -f 2)"
+if [[ -n "${latest_geekbench5_version}" ]]; then
+	latest_geekbench_zip_path="${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/darwin-le-19/Geekbench ${latest_geekbench5_version}.zip"
+	if [[ -f "${latest_geekbench_zip_path}" ]]; then
+		echo "Geekbench ${latest_geekbench5_version} ZIP Is Up-to-Date"
+	else
+		rm -f "${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/darwin-le-19/Geekbench"*'.zip'
+		echo "Downloading Geekbench ${latest_geekbench5_version}..."
+		mkdir -p "${latest_geekbench_zip_path%/*}"
+		curl --connect-timeout 5 --progress-bar -fL "${geekbench5_download_url}" -o "${latest_geekbench_zip_path}"
+	fi
+else
+	echo 'FAILED TO RETRIEVE LATEST GEEKBENCH 5 VERSION'
+fi
+
 
 # NOTE: KeyboardCleanTool (https://folivora.ai/keyboardcleantool) is also installed into user apps,
 # but not sure how to check for latest version since the download link is always just "https://folivora.ai/releases/KeyboardCleanTool.zip".
 # So, will just check/update it manually periodically instead of automating re-downloading the latest version (which may be the same as we already have) for every build.
 
-latest_drivedx_version="$(curl -m 5 -sfi 'https://binaryfruit.com/download/drivedx/mac/1/' | awk -F '/' '($1 == "location: https:") { print substr($9,9); exit }')"
-latest_drivedx_version="${latest_drivedx_version%.*}"
-if [[ -n "${latest_drivedx_version}" ]]; then
-	latest_drivedx_zip_path="${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/DriveDx ${latest_drivedx_version}.zip"
-	if [[ -f "${latest_drivedx_zip_path}" ]]; then
-		echo "DriveDx ${latest_drivedx_version} ZIP Is Up-to-Date"
-	else
-		rm -f "${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/DriveDx"*'.zip'
-		echo "Downloading DriveDx ${latest_drivedx_version}..."
-		mkdir -p "${latest_drivedx_zip_path%/*}"
-		curl --connect-timeout 5 --progress-bar -fL 'https://binaryfruit.com/download/drivedx/mac/1/' -o "${latest_drivedx_zip_path}"
-	fi
-fi
 
 # Sign "fg-snapshot-preserver.sh" so that it can be displayed nicely in macOS 13 Ventura using "AssociatedBundleIdentifiers" in the LaunchDaemon.
 # See "Setting Up Snapshot Preserver LaunchDaemon" section in "fg-prepare-os.sh" for more information.

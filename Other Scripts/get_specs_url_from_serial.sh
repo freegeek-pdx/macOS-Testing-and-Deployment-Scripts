@@ -41,7 +41,7 @@ function run(argv) {
 	const serialSearchResultsDict = JSON.parse(argv[0])
 	return [serialSearchResultsDict.name, serialSearchResultsDict.id, serialSearchResultsDict.parent, serialSearchResultsDict.grandparent, serialSearchResultsDict.greatgrandparent].join("\n")
 }
-' -- "${serial_search_results_json}")
+' -- "${serial_search_results_json}" 2> /dev/null)
 # NOTE: Because of JavaScript behavior, any "undefined" (or "null") values in an array would be turned into empty strings when using "join", making them empty lines.
 # And, because of bash behaviors with whitespace IFS treating consecutive whitespace as a single delimiter (explained in https://mywiki.wooledge.org/IFS),
 # any empty lines will NOT be included in the bash array being created with this technique to set all lines to an array.
@@ -59,7 +59,7 @@ if [[ -z "${specs_search_results_json}" ]]; then
 	exit 3
 fi
 
-specs_url_kb_part="$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).specs[0].url' -- "${specs_search_results_json}")"
+specs_url_kb_part="$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).specs[0].url' -- "${specs_search_results_json}" 2> /dev/null)"
 
 if [[ -z "${specs_url_kb_part}" ]]; then
 	>&2 echo 'UNEXPECTED ERROR - SPECS SEARCH DOES NOT CONTAIN KB SPECS URL'

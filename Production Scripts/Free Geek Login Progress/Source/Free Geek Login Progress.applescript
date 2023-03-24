@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.11.30-1
+-- Version: 2023.2.9-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -110,7 +110,7 @@ try
 						end if
 						
 						-- Set Style Mask to ONLY be Titled, which make it not minimizable or resizable and hides all the titlebar buttons.
-						(thisWindow's setStyleMask:(current application's NSWindowStyleMaskTitled as integer))
+						(thisWindow's setStyleMask:(current application's NSWindowStyleMaskTitled as integer)) -- MUST be "as integer" instead of "as number" for ObjC-bridge casting to not throw an exception.
 						
 						-- Also do not want window to be movable so that it stays over the login fields.
 						if (isRunningAtLoginWindow) then (thisWindow's setMovable:false) -- Only do this if at the login window to make debugging easier when running in OS.

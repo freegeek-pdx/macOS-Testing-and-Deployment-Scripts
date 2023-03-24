@@ -30,7 +30,7 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2023.1.12-1'
+readonly SCRIPT_VERSION='2023.3.21-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -155,222 +155,717 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 	fi
 
 
+	should_install_apps_in_darwin_folder() {
+		local this_darwin_folder_name="${1##*/}"
+
+		if [[ "${this_darwin_folder_name}" == 'darwin-all-versions' ]]; then
+			return 0
+		else
+			IFS='-' read -rd '' -a this_darwin_folder_name_parts < <(echo -n "${this_darwin_folder_name}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value.
+			local this_darwin_comparison
+			this_darwin_comparison="$(echo "${this_darwin_folder_name_parts[1]}" | tr '[:upper:]' '[:lower:]')"
+			local this_darwin_version="${this_darwin_folder_name_parts[2]}"
+
+			if [[ -n "${this_darwin_comparison}" && "${this_darwin_version}" =~ ^[[:digit:]]+$ ]] && {
+					{ [[ "${this_darwin_comparison}" == 'eq' ]] && (( DARWIN_MAJOR_VERSION == this_darwin_version )); } ||
+					{ [[ "${this_darwin_comparison}" == 'lt' ]] && (( DARWIN_MAJOR_VERSION < this_darwin_version )); } ||
+					{ [[ "${this_darwin_comparison}" == 'le' ]] && (( DARWIN_MAJOR_VERSION <= this_darwin_version )); } ||
+					{ [[ "${this_darwin_comparison}" == 'gt' ]] && (( DARWIN_MAJOR_VERSION > this_darwin_version )); } ||
+					{ [[ "${this_darwin_comparison}" == 'ge' ]] && (( DARWIN_MAJOR_VERSION >= this_darwin_version )); }
+				}; then
+				return 0
+			fi
+		fi
+
+		return 1
+	}
+
+	verify_code_signature() {
+		# USAGE NOTES: By default, this function will verify the specified path is code signed with any Developer ID. The specified path can be any type of signed/notarized bundle or flat file.
+		# To verify the path is notarized, also pass "notarized" or "notarization" as an argument (order of arguments doesn't matter).
+		# To verify the Team ID of the Developer ID used to sign the path, also pass the 10-character Team ID as an argument.
+		# To verify the path is signed by Apple directly (which would otherwise fail all other default or explicit verifications mentioned above), pass just "apple" as an argument along with the path.
+		# NOTE: Mac App Store apps CANNOT be verified with this function as it is only intended to verify things downloaded/installed from the internet outside of the Mac App Store.
+
+		local verify_code_signature_path=''
+		local verify_apple_signed=false
+		local verify_notarization=false
+		local verify_team_id=''
+
+		local this_arg
+		while (( $# > 0 )); do
+			if [[ -n "$1" ]]; then
+				this_arg="$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" # Make args all caps so they can be case-insensitive and so that Team IDs are always valid since they must always be all caps.
+				if [[ "${this_arg}" == 'APPLE' ]]; then
+					verify_apple_signed=true
+				elif [[ "${this_arg}" == 'NOTARIZED' || "${this_arg}" == 'NOTARIZATION' ]]; then
+					if (( DARWIN_MAJOR_VERSION >= 18 )); then
+						# The "spctl -a ..." output on macOS 10.13 High Sierra will only ever include "source=Developer ID" even if it is actually notarized while macOS 10.14 Mojave and newer will include "source=Notarized Developer ID",
+						# and the "notarized" token that can be verified via "codesign -vR ..." is also only available on macOS 10.14 Mojave and newer.
+						verify_notarization=true
+					else
+						echo 'NOTICE: Notarization WILL NOT be verified. Notarization verification requires running on macOS 10.14 Mojave or newer.'
+					fi
+				elif [[ -e "$1" ]]; then
+					verify_code_signature_path="$1"
+				elif [[ "${this_arg}" =~ ^[A-Z0-9]{10}$ ]]; then # Team IDs are always 10 characters of capital letters and digits: https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/
+					verify_team_id="${this_arg}"
+				else # Do not proceed if invalid args are passed.
+					>&2 echo "ERROR: INVALID \"$1\" OPTION SPECIFIED (PATH MUST EXIST AND TEAM IDS MUST BE 10 CHARACTERS OF ONLY LETTERS AND DIGITS)"
+					return 100
+				fi
+			fi
+
+			shift
+		done
+
+		if [[ -z "${verify_code_signature_path}" ]]; then
+			>&2 echo 'ERROR: NO PATH SPECIFIED'
+			return 101
+		fi
+
+		echo "Verifying Code Signature of \"${verify_code_signature_path}\"..."
+
+		declare -a codesign_verify_csreqs=() # NOTE: "declare" always and only makes "local" variables.
+		# Explanation of Code Signing Requirements (CSReqs): https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements
+
+		local is_package=false
+		local is_non_app_bundle=false
+		if [[ -f "${verify_code_signature_path}" ]]; then
+			# NOTE: Any kind of regular flat file can be signed, but packages, disk images, and Mach-O binaries are the only flat files that can also be notarized.
+			# Also, the signature for the other signed regular flat files is stored in extended attributes rather than embedded in the file contents.
+			if [[ "${verify_code_signature_path}" == *'.'[Pp][Kk][Gg] ]]; then # Must detect packages since they need to be verified using "spctl -avv -t install" and "pkgutil --check-signature" (and NOT "codesign -v ...").
+				echo 'Path Type: PACKAGE'
+				is_package=true
+			elif [[ "${verify_code_signature_path}" == *'.'[Dd][Mm][Gg] ]]; then # This and the following checks are just for display purposes, all will be verified the same way using "spctl -avv -t open ...".
+				echo 'Path Type: DISK IMAGE'
+			elif [[ "$(file -bI "${verify_code_signature_path}" 2> /dev/null)" == 'application/x-mach-binary'* ]]; then
+				echo 'Path Type: MACH-O BINARY'
+			else
+				echo 'Path Type: REGULAR FILE'
+			fi
+		elif [[ ! -f "${verify_code_signature_path}/Contents/Info.plist" ]]; then
+			>&2 echo 'ERROR: INVALID BUNDLE PATH SPECIFIED (NO "Info.plist" FILE FOUND)'
+			return 102
+		else
+			local bundle_id=''
+			if ! bundle_id="$(PlistBuddy -c 'Print :CFBundleIdentifier' "${verify_code_signature_path}/Contents/Info.plist" 2> /dev/null)" || [[ -z "${bundle_id}" ]]; then
+				>&2 echo 'ERROR: INVALID BUNDLE PATH SPECIFIED (NO "CFBundleIdentifier" WITHIN "Info.plist" FILE)'
+				return 103
+			fi
+
+			codesign_verify_csreqs=( "identifier \"${bundle_id}\"" ) # Doubly-verify that Bundle IDs are properly specified in the CSReqs. (This is not really necessary, but doesn't hurt to make sure everything is correct).
+
+			if [[ "${verify_code_signature_path}" != *'.'[Aa][Pp][Pp] ]]; then # Must detect non-app bundles vs app bundles because they must be verified with "spctl -avv -t open ..." rather than just "spctl -avv" like an app bundle (and "codesign -v ..." works for both).
+				echo 'Path Type: NON-APP BUNDLE'
+				is_non_app_bundle=true
+			else
+				echo 'Path Type: APP BUNDLE'
+			fi
+		fi
+
+		if $verify_apple_signed; then
+			echo 'Explicit Verification: APPLE SIGNED'
+		else
+			if $verify_notarization; then
+				echo 'Explicit Verification: NOTARIZATION'
+			fi
+
+			if [[ -n "${verify_team_id}" ]]; then
+				echo "Explicit Verification: TEAM ID \"${verify_team_id}\""
+			fi
+		fi
+
+		if ! $is_package; then # Output CSReqs just for debug/display purposes.
+			echo -e '\nCODE SIGNING REQUIREMENTS (codesign -dr -):'
+			codesign -dr - "${verify_code_signature_path}" 2>&1
+		fi
+
+		declare -a spctl_assess_args=( '-avv' ) # "spctl" defaults to "-t execute" when no other "-t" ("--type") is specified.
+		if $is_package; then
+			spctl_assess_args+=( '-t' 'install' )
+		elif [[ -z "${bundle_id}" ]] || $is_non_app_bundle; then
+			# Verifying signed/notarized non-app bundles or files such as disk images, Mach-O binaries, and any other signed (file such as a script) MUST be done using
+			# "spctl -avv -t open --context context:primary-signature" since just "spctl -avv" only works for app bundles and "spctl -avv -t install" only works with packages.
+			# (But, "codesign -v ..." works with any of these files as well as apps and only doesn't work with packages.)
+			# If just "spctl -avv" (which is equivalent to "spctl -avv -t execute") is used on a non-app bundle or non-package file, they error with
+			# "rejected (the code is valid but does not seem to be an app)" and also DO NOT show any "source" info where the notarization status is listed.
+			# Running "spctl -avv -t open" on its own for these files will be rejected with "source=Insufficient Context" and adding "--context context:primary-signature"
+			# solves that problem, but oddly that "--context" option is not listed in "man spctl" or the usage/help info for "spctl".
+			# But, this "--context context:primary-signature" usage is offically documented here in regards to verifying disk images (but also works for all other non-app and non-package verifications):
+			# https://developer.apple.com/library/archive/technotes/tn2206/_index.html#//apple_ref/doc/uid/DTS40007919-CH1-TNTAG18
+			spctl_assess_args+=( '-t' 'open' '--context' 'context:primary-signature' )
+		fi
+
+		echo -e "\nSECURITY ASSESSMENT OUTPUT (spctl ${spctl_assess_args[*]}):"
+		local spctl_assess_output
+		spctl_assess_output="$(spctl "${spctl_assess_args[@]}" "${verify_code_signature_path}" 2>&1)"
+		local spctl_assess_exit_code="$?"
+
+		echo -e "${spctl_assess_output}\nSECURITY ASSESSMENT EXIT CODE: ${spctl_assess_exit_code}"
+		if (( spctl_assess_exit_code != 0 )); then
+			echo 'SECURITY ASSESSMENT EXIT CODE NOTE: A "rejected" status and non-zero (failure) exit code from "spctl" DOES NOT fail verification in this function since specified factors will be verified explicitly whether or not "spctl" rejected the path.'
+
+			# NOTE: NOT relying on the "accepted" or "rejected" status or exit code from the "spctl -a" assessment because we may be intentionally verifying more or less strict than the "spctl -a" assessment.
+			# Here are some (but not all possible) examples of when our verifications won't necessarily match the status or exit code from the "spctl -a" assessment:
+			# - Signed but unnotarized app bundles are "accepted" by "spctl -avv" so the zero exit code is irrelevant if we are explicitly verifying notarization.
+			# - Signed scripts are "rejected" by "spctl -avv -t open ..." and fail with a non-zero exit code, but they CANNOT be notarized so we want to be able to pass even when the "spctl -a" assessment fails.
+			# - Signed but unnotarized packages are "rejected" by by "spctl -avv -t install" and fail with a non-zero exit code but there are times when we may want to verify a signed but unnotarized package for internal usage.
+			# - If macOS security settings are set to only allow apps downloaded from the Mac App Store, all notarized apps are "rejected" by "spctl -avv" and fail with a non-zero exit code, but we may still want to be able to just confirm that they are properly signed/notarized.
+			# - On macOS 10.14 Mojave and older, unnotarized flat files such as disk images, packages, or scripts are "accepted" while on macOS 10.15 Catalina and newer they are "rejected", so would not get consistent results across all versions of macOS if the "spctl -a" assessment status was relied on.
+			# - The "spctl -a" status can be manually overridden by a user using Right-Click+Open to explicitly allowing opening/launching, so an "accepted" status with "source=explicit preference" and zero exit code is possible even if something like a package is not even signed but has been manually allowed by a user.
+		fi
+
+		# NOTE: Along with the the "spctl_assess_output" verifications done below, packages and other products will also be double-checked with "pkgutil --check-signature" and "codesign -v ..." respectively.
+		# Package verifications are double-checked immediately after the "spctl_assess_output" verification passes using the "pkgutil_check_signature_output" that is set below from "pkgutil --check-signature" since "codesign" cannot be used to verify packages.
+		# All other bundle/file verifications will be double-checked all at once using "codesign -v ..." with the CSReq conditions that are added to the "codesign_verify_csreqs" by passing them to the "-R" ("--test-requirement") as a Code Signing Requirement condition string.
+		# These double-checks should be guaranteed to success after the explicit "spctl" verifications, but still do them anyway just to be extremely thorough.
+
+		local pkgutil_check_signature_output=''
+		if $is_package; then
+			echo -e '\nPACKAGE SIGNATURE CHECK OUTPUT (pkgutil --check-signature):'
+			pkgutil_check_signature_output="$(pkgutil --check-signature "${verify_code_signature_path}" 2>&1)"
+			local pkgutil_check_signature_exit_code="$?"
+
+			echo -e "${pkgutil_check_signature_output}\nPACKAGE SIGNATURE CHECK EXIT CODE: ${pkgutil_check_signature_exit_code}"
+
+			if (( pkgutil_check_signature_exit_code != 0 )); then # DO exit upon "pkgutil --check-signature" failure since it would only fail if completely unsigned, regardless of notarization (unlike "spctl -a ...").
+				>&2 echo "ERROR: PACKAGE SIGNATURE CHECK FAILED WITH EXIT CODE ${pkgutil_check_signature_exit_code} (SEE OUTPUT ABOVE FOR MORE INFO)"
+				return "${pkgutil_check_signature_exit_code}"
+			fi
+		fi
+
+		echo -e '\nEXPLICIT VERIFICATIONS:'
+		if $verify_apple_signed; then
+			echo -n 'Verifying Apple Signed via "spctl" Output...'
+			if [[ "${spctl_assess_output}" != *$'\nsource=Apple '"$($is_package && echo 'Installer' || echo 'System')"$'\n'* ]]; then
+				echo ''
+				>&2 echo 'ERROR: FAILED TO EXPLICITLY VERIFY APPLE SIGNED VIA "spctl" OUTPUT (SEE OUTPUT ABOVE FOR MORE INFO)'
+				return 104
+			else
+				echo ' VERIFIED'
+				if $is_package; then
+					echo -n 'Verifying Apple Signed via "pkgutil" Output...'
+					if [[ "${pkgutil_check_signature_output}" != *$'\n    1. Software Update\n'* ]]; then
+						echo ''
+						>&2 echo 'ERROR: FAILED TO EXPLICITLY VERIFY APPLE SIGNED VIA "pkgutil" OUTPUT (SEE OUTPUT ABOVE FOR MORE INFO)'
+						return 105
+					fi
+					echo ' VERIFIED'
+				else
+					codesign_verify_csreqs+=( 'anchor apple' ) # This anchor can only exist 1st party products signed directly by Apple.
+				fi
+			fi
+		else
+			# NOTE: Mac App Store installed apps would always fail the following verification since they will always be "source=Mac App Store" and "origin=Apple Mac OS Application Signing" as well as different
+			# CSReq certificates, but this function is for verifying products downloaded/installed via script, so verifying Mac App Store apps is unnecessary and out of the scope of what this function is designed for.
+
+			if ! $is_package; then
+				codesign_verify_csreqs+=(
+					'anchor apple generic' # This anchor exists for Developer ID (or Mac App Store) signed products.
+					'certificate 1[field.1.2.840.113635.100.6.2.6] exists' # Developer ID Certification Authority certificate used by Apple to issue Developer ID signing certificates.
+					'certificate leaf[field.1.2.840.113635.100.6.1.13] exists' # Developer ID Application signing certificates issued by Apple.
+				)
+				# Specific details about these Developer ID certificates are available here: https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements#Developer-ID-default-designated-requirement
+				# (If Mac App Store apps were being verified, would need to check for "certificate leaf[field.1.2.840.113635.100.6.1.9] exists" instead of the 2 listed above.)
+			fi
+
+			if $verify_notarization; then
+				# Only bundles, packages, disk images, or Mach-O binaries can be notarized while files such as scripts can only be signed but not notarized.
+				# If notarization is specified to be verified against a signed script (which cannot be notarized), this check will always fail,
+				# but the user of the function should simply not be specifying notarization verification for valid signed files that are known
+				# to not be notarized and only Team ID verification should be done instead.
+
+				echo -n 'Verifying Notarization via "spctl" Output...'
+				if [[ "${spctl_assess_output}" != *$'\nsource=Notarized Developer ID\n'* ]]; then
+					echo ''
+					>&2 echo 'ERROR: FAILED TO EXPLICITLY VERIFY NOTARIZATION VIA "spctl" OUTPUT (SEE OUTPUT ABOVE FOR MORE INFO)'
+					return 106
+				else
+					echo ' VERIFIED'
+					if $is_package; then
+						if (( DARWIN_MAJOR_VERSION >= 21 )); then
+							echo -n 'Verifying Notarization via "pkgutil" Output...'
+							if [[ "${pkgutil_check_signature_output}" != *$'\n   Notarization: trusted by the Apple notary service\n'* ]]; then # This "Notarization" line will only exist in the "pkgutil --check-signature" output on macOS 12 Monterey and newer.
+								echo ''
+								>&2 echo 'ERROR: FAILED TO EXPLICITLY VERIFY NOTARIZATION VIA "pkgutil" OUTPUT (SEE OUTPUT ABOVE FOR MORE INFO)'
+								return 107
+							fi
+							echo ' VERIFIED'
+						else
+							echo 'NOTICE: Notarization has been verified via "spctl" output, but cannot be double-checked via "pkgutil" unless running running on macOS 12 Monterey or newer.'
+						fi
+					else
+						codesign_verify_csreqs+=( 'notarized' ) # NOTE: Starting on macOS 10.14 Mojave, there is a "notarized" token which can be included in the CSReq string to confirm the app is notarized (discovered this wasn't supported/available on macOS 10.13 High Sierra through testing).
+						# This "notarized" token can be seen in the output of "spctl --list" on macOS 10.14 Mojave and newer and can also be seen here: https://gregoryszorc.com/docs/apple-codesign/stable/apple_codesign_gatekeeper.html
+						# And using this "notarized" token to verify notarization can be seen here: https://developer.apple.com/forums/thread/128683?answerId=404727022#404727022 & https://developer.apple.com/forums/thread/130560
+					fi
+				fi
+			fi
+
+			if [[ -n "${verify_team_id}" ]]; then
+				echo -n "Verifying Team ID \"${verify_team_id}\" via \"spctl\" Output..."
+				if [[ "${spctl_assess_output}" != *$'\norigin=Developer ID '"$($is_package && echo 'Installer' || echo 'Application'): "*" (${verify_team_id})" ]]; then
+					echo ''
+					>&2 echo "ERROR: FAILED TO EXPLICITLY VERIFY TEAM ID \"${verify_team_id}\" VIA \"spctl\" OUTPUT (SEE OUTPUT ABOVE FOR MORE INFO)"
+					return 108
+				else
+					echo ' VERIFIED'
+					if $is_package; then
+						echo -n "Verifying Team ID \"${verify_team_id}\" via \"pkgutil\" Output..."
+						if [[ "${pkgutil_check_signature_output}" != *$'\n    1. Developer ID Installer: '*" (${verify_team_id})"$'\n'* ]]; then
+							echo ''
+							>&2 echo "ERROR: FAILED TO EXPLICITLY VERIFY TEAM ID \"${verify_team_id}\" VIA \"pkgutil\" OUTPUT (SEE OUTPUT ABOVE FOR MORE INFO)"
+							return 109
+						fi
+						echo ' VERIFIED'
+					else
+						codesign_verify_csreqs+=( "certificate leaf[subject.OU] = \"${verify_team_id}\"" ) # NOTE: "verify_team_id" value MUST be quoted in case it starts with a NUMBER (but quotes are not required if it starts with a LETTER).
+					fi
+				fi
+			else
+				echo -n 'Verifying Any Developer ID via "spctl" Output...'
+				if [[ "${spctl_assess_output}" != *$'\norigin=Developer ID '"$($is_package && echo 'Installer' || echo 'Application'): "*' ('??????????')' ]]; then # Still verify Developer ID and SOME Team ID when not verifying a specific 10-character Team ID.
+					echo ''
+					>&2 echo 'ERROR: FAILED TO EXPLICITLY VERIFY DEVELOPER ID VIA "spctl" OUTPUT (SEE OUTPUT ABOVE FOR MORE INFO)'
+					return 110
+				else
+					echo ' VERIFIED'
+					if $is_package; then
+						echo -n 'Verifying Any Developer ID via "pkgutil" Output...'
+						if [[ "${pkgutil_check_signature_output}" != *$'\n    1. Developer ID Installer: '*' ('??????????$')\n'* ]]; then
+							echo ''
+							>&2 echo 'ERROR: FAILED TO EXPLICITLY VERIFY DEVELOPER ID VIA "pkgutil" OUTPUT (SEE OUTPUT ABOVE FOR MORE INFO)'
+							return 111
+						fi
+						echo ' VERIFIED'
+					fi
+				fi
+			fi
+		fi
+
+		if (( ${#codesign_verify_csreqs[@]} > 0 )); then
+			# As explained above, "spctl -a ..." is used for primary verification, and packages were double-checked above using "pkgutil --check-signature".
+			# Now, all other bundle/file verifications will be double-checked below all at once using "codesign -v ..." with the CSReq conditions that were added to the "codesign_verify_csreqs" by passing them to the "-R" ("--test-requirement") as a Code Signing Requirement condition string.
+
+			local codesign_verify_csreqs_condition_string # "codesign_verify_csreqs_condition_string" will never be empty since the "codesign_verify_csreqs" array will always contain at least "anchor apple" or "anchor apple generic" and may also contain more verification conditions.
+			printf -v codesign_verify_csreqs_condition_string '%s and ' "${codesign_verify_csreqs[@]}" # Join the elements of the "codesign_verify_csreqs" array into a string using a "printf" format string that adds " and " after of each element to create a valid condition string.
+			codesign_verify_csreqs_condition_string="${codesign_verify_csreqs_condition_string% and }" # BUT, joining array elements using a "printf" format string like this still includes a trailing " and " so remove it from the end of the string.
+
+			# CODESIGN NOTES:
+			# Information about using "--deep" and "--strict" options during "codesign" verification:
+				# https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution/resolving_common_notarization_issues#3087735
+				# https://developer.apple.com/library/archive/technotes/tn2206/_index.html#//apple_ref/doc/uid/DTS40007919-CH1-TNTAG211
+				# https://developer.apple.com/library/archive/technotes/tn2206/_index.html#//apple_ref/doc/uid/DTS40007919-CH1-TNTAG404
+			# The "--deep" option is DEPRECATED in macOS 13 Ventura for SIGNING but I don't think it's deprecated for VERIFYING since verification is where it was always really intended to be used (as explained in the note in the last link in the list above).
+			# NOT using "--check-notarization" (added in macOS 10.15 Catalina) since the command seems to just to always exit 0 even if the specifed app is signed but NOT notarized, so doesn't seem useful. (Maybe it would make a difference if the notarization ticket was not stapled, but that's not normal and maybe should fail if not stapled.)
+
+			local codesign_verify_output
+			codesign_verify_output="$(codesign -vv --deep --strict -R "=${codesign_verify_csreqs_condition_string}" "${verify_code_signature_path}" 2>&1)" # "--deep" is not necessary when verifying non-bundles, but doesn't hurt.
+			local codesign_verify_exit_code="$?"
+
+			echo -e "\nCODE SIGNATURE AND EXPLICIT CSREQS VERIFICATION OUTPUT (codesign -vv --deep --strict -R '=${codesign_verify_csreqs_condition_string}'):\n${codesign_verify_output}\nCODE SIGNATURE AND EXPLICIT CSREQS VERIFICATION EXIT CODE: ${codesign_verify_exit_code}"
+
+			if (( codesign_verify_exit_code != 0 )); then # DO exit upon "codesign -v ..." failure since it would only fail if completely unsigned or our explicit requirements are not met (unlike "spctl -a ...").
+				>&2 echo "ERROR: CODE SIGNATURE VERIFICATION FAILED WITH EXIT CODE ${codesign_verify_exit_code} (SEE OUTPUT ABOVE FOR MORE INFO)"
+				return "${codesign_verify_exit_code}"
+			fi
+		fi
+
+		return 0 # If no error returned non-zero before this point, all verifications were successful.
+	}
+
+	install_app_from_package() {
+		local package_to_install=''
+		declare -a app_verification_args=()
+
+		while (( $# > 0 )); do # Args can be passed in any order.
+			# Any existing ".pkg" file path will be "package_to_install" and all other args will be
+			# collected in "app_verification_args" to be passed on to the "verify_code_signature" function.
+			if [[ -n "$1" ]]; then
+				if [[ -f "$1" && "$1" == *'.'[Pp][Kk][Gg] ]]; then
+					package_to_install="$1"
+				else
+					app_verification_args+=( "$1" )
+				fi
+			fi
+
+			shift
+		done
+
+		if [[ -z "${package_to_install}" ]]; then
+			return 1
+		fi
+
+		local this_packaged_app_filename
+		this_packaged_app_filename="$(pkgutil --payload-files "${package_to_install}" | grep -im 1 '\.app$')" # NOTE: There technically could be multiple apps or apps that install into locations other than "/Applications" within a package, but none that we install are like that so not worrying about that complexity (but they would still get installed, just not verified or logged properly).
+		local this_packaged_app_filename="${this_packaged_app_filename##*/}"
+		printf '%s' "${this_packaged_app_filename}" # Output file name for retrieval via command substitution for usage in other commands and logging (whether or not there is an error).
+
+		if [[ -z "${this_packaged_app_filename}" ]]; then
+			return 2
+		fi
+
+		rm -rf "/Applications/${this_packaged_app_filename}" # Delete app if it already exist from previous customization before reset.
+
+		if ! verify_code_signature "${app_verification_args[@]}" "${package_to_install}" &> /dev/null || ! installer -pkg "${package_to_install}" -target '/' || ! verify_code_signature "${app_verification_args[@]}" "/Applications/${this_packaged_app_filename}" &> /dev/null; then
+			rm -rf "/Applications/${this_packaged_app_filename}"
+			return 3
+		fi
+
+		xattr -drs com.apple.quarantine "/Applications/${this_packaged_app_filename}"
+		touch "/Applications/${this_packaged_app_filename}"
+	}
+
+	install_app_from_archive() {
+		local archive_to_install=''
+		local app_install_folder='/Applications'
+		declare -a app_verification_args=()
+
+		while (( $# > 0 )); do # Args can be passed in any order.
+			# Any existing ".zip" file path will be "archive_to_install" and any existing folder will be "app_install_folder",
+			# and all other args will be collected in "app_verification_args" to be passed on to the "verify_code_signature" function.
+			if [[ -n "$1" ]]; then
+				if [[ -f "$1" && "$1" == *'.'[Zz][Ii][Pp] ]]; then
+					archive_to_install="$1"
+				elif [[ -d "$1" ]]; then
+					app_install_folder="$1"
+				else
+					app_verification_args+=( "$1" )
+				fi
+			fi
+
+			shift
+		done
+
+		if [[ -z "${archive_to_install}" ]]; then
+			return 1
+		fi
+
+		local this_archived_app_filename
+		this_archived_app_filename="$(zipinfo -1 "${archive_to_install}" | grep -im 1 '\.app/$')" # NOTE: There technically could be multiple apps within an archive, but none that we install are like that so not worrying about that complexity (but they would still get installed, just not verified or logged properly).
+		local this_archived_app_filename="${this_archived_app_filename%/}"
+		printf '%s' "${this_archived_app_filename}" # Output file name for retrieval via command substitution for usage in other commands and logging (whether or not there is an error).
+
+		if [[ -z "${this_archived_app_filename}" ]]; then
+			return 2
+		fi
+
+		rm -rf "${app_install_folder:?}/${this_archived_app_filename}" # Delete app if it already exist from previous customization before reset.
+
+		if ! ditto -xk --noqtn "${archive_to_install}" "${app_install_folder}" &> /dev/null || ! verify_code_signature "${app_verification_args[@]}" "${app_install_folder}/${this_archived_app_filename}" &> /dev/null; then
+			rm -rf "${app_install_folder:?}/${this_archived_app_filename}"
+			return 3
+		fi
+
+		touch "${app_install_folder}/${this_archived_app_filename}"
+	}
+
+	install_app_from_disk_image() {
+		local disk_image_to_install=''
+		local app_install_folder='/Applications'
+		local verify_disk_image=true # NOTE: It is not uncommon for valid disk images to NOT be signed/notarized (even from big developers),
+		# so a "DO-NOT-VERIFY-DMG" arg can be passed to this function to bypass disk image verification when needed while still verifying the app itself.
+
+		declare -a app_verification_args=()
+
+		while (( $# > 0 )); do # Args can be passed in any order.
+			# Any existing ".dmg" file path will be "disk_image_to_install" and any existing folder will be "app_install_folder",
+			# and all other args (other than "DO-NOT-VERIFY-DMG" mentioned above) will be collected in "app_verification_args" to be passed on to the "verify_code_signature" function.
+			if [[ -n "$1" ]]; then
+				if [[ -f "$1" && "$1" == *'.'[Dd][Mm][Gg] ]]; then
+					disk_image_to_install="$1"
+				elif [[ -d "$1" ]]; then
+					app_install_folder="$1"
+				elif [[ "$1" == 'DO-NOT-VERIFY-DMG' ]]; then
+					verify_disk_image=false
+				else
+					app_verification_args+=( "$1" )
+				fi
+			fi
+
+			shift
+		done
+
+		if [[ -z "${disk_image_to_install}" ]]; then
+			return 1
+		fi
+
+		if $verify_disk_image && ! verify_code_signature "${app_verification_args[@]}" "${disk_image_to_install}" &> /dev/null; then # See notes above about bypassing disk image verification when needed by passing the "DO-NOT-VERIFY-DMG" arg.
+			return 2
+		fi
+
+		local dmg_mount_path
+		dmg_mount_path="$(echo 'Y' | hdiutil attach "${disk_image_to_install}" -nobrowse -readonly -plist 2> /dev/null | awk '($0 == "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"), ($0 == "</plist>")' | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
+		# NOTE: Pipe "echo 'Y'" to "hdiutil attach" in case there is a license agreement that needs to be agreed to AND use an "awk" range pattern to retrieve only the plist lines from the output since the whole license agreement will be included in the output which would break "xmllint" parsing if it was included.
+		# ALSO NOTE: There technically could be multiple volumes mounted by a disk image, but none that we install are like that so not worrying about that complexity and the "xmllint" command being used will only return the path of the first volume listed within the plist output
+		# (because of the XPath "string()" commands behavior of only ever returning a single value even if an array is passed to it) and also only the first app detected in that volume will be installed (more notes about single app installs from within a disk image below).
+
+		if [[ ! -d "${dmg_mount_path}" ]]; then
+			return 3
+		fi
+
+		local install_app_from_dmg_return_code=0 # Save return code for end of function instead of returning immediately so that disk image can always be detached even if there was an error within the loop.
+
+		local this_app_in_dmg_path
+		local this_app_in_dmg_filename
+		for this_app_in_dmg_path in "${dmg_mount_path}/"*'.'[Aa][Pp][Pp]; do # NOTE: Only the FIRST app found within a disk image will only ever be installed even though there technically could be multiple apps within a volume from a mounted disk image, but none that we install are like that so not worrying about that complexity.
+			if ! verify_code_signature "${app_verification_args[@]}" "${this_app_in_dmg_path}" &> /dev/null; then
+				printf '%s' "${dmg_mount_path}" # Output disk image mount path for retrieval via command substitution for logging (whether or not there is an error).
+				install_app_from_dmg_return_code=4
+				break
+			fi
+
+			this_app_in_dmg_filename="${this_app_in_dmg_path##*/}"
+			printf '%s' "${this_app_in_dmg_filename}" # Output file name for retrieval via command substitution for usage in other commands and logging (whether or not there is an error).
+
+			rm -rf "${app_install_folder:?}/${this_app_in_dmg_filename}" # Delete app if it already exist from previous customization before reset.
+
+			if ! ditto "${this_app_in_dmg_path}" "${app_install_folder}/${this_app_in_dmg_filename}" &> /dev/null || ! verify_code_signature "${app_verification_args[@]}" "${app_install_folder}/${this_app_in_dmg_filename}" &> /dev/null; then
+				rm -rf "${app_install_folder:?}/${this_app_in_dmg_filename}"
+
+				install_app_from_dmg_return_code=5
+				break
+			fi
+
+			xattr -drs com.apple.quarantine "${app_install_folder}/${this_app_in_dmg_filename}"
+			touch "${app_install_folder}/${this_app_in_dmg_filename}"
+
+			break # NOTE: There technically could be multiple apps within a volume from a mounted disk image, but none that we install are like that so not worrying about that complexity (any other apps within a disk image will NOT be installed).
+		done
+
+		hdiutil detach "${dmg_mount_path}" &> /dev/null
+
+		return "${install_app_from_dmg_return_code}"
+	}
+
 	if ! $critical_error_occurred; then
 
 		# INSTALL GLOBAL APPS
 		# Do this before creating reset Snapshot since we want the customer to have these Apps pre-installed.
 
-		for this_darwin_folder_path in "$2/Global/Apps/darwin-"*; do
-			should_install_apps_in_this_darwin_folder=false
-			this_darwin_folder_name="${this_darwin_folder_path##*/}"
-
-			if [[ "${this_darwin_folder_name}" == 'darwin-all-versions' ]]; then
-				should_install_apps_in_this_darwin_folder=true
-			else
-				IFS='-' read -rd '' -a this_darwin_folder_name_parts < <(echo -n "${this_darwin_folder_name}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value.
-				this_darwin_comparison="$(echo "${this_darwin_folder_name_parts[1]}" | tr '[:upper:]' '[:lower:]')"
-				this_darwin_version="${this_darwin_folder_name_parts[2]}"
-
-				if [[ -n "${this_darwin_comparison}" && "${this_darwin_version}" =~ ^[[:digit:]]+$ ]] && {
-						{ [[ "${this_darwin_comparison}" == 'eq' ]] && (( DARWIN_MAJOR_VERSION == this_darwin_version )); } ||
-						{ [[ "${this_darwin_comparison}" == 'lt' ]] && (( DARWIN_MAJOR_VERSION < this_darwin_version )); } ||
-						{ [[ "${this_darwin_comparison}" == 'le' ]] && (( DARWIN_MAJOR_VERSION <= this_darwin_version )); } ||
-						{ [[ "${this_darwin_comparison}" == 'gt' ]] && (( DARWIN_MAJOR_VERSION > this_darwin_version )); } ||
-						{ [[ "${this_darwin_comparison}" == 'ge' ]] && (( DARWIN_MAJOR_VERSION >= this_darwin_version )); }
-					}; then
-					should_install_apps_in_this_darwin_folder=true
-				fi
-			fi
-
-			if $should_install_apps_in_this_darwin_folder; then
-				for this_global_app_installer in "${this_darwin_folder_path}/"*'.'*; do
+		for this_global_apps_darwin_folder_path in "$2/Global/Apps/darwin-"*; do
+			if should_install_apps_in_darwin_folder "${this_global_apps_darwin_folder_path}"; then
+				for this_global_app_installer in "${this_global_apps_darwin_folder_path}/"*'.'*; do
 					if [[ -f "${this_global_app_installer}" ]]; then
-						this_global_app_name="${this_global_app_installer##*/}"
-						this_global_app_name="${this_global_app_name%.*}"
+						this_global_app_installer_name="${this_global_app_installer##*/}"
+						this_global_app_installer_name="${this_global_app_installer_name%.*}"
 
-						if [[ "${this_global_app_installer}" == *'.zip' ]]; then
-							write_to_log "Installing Global App \"${this_global_app_name}\""
+						declare -a global_app_verification_args=( 'YRW6NUGA63' ) # Use my (Pico Mitchell) Team ID as the default value, which means any newly added apps that are not internal testing tools and are not explictly specified with a different value below will fail verification.
 
-							rm -rf "/Applications/${this_global_app_name}.app" # Delete app if it already exist from previous customization before reset.
-							ditto -xk --noqtn "${this_global_app_installer}" '/Applications' &> /dev/null
+						if [[ "${this_global_app_installer}" == *'.'[Pp][Kk][Gg] ]]; then
+							write_to_log "Installing Global App \"${this_global_app_installer_name}\" From Package"
 
-							if [[ -d "/Applications/${this_global_app_name}.app" ]]; then
-								touch "/Applications/${this_global_app_name}.app"
-								chown -R 501:20 "/Applications/${this_global_app_name}.app" # Make sure the customer user account ends up owning the pre-installed apps.
+							if [[ "${this_global_app_installer_name}" == 'Firefox'* ]]; then
+								global_app_verification_args=( 'notarized' '43AQ936H96' ) # Team ID of "Mozilla Corporation"
 							fi
-						elif [[ "${this_global_app_installer}" == *'.dmg' ]]; then
-							#write_to_log "Mounting \"${this_global_app_name}\" Disk Image for Global Apps"
 
-							dmg_mount_path="$(hdiutil attach "${this_global_app_installer}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
+							this_packaged_app_filename="$(install_app_from_package "${global_app_verification_args[@]}" "${this_global_app_installer}")"
+							install_app_from_package_exit_code="$?"
 
-							if [[ -d "${dmg_mount_path}" ]]; then
-								for this_dmg_app in "${dmg_mount_path}/"*'.app'; do
-									if [[ -d "${this_dmg_app}" ]]; then
-										this_global_app_name="${this_dmg_app##*/}"
-										this_global_app_name="${this_global_app_name%.*}"
+							if (( install_app_from_package_exit_code == 0 )); then
+								chown -R 501:20 "/Applications/${this_packaged_app_filename}" # Make sure the customer user account ends up owning the pre-installed apps.
+							else
+								if (( install_app_from_package_exit_code == 2 )); then
+									write_to_log "ERROR: Failed to Detect App Within \"${this_global_app_installer_name}\" Package for Global App"
+								elif (( install_app_from_package_exit_code == 3 )); then
+									write_to_log "ERROR: Failed to Install or Verify Global App \"${this_packaged_app_filename}\""
+								fi
 
-										write_to_log "Installing Global App \"${this_global_app_name}\""
+								critical_error_occurred=true
+								break
+							fi
+						elif [[ "${this_global_app_installer}" == *'.'[Zz][Ii][Pp] ]]; then # There are not currently any global apps installed via ZIP, but keep this code for easy future use.
+							write_to_log "Installing Global App \"${this_global_app_installer_name}\" From Archive"
 
-										rm -rf "/Applications/${this_global_app_name}.app" # Delete app if it already exist from previous customization before reset.
-										ditto "${this_dmg_app}" "/Applications/${this_global_app_name}.app" &> /dev/null
+							this_archived_app_filename="$(install_app_from_archive "${global_app_verification_args[@]}" "${this_global_app_installer}")"
+							install_app_from_archive_exit_code="$?"
 
-										if [[ -d "/Applications/${this_global_app_name}.app" ]]; then
-											xattr -drs com.apple.quarantine "/Applications/${this_global_app_name}.app"
-											touch "/Applications/${this_global_app_name}.app"
-											chown -R 501:20 "/Applications/${this_global_app_name}.app" # Make sure the customer user account ends up owning the pre-installed apps.
-										fi
-									fi
-								done
+							if (( install_app_from_archive_exit_code == 0 )); then
+								chown -R 501:20 "/Applications/${this_archived_app_filename}" # Make sure the customer user account ends up owning the pre-installed apps.
+							else
+								if (( install_app_from_archive_exit_code == 2 )); then
+									write_to_log "ERROR: Failed to Detect App Within \"${this_global_app_installer_name}\" Archive for Global App"
+								elif (( install_app_from_archive_exit_code == 3 )); then
+									write_to_log "ERROR: Failed to Install or Verify Global App \"${this_archived_app_filename}\""
+								fi
 
-								#write_to_log "Unmounting \"${this_global_app_name}\" Disk Image for Global Apps"
-								hdiutil detach "${dmg_mount_path}" &> /dev/null
+								critical_error_occurred=true
+								break
+							fi
+						elif [[ "${this_global_app_installer}" == *'.'[Dd][Mm][Gg] ]]; then # There are not currently any global apps installed via DMG, but keep this code for easy future use.
+							write_to_log "Installing Global App \"${this_global_app_installer_name}\" From Disk Image"
+
+							this_dmg_app_filename="$(install_app_from_disk_image "${global_app_verification_args[@]}" "${this_global_app_installer}")"
+							install_app_from_disk_image_exit_code="$?"
+
+							if (( install_app_from_disk_image_exit_code == 0 )); then
+								chown -R 501:20 "/Applications/${this_dmg_app_filename}" # Make sure the customer user account ends up owning the pre-installed apps.
+							else
+								if (( install_app_from_disk_image_exit_code == 2 )); then
+									write_to_log "ERROR: Failed to Verify \"${this_global_app_installer_name}\" Disk Image for Global App"
+								elif (( install_app_from_disk_image_exit_code == 3 )); then
+									write_to_log "ERROR: Failed to Detect Mount Path of \"${this_global_app_installer_name}\" Disk Image for Global App"
+								elif (( install_app_from_disk_image_exit_code == 4 )); then
+									write_to_log "ERROR: Failed to Detect or Verify App In Mounted Disk Image \"${this_dmg_app_filename}\" for Global App" # "this_dmg_app_filename" will be the "dmg_mount_path" when this error occurs.
+								elif (( install_app_from_disk_image_exit_code == 5 )); then
+									write_to_log "ERROR: Failed to Install or Verify Global App \"${this_dmg_app_filename}\""
+								fi
+
+								critical_error_occurred=true
+								break
 							fi
 						else
-							write_to_log "Skipping Unrecognized Global App Installer (${this_user_app_installer})"
+							write_to_log "Skipping Unrecognized Global App Installer \"${this_global_app_installer##*/}\""
 						fi
 					fi
 				done
+
+				if $critical_error_occurred; then
+					break
+				fi
 			fi
 		done
 
 
-		if (( DARWIN_MAJOR_VERSION >= 19 )); then
+		if ! $critical_error_occurred; then
+			if (( DARWIN_MAJOR_VERSION >= 19 )); then
 
-			# PREPARE fg-snapshot-reset RESOURCES AND LAUNCH DAEMON AND PROGRESS LAUNCH AGENT AND SNAPSHOT FOR FULL RESET *BEFORE* DOING *ANYTHING* ELSE
+				# PREPARE fg-snapshot-reset RESOURCES AND LAUNCH DAEMON AND PROGRESS LAUNCH AGENT AND SNAPSHOT FOR FULL RESET *BEFORE* DOING *ANYTHING* ELSE
 
-			# Only prepare reset Snapshot on macOS 10.15 Catalina and newer since:
-				# macOS 10.14 Mojave and older do not store "trimforce" setting in NVRAM (it is stored in the filesystem, so it would get undone with the reset Snapshot).
-				# macOS 10.13 High Sierra is not guaranteed to be APFS so the Snapshot could not always be created and it would be confusing to have multiple reset options for the same version of macOS.
-				# Also, we can do full resets with fgreset on macOS 10.14 Mojave and older (and we do not even install macOS 10.14 Mojave anymore, but we do still install macOS 10.13 High Sierra).
-				# So, fgreset will continue to be used on older versions of macOS.
+				# Only prepare reset Snapshot on macOS 10.15 Catalina and newer since:
+					# macOS 10.14 Mojave and older do not store "trimforce" setting in NVRAM (it is stored in the filesystem, so it would get undone with the reset Snapshot).
+					# macOS 10.13 High Sierra is not guaranteed to be APFS so the Snapshot could not always be created and it would be confusing to have multiple reset options for the same version of macOS.
+					# Also, we can do full resets with fgreset on macOS 10.14 Mojave and older (and we do not even install macOS 10.14 Mojave anymore, but we do still install macOS 10.13 High Sierra).
+					# So, fgreset will continue to be used on older versions of macOS.
 
-			write_to_log 'Setting Up Snapshot Reset LaunchDaemon'
+				write_to_log 'Setting Up Snapshot Reset LaunchDaemon'
 
-			snapshot_reset_resources_install_path='/Users/Shared/fg-snapshot-reset'
-			rm -rf "${snapshot_reset_resources_install_path}"
-			ditto "$2/fg-snapshot-reset" "${snapshot_reset_resources_install_path}"
-			chmod +x "${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh"
+				snapshot_reset_resources_install_path='/Users/Shared/fg-snapshot-reset'
+				rm -rf "${snapshot_reset_resources_install_path}"
+				ditto "$2/fg-snapshot-reset" "${snapshot_reset_resources_install_path}"
+				chmod +x "${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh"
 
-			PlistBuddy \
-				-c 'Add :Label string org.freegeek.fg-snapshot-reset' \
-				-c "Add :Program string ${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh" \
-				-c 'Add :RunAtLoad bool true' \
-				-c 'Add :StandardOutPath string /dev/null' \
-				-c 'Add :StandardErrorPath string /dev/null' \
-				'/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' &> /dev/null
+				PlistBuddy \
+					-c 'Add :Label string org.freegeek.fg-snapshot-reset' \
+					-c "Add :Program string ${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh" \
+					-c 'Add :RunAtLoad bool true' \
+					-c 'Add :StandardOutPath string /dev/null' \
+					-c 'Add :StandardErrorPath string /dev/null' \
+					'/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' &> /dev/null
 
-			if [[ ! -f "${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh" || ! -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' ]]; then
-				write_to_log 'ERROR: Failed to Setup Reset Snapshot LaunchDaemon'
-				critical_error_occurred=true
-			fi
-
-			if ! $critical_error_occurred; then
-
-				if [[ "$(tmutil listlocalsnapshots /)" == *'com.apple.TimeMachine'* ]]; then
-					# Make sure there are not previous Snapshots (which should not happen since this is a clean install, just being thorough).
-					write_to_log 'Deleting Previous Snapshots'
-
-					tmutil deletelocalsnapshots / &> /dev/null
-				fi
-
-				if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
-					# Network Time will already have been synced and turned off if started via LaunchDaemon since drastic time manipulation during the install can cause an indefinite hang.
-					# So, only make sure time is synced here if running via "startosinstall --installpackage" which does not have an issue with drastic time manipulation during this package installation.
-
-					write_to_log 'Turning On Network Time Before Creating Reset Snapshot'
-
-					systemsetup -setusingnetworktime on &> /dev/null
-					sleep 5 # Give system 5 seconds to sync to correct time before turning off network time and setting to midnight for reset Snapshot.
-				fi
-
-				actual_snapshot_time="$(date '+%T')"
-
-				if [[ "${actual_snapshot_time}" != '00:0'* ]]; then # Do not set time all the way back to midnight it was already set back by "fg-install-packages". See "SET TIME BACK TO MIDNIGHT FOR RESET SNAPSHOT" in "fg-install-packages" for more info.
-
-					write_to_log 'Setting Time to Midnight for Reset Snapshot'
-
-					systemsetup -setusingnetworktime off &> /dev/null
-					systemsetup -settime '00:00:00' &> /dev/null
-
-					# Once, the time did not get set to midnight properly, so keep setting it in a loop for 10 seconds and confirm it was set to be sure.
-					for (( set_time_to_midnight_attempt = 0; set_time_to_midnight_attempt < 10; set_time_to_midnight_attempt ++ )); do
-						if [[ "$(date '+%T')" != '00:0'* ]]; then
-							write_to_log 'Setting Time to Midnight for Reset Snapshot (Again)'
-							systemsetup -settime '00:00:00' &> /dev/null
-							sleep 1
-						fi
-					done
-
-					# ABOUT RESET SNAPSHOT TIME MANIPULATION
-					# Since macOS will automatically delete Snapshot 24 hours after they are created, I've created the "fg-snapshot-preserver" LaunchDaemon
-					# which will be run on boot and at regular intervals to manipulate the date and time to make macOS think that 24 hours has never passed.
-					# Since macOS will also delete any Snapshots that are in the future, setting the time to midnight makes it so that no matter what time
-					# it happens to be, the reset Snapshot will not be in the future when the date is set back to the reset Snapshot date.
-					# Creating the reset Snapshot at midnight is also a way to "tag" the reset Snapshot so that it is clear that this is a valid reset Snapshot,
-					# this can be useful to validate the reset Snapshot code as well as visually when restoring the reset Snapshot (even though the reset Snapshot should be the only available Snapshot).
-					# See comments at the top of "fg-snapshot-preserver" for more information about this and another solution that is used to prevent the reset Snapshot from being deleted by macOS.
-				fi
-
-				if [[ -f '/Users/Shared/fg-customization-resources/actual-snapshot-time.txt' ]]; then
-					# If time was already set back by fg-install-packages, then save that actual time for Snapshot reset, and set back to it after reset Snapshot is created.
-					actual_snapshot_time="$(< '/Users/Shared/fg-customization-resources/actual-snapshot-time.txt')"
-				fi
-
-				echo "${actual_snapshot_time}" > "${snapshot_reset_resources_install_path}/actual-snapshot-time.txt" # Save actual_snapshot_time to be used during Snapshot reset.
-
-				actual_snapshot_date="$(date '+%F')" # Must load this "date" command (used to validate the reset Snapshot) before turning back on Network Time in case the date is not synced when creating the Snapshot.
-
-				write_to_log 'Creating Reset Snapshot'
-
-				tmutil localsnapshot &> /dev/null # Create the reset Snapshot.
-				# Automatic Snapshots are not enabled by default, so this should be the only Snapshot available to restore.
-				# BUT! macOS will automatically delete Snapshots after 24 hours, SO WE ARE MANIPULATING TIME SO macOS THINKS ITS ALWAYS WITHIN 24 HOURS!
-
-				if [[ "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
-					write_to_log 'Turning On Network Time After Creating Reset Snapshot'
-
-					systemsetup -settime "${actual_snapshot_time}" &> /dev/null
-					systemsetup -setusingnetworktime on &> /dev/null
-				fi
-
-				reset_snapshot_name="$(tmutil listlocalsnapshots / | grep 'com.apple.TimeMachine' | head -1)"
-
-				# Create flags that reset Snapshot has been created (or not) for other Apps and Scripts to check for (and can use the contents to confirm the Snapshot still exists).
-
-				if [[ "${reset_snapshot_name}" == "com.apple.TimeMachine.${actual_snapshot_date}-00"* ]]; then
-					echo "${reset_snapshot_name}" > '/Users/Shared/.fgResetSnapshotCreated'
-				else
-					echo "${reset_snapshot_name}" > '/Users/Shared/.fgResetSnapshotLost'
-					echo "LOST REASON: Snapshot Name != com.apple.TimeMachine.${actual_snapshot_date}-00*" >> '/Users/Shared/.fgResetSnapshotLost'
-
-					tmutil deletelocalsnapshots / &> /dev/null
-
-					# Still setup fg-snapshot-preserver even if the Snapshot creation failed so that it can be used to display an error instead of preserving the Snapshot.
-				fi
-
-				rm -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' # Only want this to launch on first boot after restoring from the reset Snapshot, never another time.
-
-				if [[ ! -f '/Users/Shared/.fgResetSnapshotCreated' || -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' ]]; then
-					write_to_log 'ERROR: Failed to Create Reset Snapshot'
+				if [[ ! -f "${snapshot_reset_resources_install_path}/fg-snapshot-reset.sh" || ! -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' ]]; then
+					write_to_log 'ERROR: Failed to Setup Reset Snapshot LaunchDaemon'
 					critical_error_occurred=true
 				fi
 
-				# NOTE: Previously would create fg-snapshot-preserver LaunchDaemon here, but now creating during User Specific Tasks setup so that the LaunchDeamon can be properly associated with the "Free Geek Snapshot Helper"
-				# app when on macOS 13 Ventura (via the new "AssociatedBundleIdentifiers" key), which requires the app be installed before the LaunchDaemon is created for the app name to be displayed properly in the list of login items.
-			fi
-		else
+				if ! $critical_error_occurred; then
 
-			# FIX EXPIRED LET'S ENCRYPT CERTFICATE FOR MOJAVE AND OLDER
-			# This removes the expired Let's Encrypt certificate based on these instructions: https://docs.hedge.video/remove-dst-root-ca-x3-certificate
-			# If the expired certificate exists, using curl with sites using Let's Encrypt will fail, but just removing the certificate allows curl to work.
-			# But, I'm not exactly sure what certificate is getting used to authenticate the connection after the expired on is removed. Kinda weird.
+					if [[ "$(tmutil listlocalsnapshots /)" == *'com.apple.TimeMachine'* ]]; then
+						# Make sure there are not previous Snapshots (which should not happen since this is a clean install, just being thorough).
+						write_to_log 'Deleting Previous Snapshots'
 
-			# Newer versions of macOS do not need this fix and the versions that do need it don't use a the Snapshot reset technique,
-			# so it's fine for this to be in this "else" statement only when a Snapshot is NOT being made.
+						tmutil deletelocalsnapshots / &> /dev/null
+					fi
 
-			mv -f '/private/etc/ssl/cert.pem' '/private/etc/ssl/cert-orig.pem'
+					if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
+						# Network Time will already have been synced and turned off if started via LaunchDaemon since drastic time manipulation during the install can cause an indefinite hang.
+						# So, only make sure time is synced here if running via "startosinstall --installpackage" which does not have an issue with drastic time manipulation during this package installation.
 
-			awk '
+						write_to_log 'Turning On Network Time Before Creating Reset Snapshot'
+
+						systemsetup -setusingnetworktime on &> /dev/null
+						sleep 5 # Give system 5 seconds to sync to correct time before turning off network time and setting to midnight for reset Snapshot.
+					fi
+
+					actual_snapshot_time="$(date '+%T')"
+
+					if [[ "${actual_snapshot_time}" != '00:0'* ]]; then # Do not set time all the way back to midnight it was already set back by "fg-install-packages". See "SET TIME BACK TO MIDNIGHT FOR RESET SNAPSHOT" in "fg-install-packages" for more info.
+
+						write_to_log 'Setting Time to Midnight for Reset Snapshot'
+
+						systemsetup -setusingnetworktime off &> /dev/null
+						systemsetup -settime '00:00:00' &> /dev/null
+
+						# Once, the time did not get set to midnight properly, so keep setting it in a loop for 10 seconds and confirm it was set to be sure.
+						for (( set_time_to_midnight_attempt = 0; set_time_to_midnight_attempt < 10; set_time_to_midnight_attempt ++ )); do
+							if [[ "$(date '+%T')" != '00:0'* ]]; then
+								write_to_log 'Setting Time to Midnight for Reset Snapshot (Again)'
+								systemsetup -settime '00:00:00' &> /dev/null
+								sleep 1
+							fi
+						done
+
+						# ABOUT RESET SNAPSHOT TIME MANIPULATION
+						# Since macOS will automatically delete Snapshot 24 hours after they are created, I've created the "fg-snapshot-preserver" LaunchDaemon
+						# which will be run on boot and at regular intervals to manipulate the date and time to make macOS think that 24 hours has never passed.
+						# Since macOS will also delete any Snapshots that are in the future, setting the time to midnight makes it so that no matter what time
+						# it happens to be, the reset Snapshot will not be in the future when the date is set back to the reset Snapshot date.
+						# Creating the reset Snapshot at midnight is also a way to "tag" the reset Snapshot so that it is clear that this is a valid reset Snapshot,
+						# this can be useful to validate the reset Snapshot code as well as visually when restoring the reset Snapshot (even though the reset Snapshot should be the only available Snapshot).
+						# See comments at the top of "fg-snapshot-preserver" for more information about this and another solution that is used to prevent the reset Snapshot from being deleted by macOS.
+					fi
+
+					if [[ -f '/Users/Shared/fg-customization-resources/actual-snapshot-time.txt' ]]; then
+						# If time was already set back by fg-install-packages, then save that actual time for Snapshot reset, and set back to it after reset Snapshot is created.
+						actual_snapshot_time="$(< '/Users/Shared/fg-customization-resources/actual-snapshot-time.txt')"
+					fi
+
+					echo "${actual_snapshot_time}" > "${snapshot_reset_resources_install_path}/actual-snapshot-time.txt" # Save actual_snapshot_time to be used during Snapshot reset.
+
+					actual_snapshot_date="$(date '+%F')" # Must load this "date" command (used to validate the reset Snapshot) before turning back on Network Time in case the date is not synced when creating the Snapshot.
+
+					write_to_log 'Creating Reset Snapshot'
+
+					tmutil localsnapshot &> /dev/null # Create the reset Snapshot.
+					# Automatic Snapshots are not enabled by default, so this should be the only Snapshot available to restore.
+					# BUT! macOS will automatically delete Snapshots after 24 hours, SO WE ARE MANIPULATING TIME SO macOS THINKS ITS ALWAYS WITHIN 24 HOURS!
+
+					if [[ "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
+						write_to_log 'Turning On Network Time After Creating Reset Snapshot'
+
+						systemsetup -settime "${actual_snapshot_time}" &> /dev/null
+						systemsetup -setusingnetworktime on &> /dev/null
+					fi
+
+					reset_snapshot_name="$(tmutil listlocalsnapshots / | grep 'com.apple.TimeMachine' | head -1)"
+
+					# Create flags that reset Snapshot has been created (or not) for other Apps and Scripts to check for (and can use the contents to confirm the Snapshot still exists).
+
+					if [[ "${reset_snapshot_name}" == "com.apple.TimeMachine.${actual_snapshot_date}-00"* ]]; then
+						echo "${reset_snapshot_name}" > '/Users/Shared/.fgResetSnapshotCreated'
+					else
+						echo "${reset_snapshot_name}" > '/Users/Shared/.fgResetSnapshotLost'
+						echo "LOST REASON: Snapshot Name != com.apple.TimeMachine.${actual_snapshot_date}-00*" >> '/Users/Shared/.fgResetSnapshotLost'
+
+						tmutil deletelocalsnapshots / &> /dev/null
+
+						# Still setup fg-snapshot-preserver even if the Snapshot creation failed so that it can be used to display an error instead of preserving the Snapshot.
+					fi
+
+					rm -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' # Only want this to launch on first boot after restoring from the reset Snapshot, never another time.
+
+					if [[ ! -f '/Users/Shared/.fgResetSnapshotCreated' || -f '/Library/LaunchDaemons/org.freegeek.fg-snapshot-reset.plist' ]]; then
+						write_to_log 'ERROR: Failed to Create Reset Snapshot'
+						critical_error_occurred=true
+					fi
+
+					# NOTE: Previously would create fg-snapshot-preserver LaunchDaemon here, but now creating during User Specific Tasks setup so that the LaunchDeamon can be properly associated with the "Free Geek Snapshot Helper"
+					# app when on macOS 13 Ventura (via the new "AssociatedBundleIdentifiers" key), which requires the app be installed before the LaunchDaemon is created for the app name to be displayed properly in the list of login items.
+				fi
+			else
+
+				# FIX EXPIRED LET'S ENCRYPT CERTFICATE FOR MOJAVE AND OLDER
+				# This removes the expired Let's Encrypt certificate based on these instructions: https://docs.hedge.video/remove-dst-root-ca-x3-certificate
+				# If the expired certificate exists, using curl with sites using Let's Encrypt will fail, but just removing the certificate allows curl to work.
+				# But, I'm not exactly sure what certificate is getting used to authenticate the connection after the expired on is removed. Kinda weird.
+
+				# Newer versions of macOS do not need this fix and the versions that do need it don't use a the Snapshot reset technique,
+				# so it's fine for this to be in this "else" statement only when a Snapshot is NOT being made.
+
+				mv -f '/private/etc/ssl/cert.pem' '/private/etc/ssl/cert-orig.pem'
+
+				awk '
 (!remove_cert) {
 	if (is_cert_body) {
 		print
@@ -394,14 +889,15 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 ' '/private/etc/ssl/cert-orig.pem' > '/private/etc/ssl/cert.pem'
 
 
-			if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
+				if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
 
-				# MAKE SURE TIME IS SYNCED
-				# This will already have been done if launched via LaunchDaemon or will be done in this script after reset Snapshot is created if on macOS 10.15 Catalina and newer.
+					# MAKE SURE TIME IS SYNCED
+					# This will already have been done if launched via LaunchDaemon or will be done in this script after reset Snapshot is created if on macOS 10.15 Catalina and newer.
 
-				write_to_log 'Turning On Network Time'
+					write_to_log 'Turning On Network Time'
 
-				systemsetup -setusingnetworktime on &> /dev/null
+					systemsetup -setusingnetworktime on &> /dev/null
+				fi
 			fi
 		fi
 	fi
@@ -539,19 +1035,18 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		# NOTE: The "fgreset" global script is no longer installed since we are no longer installing older than macOS 10.15 Catalina.
 		# So, this code to install it is now commented out, but it is being left in place in case it is useful in the future.
 
-		# for this_global_script_zip in "$2/Global/Scripts/"*'.zip'; do
+		# for this_global_script_zip in "$2/Global/Scripts/"*'.'[Zz][Ii][Pp]; do
 		# 	if [[ -f "${this_global_script_zip}" ]]; then
 		# 		this_global_script_name="${this_global_script_zip##*/}"
 		# 		this_global_script_name="${this_global_script_name%.*}"
 
-		# 		write_to_log "Installing Global Script \"${this_global_script_name}\""
+		# 		write_to_log "Installing Global Script \"${this_global_script_name}\" From Archive"
 
-		# 		ditto -xk --noqtn "${this_global_script_zip}" '/Applications' &> /dev/null
+		# 		rm -rf "/Applications/${this_global_script_name}.sh" "/Applications/${this_global_script_name}"
 
-		# 		if [[ -f "/Applications/${this_global_script_name}.sh" ]]; then
+		# 		if ditto -xk --noqtn "${this_global_script_zip}" '/Applications' &> /dev/null && verify_code_signature 'YRW6NUGA63' "/Applications/${this_global_script_name}.sh" &> /dev/null; then
 		# 			mv -f "/Applications/${this_global_script_name}.sh" "/Applications/${this_global_script_name}"
 
-		# 			xattr -c "/Applications/${this_global_script_name}"
 		# 			chmod +x "/Applications/${this_global_script_name}"
 		# 			chflags hidden "/Applications/${this_global_script_name}"
 
@@ -560,15 +1055,20 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		# 			fi
 
 		# 			ln -s "/Applications/${this_global_script_name}" '/usr/local/bin'
+		# 		else
+		# 			rm -f "/Applications/${this_global_script_name}.sh" "/Applications/${this_global_script_name}"
+		# 			write_to_log "ERROR: Failed to Install or Verify Global Script \"${this_global_script_name}\""
+		# 			critical_error_occurred=true
+		# 			break
 		# 		fi
 		# 	fi
 		# done
 
-		# if [[ ! -f '/Applications/fgreset' ]]; then
-		# 	write_to_log 'ERROR: Failed to Install "fgreset" Global Script'
-		# 	critical_error_occurred=true
-		# fi
 
+		# CREATE TESTING USERS
+
+		mkuser_path="$2/Tools/mkuser/mkuser.sh"
+		chmod +x "${mkuser_path}"
 
 		fg_user_picture_path="$2/Global/Users/Free Geek User Picture.png"
 
@@ -579,19 +1079,21 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 			write_to_log "Creating Hidden Admin User \"${hidden_admin_user_full_name}\" (${hidden_admin_user_account_name})"
 
-			declare -a create_hidden_admin_user_options=( '--account-name' "${hidden_admin_user_account_name}" )
-			create_hidden_admin_user_options+=( '--full-name' "${hidden_admin_user_full_name}" )
-			create_hidden_admin_user_options+=( '--generated-uid' '0CAA0000-0A00-0000-BA00-0B000C00B00A' ) # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT208050
-			create_hidden_admin_user_options+=( '--stdin-password' )
-			create_hidden_admin_user_options+=( '--password-hint' 'If you do not know this password, then you should not be logging in as this user.' )
-			create_hidden_admin_user_options+=( '--picture' "${fg_user_picture_path}" )
-			create_hidden_admin_user_options+=( '--administrator' )
-			create_hidden_admin_user_options+=( '--hidden' )
-			create_hidden_admin_user_options+=( '--skip-setup-assistant' )
-			create_hidden_admin_user_options+=( '--prohibit-user-password-changes' )
-			create_hidden_admin_user_options+=( '--prohibit-user-picture-changes' )
-			create_hidden_admin_user_options+=( '--prevent-secure-token-on-big-sur-and-newer' )
-			create_hidden_admin_user_options+=( '--suppress-status-messages' ) # Don't output stdout messages, but we will still get stderr to save to variable.
+			declare -a create_hidden_admin_user_options=(
+				'--account-name' "${hidden_admin_user_account_name}"
+				'--full-name' "${hidden_admin_user_full_name}"
+				'--generated-uid' '0CAA0000-0A00-0000-BA00-0B000C00B00A' # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT208050
+				'--stdin-password'
+				'--password-hint' 'If you do not know this password, then you should not be logging in as this user.'
+				'--picture' "${fg_user_picture_path}"
+				'--administrator'
+				'--hidden'
+				'--skip-setup-assistant'
+				'--prohibit-user-password-changes'
+				'--prohibit-user-picture-changes'
+				'--prevent-secure-token-on-big-sur-and-newer'
+				'--suppress-status-messages' # Don't output stdout messages, but we will still get stderr to save to variable.
+			)
 
 			# PREVENT SECURE TOKEN ON BIG SUR AND NEWER
 			# See comments in "mkuser.sh" for more information about preventing Secure Tokens on macOS 11 Big Sur.
@@ -601,8 +1103,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			# But, since Secure Tokens cannot be removed on SEP Macs (T2/Apple Silicon), this is still a very critical thing to do to be able to do a Snapshot reset on those newer Macs.
 			# See comments in fg-snapshot-reset for more info about deleting crypto user references on macOS 10.15 Catalina.
 
-			chmod +x "$2/Tools/mkuser.sh"
-			create_hidden_admin_user_error="$(printf '%s' "${hidden_admin_user_password}" | "$2/Tools/mkuser.sh" "${create_hidden_admin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
+			create_hidden_admin_user_error="$(printf '%s' "${hidden_admin_user_password}" | "${mkuser_path}" "${create_hidden_admin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
 			create_hidden_admin_user_exit_code="$?" # Do not check "create_user" exit code directly by putting the function within an "if" since we want to print it as well when an error occurs.
 
 			if (( create_hidden_admin_user_exit_code != 0 )) || [[ "$(id -u "${hidden_admin_user_account_name}" 2> /dev/null)" != '501' ]]; then # Confirm hidden_admin_user_account_name was assigned UID 501 to be sure all is as expected.
@@ -621,22 +1122,23 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 			write_to_log "Creating Standard Auto-Login User \"${standard_autologin_user_full_name}\" (${standard_autologin_user_account_name})"
 
-			declare -a create_standard_autologin_user_options=( '--account-name' "${standard_autologin_user_account_name}" )
-			create_standard_autologin_user_options+=( '--full-name' "${standard_autologin_user_full_name}" )
-			create_standard_autologin_user_options+=( '--generated-uid' 'B0ABCAB0-D000-00C0-A0D0-00000CA000C0' ) # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT201548 (which is different from the one above)
-			create_standard_autologin_user_options+=( '--stdin-password' )
-			create_standard_autologin_user_options+=( '--password-hint' "The password is \"${standard_autologin_user_password}\"." )
-			create_standard_autologin_user_options+=( '--picture' "${fg_user_picture_path}" )
-			create_standard_autologin_user_options+=( '--skip-setup-assistant' )
-			create_standard_autologin_user_options+=( '--automatic-login' )
-			create_standard_autologin_user_options+=( '--do-not-share-public-folder' )
-			create_standard_autologin_user_options+=( '--prohibit-user-password-changes' )
-			create_standard_autologin_user_options+=( '--prohibit-user-picture-changes' )
-			create_standard_autologin_user_options+=( '--prevent-secure-token-on-big-sur-and-newer' )
-			create_standard_autologin_user_options+=( '--suppress-status-messages' ) # Don't output stdout messages, but we will still get stderr to save to variable.
+			declare -a create_standard_autologin_user_options=(
+				'--account-name' "${standard_autologin_user_account_name}"
+				'--full-name' "${standard_autologin_user_full_name}"
+				'--generated-uid' 'B0ABCAB0-D000-00C0-A0D0-00000CA000C0' # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT201548 (which is different from the one above)
+				'--stdin-password'
+				'--password-hint' "The password is \"${standard_autologin_user_password}\"."
+				'--picture' "${fg_user_picture_path}"
+				'--skip-setup-assistant'
+				'--automatic-login'
+				'--do-not-share-public-folder'
+				'--prohibit-user-password-changes'
+				'--prohibit-user-picture-changes'
+				'--prevent-secure-token-on-big-sur-and-newer'
+				'--suppress-status-messages' # Don't output stdout messages, but we will still get stderr to save to variable.
+			)
 
-			chmod +x "$2/Tools/mkuser.sh"
-			create_standard_autologin_user_error="$(printf '%s' "${standard_autologin_user_password}" | "$2/Tools/mkuser.sh" "${create_standard_autologin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
+			create_standard_autologin_user_error="$(printf '%s' "${standard_autologin_user_password}" | "${mkuser_path}" "${create_standard_autologin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
 			create_standard_autologin_user_exit_code="$?" # Do not check "create_user" exit code directly by putting the function within an "if" since we want to print it as well when an error occurs.
 
 			if (( create_standard_autologin_user_exit_code != 0 )) || [[ "$(id -u "${standard_autologin_user_account_name}" 2> /dev/null)" != '502' ]]; then # Confirm standard_autologin_user_account_name was assigned UID 502 to be sure all is as expected.
@@ -787,8 +1289,8 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 
 						# DISABLE NOTIFICATIONS FOR BACKGROUND TASK MANAGEMENT ON VENTURA (TO HIDE NOTIFICATIONS WHEN ADDING A LAUNCHDAEMON OR LAUNCHAGENT)
-						# On macOS 13 Ventura, each new login item, LaunchDaemon, or LaunchAgent added posts a notification to inform the user, which is great for regular users but unecessary for our technicians during testing (such as when the "Free Geek Demo Helper" LaunchAgent is created by "Free Geek Setup").
-						# So, completely disblale all notifications from the "BTMNotificationAgent" process which will hide these new "Background Task Management" notifications.
+						# On macOS 13 Ventura, each new login item, LaunchDaemon, or LaunchAgent added posts a notification to inform the user, which is great for regular users but unnecessary for our technicians during testing (such as when the "Free Geek Demo Helper" LaunchAgent is created by "Free Geek Setup").
+						# So, completely disable all notifications from the "BTMNotificationAgent" process which will hide these new "Background Task Management" notifications.
 						# Credit to @LucasM on the MacAdmins Slack for discovering and sharing how to disable these notifications: https://macadmins.slack.com/archives/GA92U9YV9/p1663919213484999?thread_ts=1663782045.275729&channel=GA92U9YV9&message_ts=1663919213.484999
 
 						notification_center_disable_all_flags='8401217' # macOS 11 Big Sur and newer: "Allow Notifications" disabled, alert style "None", and every checkbox option disabled.
@@ -833,7 +1335,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 								this_user_pictures_folder="${this_home_folder}/Pictures"
 
-								for this_pics_zip in "${this_user_resources_folder}/Pics/"*'.zip'; do
+								for this_pics_zip in "${this_user_resources_folder}/Pics/"*'.'[Zz][Ii][Pp]; do
 									if [[ -f "${this_pics_zip}" ]]; then
 										write_to_log "Installing Screen Saver Promo Pics for \"${this_username}\" User"
 
@@ -841,7 +1343,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 									fi
 								done
 
-								chown -R "${this_username}" "${this_user_pictures_folder}"
+								chown -R "${this_uid}:20" "${this_user_pictures_folder}"
 							fi
 
 
@@ -849,54 +1351,91 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 								# INSTALL USER APPS
 
-								mkdir -p "${this_user_apps_folder}"
+								for this_user_apps_darwin_folder_path in "${this_user_resources_folder}/Apps/darwin-"*; do
+									if should_install_apps_in_darwin_folder "${this_user_apps_darwin_folder_path}"; then
+										if [[ ! -f "${this_user_apps_folder}" ]]; then
+											mkdir -p "${this_user_apps_folder}"
+											chown -R "${this_uid}:20" "${this_user_apps_folder}"
+										fi
 
-								for this_user_app_installer in "${this_user_resources_folder}/Apps/"*'.'*; do
-									if [[ -f "${this_user_app_installer}" ]]; then
-										this_user_app_name="${this_user_app_installer##*/}"
-										this_user_app_name="${this_user_app_name%.*}"
+										for this_user_app_installer in "${this_user_apps_darwin_folder_path}/"*'.'*; do
+											if [[ -f "${this_user_app_installer}" ]]; then
+												this_user_app_installer_name="${this_user_app_installer##*/}"
+												this_user_app_installer_name="${this_user_app_installer_name%.*}"
 
-										if [[ "${this_user_app_installer}" == *'.zip' ]]; then
-											this_user_app_name="${this_user_app_name//-/ }"
+												declare -a user_app_verification_args=( 'YRW6NUGA63' ) # Use my (Pico Mitchell) Team ID as the default value, which means any newly added apps that are not internal testing tools and are not explictly specified with a different value below will fail verification.
 
-											if [[ "${this_user_app_name}" != 'Free Geek Snapshot Helper' ]] || (( DARWIN_MAJOR_VERSION >= 19 )); then # Only install "Free Geek Snapshot Helper" on macOS 10.15 Catalina and newer which do the Snapshot reset technique (macOS 10.14 Mojave and older use the "fgreset" script instead).
-												if [[ "${this_user_app_name}" == 'QAHelper'* ]]; then this_user_app_name='QA Helper'; fi
+												if [[ "${this_user_app_installer}" == *'.'[Zz][Ii][Pp] ]]; then
+													this_user_app_installer_name="${this_user_app_installer_name//-/ }"
 
-												write_to_log "Installing User App \"${this_user_app_name}\" for \"${this_username}\" User"
+													if [[ "${this_user_app_installer_name}" != 'Free Geek Snapshot Helper' ]] || (( DARWIN_MAJOR_VERSION >= 19 )); then # Only install "Free Geek Snapshot Helper" on macOS 10.15 Catalina and newer which do the Snapshot reset technique (macOS 10.14 Mojave and older use the "fgreset" script instead).
+														if [[ "${this_user_app_installer_name}" == 'QAHelper'* ]]; then this_user_app_installer_name='QA Helper'; fi
 
-												ditto -xk --noqtn "${this_user_app_installer}" "${this_user_apps_folder}" &> /dev/null
-											fi
-										elif [[ "${this_user_app_installer}" == *'.dmg' ]]; then
-											#write_to_log "Mounting \"${this_user_app_name}\" Disk Image for \"${this_username}\" User Apps"
+														write_to_log "Installing User App \"${this_user_app_installer_name}\" for \"${this_username}\" User From Archive"
 
-											dmg_mount_path="$(hdiutil attach "${this_user_app_installer}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
+														if [[ "${this_user_app_installer_name}" == 'DriveDx'* ]]; then
+															user_app_verification_args=( 'notarized' '4ZNF85T75D' ) # Team ID of "Kirill Luzanov"
+														elif [[ "${this_user_app_installer_name}" == 'KeyboardCleanTool' ]]; then
+															user_app_verification_args=( 'notarized' 'DAFVSXZ82P' ) # Team ID of "folivora.AI GmbH"
+														elif [[ "${this_user_app_installer_name}" == 'Geekbench'* ]]; then
+															user_app_verification_args=( 'notarized' 'SRW94G4YYQ' ) # Team ID of "Primate Labs Inc."
+														elif [[ "${this_user_app_installer_name}" == 'QA Helper' ]]; then
+															user_app_verification_args+=( 'notarized' ) # The Team ID of "Pico Mitchell" is already the default value, so just ALSO check notarization since "QA Helper" is notarized (unlike other internal testing apps).
+														fi # All other apps should be internal testing apps signed with my Team ID (specified in the original declaration), but are NOT notarized (since it's not worth the extra time on each build).
 
-											if [[ -d "${dmg_mount_path}" ]]; then
-												for this_dmg_app in "${dmg_mount_path}/"*'.app'; do
-													if [[ -d "${this_dmg_app}" ]]; then
-														this_user_app_name="${this_dmg_app##*/}"
-														this_user_app_name="${this_user_app_name%.*}"
+														this_archived_app_filename="$(install_app_from_archive "${user_app_verification_args[@]}" "${this_user_apps_folder}" "${this_user_app_installer}")"
+														install_app_from_archive_exit_code="$?"
 
-														write_to_log "Installing User App \"${this_user_app_name}\" for \"${this_username}\" User"
+														if (( install_app_from_archive_exit_code == 0 )); then
+															chown -R "${this_uid}:20" "${this_user_apps_folder}/${this_archived_app_filename}"
+														else
+															if (( install_app_from_archive_exit_code == 2 )); then
+																write_to_log "ERROR: Failed to Detect App Within \"${this_user_app_installer_name}\" Archive for User App"
+															elif (( install_app_from_archive_exit_code == 3 )); then
+																write_to_log "ERROR: Failed to Install or Verify User App \"${this_archived_app_filename}\" for \"${this_username}\""
+															fi
 
-														ditto "${this_dmg_app}" "/Applications/${this_user_app_name}.app" &> /dev/null
+															critical_error_occurred=true
+															break
+														fi
 													fi
-												done
+												elif [[ "${this_user_app_installer}" == '.'[Dd][Mm][Gg] ]]; then # There are not currently any user apps installed via DMG, but keep this code for easy future use.
+													write_to_log "Installing User App \"${this_user_app_installer_name}\" for \"${this_username}\" User From Disk Image"
 
-												#write_to_log "Unmounting \"${this_user_app_name}\" Disk Image for \"${this_username}\" User Apps"
-												hdiutil detach "${dmg_mount_path}" &> /dev/null
+													this_dmg_app_filename="$(install_app_from_disk_image "${user_app_verification_args[@]}" "${this_user_apps_folder}" "${this_user_app_installer}")"
+													install_app_from_disk_image_exit_code="$?"
+
+													if (( install_app_from_disk_image_exit_code == 0 )); then
+														chown -R "${this_uid}:20" "${this_user_apps_folder}/${this_dmg_app_filename}"
+													else
+														if (( install_app_from_disk_image_exit_code == 2 )); then
+															write_to_log "ERROR: Failed to Verify \"${this_user_app_installer_name}\" Disk Image for User App"
+														elif (( install_app_from_disk_image_exit_code == 3 )); then
+															write_to_log "ERROR: Failed to Detect Mount Path of \"${this_user_app_installer_name}\" Disk Image for User App"
+														elif (( install_app_from_disk_image_exit_code == 4 )); then
+															write_to_log "ERROR: Failed to Detect or Verify App In Mounted Disk Image \"${this_dmg_app_filename}\" for User App" # "this_dmg_app_filename" will be the "dmg_mount_path" when this error occurs.
+														elif (( install_app_from_disk_image_exit_code == 5 )); then
+															write_to_log "ERROR: Failed to Install or Verify User App \"${this_dmg_app_filename}\" for \"${this_username}\""
+														fi
+
+														critical_error_occurred=true
+														break
+													fi
+												elif [[ "${this_user_app_installer}" != *'.driveDxLicense' && "${this_user_app_installer}" != *'.preferences' ]]; then
+													write_to_log "Skipping Unrecognized \"${this_username}\" User App Installer \"${this_user_app_installer##*/}\""
+												fi
 											fi
-										elif [[ "${this_user_app_installer}" != *'.driveDxLicense' && "${this_user_app_installer}" != *'.preferences' ]]; then
-											write_to_log "Skipping Unrecognized \"${this_username}\" User App Installer (${this_user_app_installer})"
+										done
+
+										if $critical_error_occurred; then
+											break
 										fi
 									fi
 								done
 
-								xattr -drs com.apple.quarantine "${this_user_apps_folder}/"*'.app' &> /dev/null # Still remove all Quarantine flags in case app came from DMG instead of unzipped with "ditto -xk --noqtn".
-								touch "${this_user_apps_folder}/"*'.app' &> /dev/null
-
-								chown -R "${this_username}" "${this_user_apps_folder}"
-
+								if $critical_error_occurred; then
+									break
+								fi
 
 								# SET PREFERENCES (AND LICENSES AND DISABLE NOTIFICATIONS) FOR USER APPS
 								# Notifications are disabled so that notification approval is not prompted for the technician to have to dismiss (even though QA Helper does not send any notifications and DriveDx will have all notifications disabled).
@@ -917,7 +1456,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 								fi
 
 								if [[ -d "${this_user_apps_folder}/DriveDx.app" ]]; then
-									if [[ -f "${this_user_resources_folder}/Apps/DriveDx.driveDxLicense" ]]; then
+									if [[ -f "${this_user_resources_folder}/Apps/darwin-all-versions/DriveDx.driveDxLicense" ]]; then
 										write_to_log "Disabling \"DriveDx\" App Notifications for \"${this_username}\" User"
 										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.ncprefs' apps -array-add "$(echo '<dict/>' | # Search for "<dict/>" above in this script for comments about creating the plist this way.
 											plutil -insert 'bundle-id' -string 'com.binaryfruit.DriveDx' -o - - |
@@ -933,7 +1472,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' DriveDx_OS_Mode -bool true # Sync diagnostics KB online.
 										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' App_Updater_CheckForUpdates -bool false # Do not check for updates.
 
-										ditto "${this_user_resources_folder}/Apps/DriveDx.driveDxLicense" "${this_home_folder}/Library/Application Support/DriveDx/DriveDx.driveDxLicense" &> /dev/null # Do not need to "mkdir" first since "ditto" takes care of that automatically.
+										ditto "${this_user_resources_folder}/Apps/darwin-all-versions/DriveDx.driveDxLicense" "${this_home_folder}/Library/Application Support/DriveDx/DriveDx.driveDxLicense" &> /dev/null # Do not need to "mkdir" first since "ditto" takes care of that automatically.
 
 										if [[ "$(sysctl -in hw.optional.arm64)" == '1' && "$(file "${this_user_apps_folder}/DriveDx.app/Contents/MacOS/DriveDx")" != *'executable arm64'* ]] && ! arch -x86_64 /usr/bin/true 2> /dev/null; then # https://mostlymac.blog/2022/01/13/detecting-if-rosetta-2-is-installed-on-an-apple-silicon-mac/
 											# If is running on Apple Silicon and DriveDx isn't native (as version 1.11.0 is not) and Rosetta isn't aleady installed (which it will never be),
@@ -948,21 +1487,35 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 									fi
 								fi
 
-								if [[ -d "${this_user_apps_folder}/Geekbench 5.app" ]]; then
-									if [[ -f "${this_user_resources_folder}/Apps/Geekbench 5.preferences" ]]; then
-										write_to_log "Setting Preferences for \"Geekbench\" App for \"${this_username}\" User"
-										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.primatelabs.Geekbench5' AgreedToEULA -bool true
-										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.primatelabs.Geekbench5' SUEnableAutomaticChecks -bool false
+								for geekbench_app_path in "${this_user_apps_folder}/Geekbench "*'.app'; do # NOTE: Geekbench 5 will be installed on macOS 10.15 Catalina and older and Geekbench 6 will be installed on macOS 11 Big Sur and newer.
+									# Instead of needing to explicitly check for which version of macOS is running or which version of Geekbench got installed, just use a glob to match any version of Geekbench that got installed.
+									# This glob should only ever match a single Geekbench app, doing it in a loop is a safe and correct way to handle the output of a glob since it shouldn't be assumed that there will be only one match.
 
-										geekbench_license_json="$(< "${this_user_resources_folder}/Apps/Geekbench 5.preferences")" # This file could be placed in the "this_user_apps_folder" alongside the app to license it automatically, but instead read it to manually set the values in the preferences so that it's not as easily seen by technicians.
-										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.primatelabs.Geekbench5' LicenseEmail -string "$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).license_user' -- "${geekbench_license_json}")"
-										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.primatelabs.Geekbench5' LicenseKey -string "$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).license_key' -- "${geekbench_license_json}")"
-										# NOTE: Could also pass this user and key to the "geekbench_x86_64" or "geekbench_aarch64" binary (within "Geekbench 5.app/Contents/Resources") with the "--unlock" option, but that just sets these preferences so just do that directly instead.
-									else
-										write_to_log "WARNING: Uninstalling \"Geekbench\" App for \"${this_username}\" User Because License Not Found"
-										rm -rf "${this_user_apps_folder}/Geekbench 5.app"
+									if [[ -d "${geekbench_app_path}" ]]; then
+										geekbench_app_name="${geekbench_app_path##*/}"
+										geekbench_app_name="${geekbench_app_name%.*}"
+
+										declare -a geekbench_license_paths=( "${this_user_resources_folder}/Apps/darwin-"*"/${geekbench_app_name}.preferences" ) # To locate the correct license file for the version of Geekbench that was installed, we will again use a glob,
+										# but this time searching any "darwin-" version folder from the app installers for the correct license file name containing "geekbench_app_name" (which will have the app version in it and always be present in the same folder as the installer).
+										geekbench_license_path="${geekbench_license_paths[0]}" # Again, this glob should only ever have a single match but to be extra safe assign the output of the glob to an array and only every use the first element of the array (which should be the only element).
+
+										if [[ -f "${geekbench_license_path}" ]]; then
+											write_to_log "Setting Preferences for \"${geekbench_app_name}\" App for \"${this_username}\" User"
+
+											geekbench_bundle_id="$(PlistBuddy -c 'Print :CFBundleIdentifier' "${geekbench_app_path}/Contents/Info.plist")"
+											launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write "${geekbench_bundle_id}" AgreedToEULA -bool true
+											launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write "${geekbench_bundle_id}" SUEnableAutomaticChecks -bool false
+
+											geekbench_license_json="$(< "${geekbench_license_path}")" # This file could be placed in the "this_user_apps_folder" alongside the app to license it automatically, but instead read it to manually set the values in the preferences so that it's not as easily seen by technicians.
+											launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write "${geekbench_bundle_id}" LicenseEmail -string "$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).license_user' -- "${geekbench_license_json}" 2> /dev/null)"
+											launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write "${geekbench_bundle_id}" LicenseKey -string "$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).license_key' -- "${geekbench_license_json}" 2> /dev/null)"
+											# NOTE: Could also pass this user and key to the "geekbench_x86_64" or "geekbench_aarch64" binary (within "Geekbench #.app/Contents/Resources") with the "--unlock" option, but that just sets these preferences so just do that directly instead.
+										else
+											write_to_log "WARNING: Uninstalling \"${geekbench_app_name}\" App for \"${this_username}\" User Because License Not Found"
+											rm -rf "${geekbench_app_path}"
+										fi
 									fi
-								fi
+								done
 
 								if [[ -d "${this_user_apps_folder}/KeyboardCleanTool.app" ]]; then
 									write_to_log "Setting Preferences for \"KeyboardCleanTool\" App for \"${this_username}\" User"
@@ -980,7 +1533,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 									this_user_desktop_folder="${this_home_folder}/Desktop"
 
 									ln -s "${this_user_apps_folder}/Free Geek Setup.app" "${this_user_desktop_folder}"
-									chown -R "${this_username}" "${this_user_desktop_folder}"
+									chown -R "${this_uid}:20" "${this_user_desktop_folder}"
 
 
 									# SETUP FREE GEEK SETUP AUTO-LAUNCH
@@ -1019,7 +1572,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 										-c 'Add :StandardErrorPath string /dev/null' \
 										"${this_user_launch_agents_folder}/org.freegeek.Free-Geek-Setup.plist" &> /dev/null
 
-									chown -R "${this_username}" "${this_user_launch_agents_folder}"
+									chown -R "${this_uid}:20" "${this_user_launch_agents_folder}"
 								fi
 
 								if [[ -f '/Users/Shared/.fgResetSnapshotCreated' && -d "${this_user_apps_folder}/Free Geek Snapshot Helper.app" ]]; then
@@ -1106,7 +1659,7 @@ Save
 							declare -a custom_dock_persistent_apps=()
 
 							dock_app_dict_for_path() { # This function will generate a plist dict string that is suitable to be passed to "defaults write ... -array".
-								if [[ "$1" != *'.app' || ! -d "$1" ]]; then # Make sure the specified path is for an app that exists.
+								if [[ "$1" != *'.'[Aa][Pp][Pp] || ! -d "$1" ]]; then # Make sure the specified path is for an app that exists.
 									return 1
 								fi
 
@@ -1125,9 +1678,14 @@ Save
 								custom_dock_persistent_apps+=( "${dock_app_dict_for_drivedx}" )
 							fi
 
-							if dock_app_dict_for_geekbench="$(dock_app_dict_for_path "${this_user_apps_folder}/Geekbench 5.app")"; then
-								custom_dock_persistent_apps+=( "${dock_app_dict_for_geekbench}" )
-							fi
+							for geekbench_app_path in "${this_user_apps_folder}/Geekbench "*'.app'; do # NOTE: Geekbench 5 will be installed on macOS 10.15 Catalina and older and Geekbench 6 will be installed on macOS 11 Big Sur and newer.
+								# Instead of needing to explicitly check for which version of macOS is running or which version of Geekbench got installed, just use a glob to match any version of Geekbench that got installed.
+								# This glob should only ever match a single Geekbench app, doing it in a loop is a safe and correct way to handle the output of a glob since it shouldn't be assumed that there will be only one match.
+
+								if dock_app_dict_for_geekbench="$(dock_app_dict_for_path "${geekbench_app_path}")"; then
+									custom_dock_persistent_apps+=( "${dock_app_dict_for_geekbench}" )
+								fi
+							done
 
 							if $is_laptop && dock_app_dict_for_keyboard_clean_tool="$(dock_app_dict_for_path "${this_user_apps_folder}/KeyboardCleanTool.app")"; then # Add "KeyboardCleanTool" only when the Mac is a laptop.
 								custom_dock_persistent_apps+=( "${dock_app_dict_for_keyboard_clean_tool}" )

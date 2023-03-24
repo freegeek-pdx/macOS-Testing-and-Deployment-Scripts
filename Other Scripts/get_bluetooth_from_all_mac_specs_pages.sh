@@ -32,6 +32,7 @@ all_mac_identification_pages+=( 'HT202888' ) # Mac Pro
 
 every_bluetooth_version=''
 
+every_bluetooth_5dot3_model=''
 every_bluetooth_5_model=''
 every_bluetooth_4dot2_model=''
 every_bluetooth_4_model='Macmini5,3+' # Mid 2011 Mac mini Server (Macmini5,3) is not listed in the Specs pages.
@@ -68,6 +69,9 @@ for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
 				fi
 
 				case "${bluetooth_version}" in
+					'5.3')
+						every_bluetooth_5dot3_model+="${this_model_identifier}+"
+						;;
 					'5.0')
 						every_bluetooth_5_model+="${this_model_identifier}+"
 						;;
@@ -97,42 +101,50 @@ for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
 	# echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur
 done
 
-echo -e "\n\nEvery Bluetooth Verison"
+echo -e '\n\nEvery Bluetooth Verison'
 echo "${every_bluetooth_version}" | sort -urV
 
-echo -e "Bluetooth 5.0"
+echo 'Bluetooth 5.3'
+every_bluetooth_5dot3_model="$(echo "${every_bluetooth_5dot3_model%+}" | tr '+' '\n' | sort -uV)"
+echo "\"${every_bluetooth_5dot3_model//$'\n'/", "}\""
+
+echo -e '\nBluetooth 5.0'
 every_bluetooth_5_model="$(echo "${every_bluetooth_5_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_bluetooth_5_model//$'\n'/", "}\""
 
-echo -e "\nBluetooth 4.2"
+echo -e '\nBluetooth 4.2'
 every_bluetooth_4dot2_model="$(echo "${every_bluetooth_4dot2_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_bluetooth_4dot2_model//$'\n'/", "}\""
 
-echo -e "\nBluetooth 4.0"
+echo -e '\nBluetooth 4.0'
 every_bluetooth_4_model="$(echo "${every_bluetooth_4_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_bluetooth_4_model//$'\n'/", "}\""
 
-echo -e "\nBluetooth 2.1 + EDR"
+echo -e '\nBluetooth 2.1 + EDR'
 every_bluetooth_2dot1plusEDR_model="$(echo "${every_bluetooth_2dot1plusEDR_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_bluetooth_2dot1plusEDR_model//$'\n'/", "}\""
 
-echo -e "\nBluetooth OTHER VERSION"
+echo -e '\nBluetooth OTHER VERSION'
 every_bluetooth_other_version_model="$(echo "${every_bluetooth_other_version_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_bluetooth_other_version_model//$'\n'/", "}\""
 
-echo -e "\nERROR DETECTING BLUETOOTH"
+echo -e '\nERROR DETECTING BLUETOOTH'
 every_error_model="$(echo "${every_error_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_error_model//$'\n'/", "}\""
 
 echo ''
 
-# Example output from 1/9/23:
+# Example output from 2/1/23:
 
 # Every Bluetooth Verison
+# 5.3
 # 5.0
 # 4.2
 # 4.0
 # 2.1 + EDR
+
+# Bluetooth 5.3
+# "Mac14,3", "Mac14,5", "Mac14,6", "Mac14,9", "Mac14,10", "Mac14,12"
 
 # Bluetooth 5.0
 # "Mac13,1", "Mac13,2", "Mac14,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"

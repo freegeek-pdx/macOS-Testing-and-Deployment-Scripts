@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.1.11-1
+-- Version: 2023.2.17-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -154,7 +154,7 @@ if ((currentUsername is equal to "Tester") and ((POSIX path of (path to me)) is 
 				tell application id "com.apple.systempreferences" to activate
 			end try
 			try
-				do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation'" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
+				open location "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation" -- The "Privacy_Automation" anchor is not exposed/accessible via AppleScript, but can be accessed via URL Scheme.
 			end try
 			try
 				activate
@@ -265,7 +265,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			-- The MTB version is NOT stored in a user accessable location so that it cannot be super easily manually edited.
 			set currentMTBversion to doShellScriptAsAdmin("cat '/private/var/root/.mtbVersion'") -- If the file doesn't exist, it's older than 20220726 which was the first version to include this file (version 20220705 stored the file at "/Users/Shared/.mtbVersion" and no MTB version file existed before that).
 			
-			if ((currentMTBversion is not equal to "20221025") and (currentMTBversion is not equal to "20230111")) then error "OUTDATED"
+			if (currentMTBversion is not equal to "20230113") then error "OUTDATED"
 		on error
 			set serialNumber to ""
 			try

@@ -29,7 +29,7 @@ fi
 
 # The following URLs were discovered from examining how "https://support.apple.com/specs/${serial_number}" loads the specs URL via JavaScript (as of August 9th, 2022 in case this breaks in the future).
 
-serial_search_results_json="$(curl -m 5 -sfL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${serial_number}" 2> /dev/null)"
+serial_search_results_json="$(curl -m 10 -sfL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${serial_number}" 2> /dev/null)" # I have seem this URL API timeout after 5 seconds when called multiple times rapidly (likely because of rate limiting), so give it a 10 second timeout which seems to always work.
 
 if [[ -z "${serial_search_results_json}" ]]; then
 	>&2 echo 'INTERNET REQUIRED - SERIAL SEARCH FAILED'
@@ -52,7 +52,7 @@ if (( ${#serial_search_results_values[@]} != 5 )); then
 	exit 2
 fi
 
-specs_search_results_json="$(curl -m 5 -sfL "https://km.support.apple.com/kb/index?page=specs_browse&category=${serial_search_results_values[1]}&parent=${serial_search_results_values[2]}&grandparent=${serial_search_results_values[3]}&greatgrandparent=${serial_search_results_values[4]}" 2> /dev/null)"
+specs_search_results_json="$(curl -m 10 -sfL "https://km.support.apple.com/kb/index?page=specs_browse&category=${serial_search_results_values[1]}&parent=${serial_search_results_values[2]}&grandparent=${serial_search_results_values[3]}&greatgrandparent=${serial_search_results_values[4]}" 2> /dev/null)"
 
 if [[ -z "${specs_search_results_json}" ]]; then
 	>&2 echo 'INTERNET REQUIRED - SPECS SEARCH FAILED'

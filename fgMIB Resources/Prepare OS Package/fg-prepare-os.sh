@@ -30,7 +30,7 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2023.3.21-1'
+readonly SCRIPT_VERSION='2023.6.16-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -239,7 +239,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 				is_package=true
 			elif [[ "${verify_code_signature_path}" == *'.'[Dd][Mm][Gg] ]]; then # This and the following checks are just for display purposes, all will be verified the same way using "spctl -avv -t open ...".
 				echo 'Path Type: DISK IMAGE'
-			elif [[ "$(file -bI "${verify_code_signature_path}" 2> /dev/null)" == 'application/x-mach-binary'* ]]; then
+			elif [[ "$(file -b --mime-type "${verify_code_signature_path}" 2> /dev/null)" == 'application/x-mach-binary'* ]]; then
 				echo 'Path Type: MACH-O BINARY'
 			else
 				echo 'Path Type: REGULAR FILE'
@@ -729,15 +729,49 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 
 		if ! $critical_error_occurred; then
-			if (( DARWIN_MAJOR_VERSION >= 19 )); then
+			if (( DARWIN_MAJOR_VERSION < 19 )); then
 
-				# PREPARE fg-snapshot-reset RESOURCES AND LAUNCH DAEMON AND PROGRESS LAUNCH AGENT AND SNAPSHOT FOR FULL RESET *BEFORE* DOING *ANYTHING* ELSE
+				# FIX EXPIRED LET'S ENCRYPT CERTFICATE FOR MOJAVE AND OLDER
+				# This removes the expired Let's Encrypt certificate based on these instructions: https://docs.hedge.video/remove-dst-root-ca-x3-certificate
+				# If the expired certificate exists, using curl with sites using Let's Encrypt will fail, but just removing the certificate allows curl to work.
+				# But, I'm not exactly sure what certificate is getting used to authenticate the connection after the expired on is removed. Kinda weird.
+				# NOTE: We no longer install macOS 10.14 Mojave and older, but keep this code here for possible testing or future reference.
 
-				# Only prepare reset Snapshot on macOS 10.15 Catalina and newer since:
-					# macOS 10.14 Mojave and older do not store "trimforce" setting in NVRAM (it is stored in the filesystem, so it would get undone with the reset Snapshot).
-					# macOS 10.13 High Sierra is not guaranteed to be APFS so the Snapshot could not always be created and it would be confusing to have multiple reset options for the same version of macOS.
-					# Also, we can do full resets with fgreset on macOS 10.14 Mojave and older (and we do not even install macOS 10.14 Mojave anymore, but we do still install macOS 10.13 High Sierra).
-					# So, fgreset will continue to be used on older versions of macOS.
+				mv -f '/private/etc/ssl/cert.pem' '/private/etc/ssl/cert-orig.pem'
+
+				awk '
+(!remove_cert) {
+	if (is_cert_body) {
+		print
+	} else if ($0 == "-----BEGIN CERTIFICATE-----") {
+		print cert_header $0
+		cert_header = ""
+		is_cert_body = 1
+	} else if (!is_cert_body) {
+		if ($1 == "44:af:b0:80:d6:a3:27:ba:89:30:39:86:2e:f8:40:6b") {
+			remove_cert = 1
+			cert_header = ""
+		} else {
+			cert_header = cert_header $0 "\n"
+		}
+	}
+}
+($0 == "-----END CERTIFICATE-----") {
+	is_cert_body = 0
+	remove_cert = 0
+}
+' '/private/etc/ssl/cert-orig.pem' > '/private/etc/ssl/cert.pem'
+			elif [[ -z "$(ioreg -rc AppleSEPManager)" ]] || (( DARWIN_MAJOR_VERSION < 21 )); then
+
+				# WHEN THE SNAPSHOT RESET TECHNIQUE IS USED, PREPARE fg-snapshot-reset RESOURCES AND LAUNCH DAEMON AND SNAPSHOT FOR FULL RESET *BEFORE* DOING *ANYTHING* ELSE
+
+				# The Snapshot Reset techinque will only be used on pre-T2 Macs or any Mac running macOS 10.15 Catalina or macOS 11 Big Sur since the "Erase All Content & Settings" (via "Erase Assistant") is not available for those Macs.
+				# For T2 or Apple Silicon Macs (determined by checking for a Secure Enclave which is present on T2 or Apple Silicon Macs, and NOT on T1 Macs or older) running macOS 12 Monterey or newer,
+				# the "Free Geek Reset" app will automate the "Erase Assistant" app to perform "Erase All Content & Settings" instead of doing the Snapshot Reset technique.
+
+				# Previously, we would do resets with a custom "fgreset" script on macOS 10.14 Mojave and older, but we no longer install macOS 10.14 Mojave and older anyways.
+				# The Snapshot Reset technique was not used on older than macOS 10.15 Catalina because macOS 10.14 Mojave and older do not store "trimforce" setting in NVRAM (it is stored in the filesystem, so it would get undone with the reset Snapshot),
+				# and macOS 10.13 High Sierra is not guaranteed to be APFS so the Snapshot could not always be created and it would be confusing to have multiple reset options for the same version of macOS.
 
 				write_to_log 'Setting Up Snapshot Reset LaunchDaemon'
 
@@ -853,51 +887,17 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 					# NOTE: Previously would create fg-snapshot-preserver LaunchDaemon here, but now creating during User Specific Tasks setup so that the LaunchDeamon can be properly associated with the "Free Geek Snapshot Helper"
 					# app when on macOS 13 Ventura (via the new "AssociatedBundleIdentifiers" key), which requires the app be installed before the LaunchDaemon is created for the app name to be displayed properly in the list of login items.
 				fi
-			else
+			fi
 
-				# FIX EXPIRED LET'S ENCRYPT CERTFICATE FOR MOJAVE AND OLDER
-				# This removes the expired Let's Encrypt certificate based on these instructions: https://docs.hedge.video/remove-dst-root-ca-x3-certificate
-				# If the expired certificate exists, using curl with sites using Let's Encrypt will fail, but just removing the certificate allows curl to work.
-				# But, I'm not exactly sure what certificate is getting used to authenticate the connection after the expired on is removed. Kinda weird.
+			if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
 
-				# Newer versions of macOS do not need this fix and the versions that do need it don't use a the Snapshot reset technique,
-				# so it's fine for this to be in this "else" statement only when a Snapshot is NOT being made.
+				# MAKE SURE TIME IS SYNCED
+				# This will already have been done if launched via LaunchDaemon or may have already been done above in this script after reset Snapshot is created if is pre-T2 Mac on macOS 10.15 Catalina and newer,
+				# but double-check here since T2 or Apple Silicon Macs won't have the reset Snapshot created above.
 
-				mv -f '/private/etc/ssl/cert.pem' '/private/etc/ssl/cert-orig.pem'
+				write_to_log 'Turning On Network Time'
 
-				awk '
-(!remove_cert) {
-	if (is_cert_body) {
-		print
-	} else if ($0 == "-----BEGIN CERTIFICATE-----") {
-		print cert_header $0
-		cert_header = ""
-		is_cert_body = 1
-	} else if (!is_cert_body) {
-		if ($1 == "44:af:b0:80:d6:a3:27:ba:89:30:39:86:2e:f8:40:6b") {
-			remove_cert = 1
-			cert_header = ""
-		} else {
-			cert_header = cert_header $0 "\n"
-		}
-	}
-}
-($0 == "-----END CERTIFICATE-----") {
-	is_cert_body = 0
-	remove_cert = 0
-}
-' '/private/etc/ssl/cert-orig.pem' > '/private/etc/ssl/cert.pem'
-
-
-				if [[ ! -f '/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist' && "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
-
-					# MAKE SURE TIME IS SYNCED
-					# This will already have been done if launched via LaunchDaemon or will be done in this script after reset Snapshot is created if on macOS 10.15 Catalina and newer.
-
-					write_to_log 'Turning On Network Time'
-
-					systemsetup -setusingnetworktime on &> /dev/null
-				fi
+				systemsetup -setusingnetworktime on &> /dev/null
 			fi
 		fi
 	fi
@@ -1134,9 +1134,17 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 				'--do-not-share-public-folder'
 				'--prohibit-user-password-changes'
 				'--prohibit-user-picture-changes'
-				'--prevent-secure-token-on-big-sur-and-newer'
 				'--suppress-status-messages' # Don't output stdout messages, but we will still get stderr to save to variable.
 			)
+
+			if [[ -f '/Users/Shared/.fgResetSnapshotCreated' ]]; then
+				# If a reset Snapshot was not created (which would happen if this is T2 or Apple Silicon Mac running macOS running macOS 12 Monterey or newer), "fg-demo" can be allowed to get the first
+				# Secure Token since the user must have a Secure Token to be able to run "Erase All Content & Settings" (which will remove all users and Secure Tokens) and allowing it to be granted upon
+				# user creation instead of it being granted when the "Erase All Content & Settings" reset process is started by "Free Geek Reset" allows the reset to run more quickly and the user having
+				# a Secure Token is not an issue like it is with the Snapshot Reset process which would not be able to remove the Secure Token.
+
+				create_standard_autologin_user_options+=( '--prevent-secure-token-on-big-sur-and-newer' )
+			fi
 
 			create_standard_autologin_user_error="$(printf '%s' "${standard_autologin_user_password}" | "${mkuser_path}" "${create_standard_autologin_user_options[@]}" 2>&1)" # Redirect stderr to save to variable.
 			create_standard_autologin_user_exit_code="$?" # Do not check "create_user" exit code directly by putting the function within an "if" since we want to print it as well when an error occurs.
@@ -1159,7 +1167,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			for this_home_folder in '/Users/'*; do
 				if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
 					this_username="$(dscl . -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
-					this_uid="$(dscl -plist . -read "/Users/${this_username}" UniqueID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)"
+					this_uid="$(dscl -plist . -read "/Users/${this_username}" UniqueID 2> /dev/null | xmllint --xpath 'string(//string)' - 2> /dev/null)"
 
 					if [[ -n "${this_uid}" && -d "${this_home_folder}/Library" ]]; then
 
@@ -1368,19 +1376,31 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 												if [[ "${this_user_app_installer}" == *'.'[Zz][Ii][Pp] ]]; then
 													this_user_app_installer_name="${this_user_app_installer_name//-/ }"
 
-													if [[ "${this_user_app_installer_name}" != 'Free Geek Snapshot Helper' ]] || (( DARWIN_MAJOR_VERSION >= 19 )); then # Only install "Free Geek Snapshot Helper" on macOS 10.15 Catalina and newer which do the Snapshot reset technique (macOS 10.14 Mojave and older use the "fgreset" script instead).
+													should_install_this_user_app=true
+													if [[ "${this_user_app_installer_name}" == 'Free Geek Snapshot Helper' && ! -f '/Users/Shared/.fgResetSnapshotCreated' ]]; then
+														# "Free Geek Snapshot Helper" does not need to be installed if a reset Snapshot was not created, which would happen if this is T2 or Apple Silicon Mac running macOS running macOS 12 Monterey or newer
+														# where the "Free Geek Reset" app will automate the "Erase Assistant" app to perform "Erase All Content & Settings" instead of doing the Snapshot Reset technique.
+														# Also, no reset Snapshot was created on macOS 10.14 Mojave and older where a custom "fgreset" script used to be used instead (but we no longer install macOS 10.14 Mojave and older anyways).
+														# NOTE: The "Free Geek Reset" app is still installed even if the Snapshot Reset technique is used and it will just show instructions for the Snapshot Reset and allow auto-rebooting into recoverOS by setting an NVRAM key.
+
+														should_install_this_user_app=false
+													fi
+
+													if $should_install_this_user_app; then
 														if [[ "${this_user_app_installer_name}" == 'QAHelper'* ]]; then this_user_app_installer_name='QA Helper'; fi
 
 														write_to_log "Installing User App \"${this_user_app_installer_name}\" for \"${this_username}\" User From Archive"
 
 														if [[ "${this_user_app_installer_name}" == 'DriveDx'* ]]; then
 															user_app_verification_args=( 'notarized' '4ZNF85T75D' ) # Team ID of "Kirill Luzanov"
-														elif [[ "${this_user_app_installer_name}" == 'KeyboardCleanTool' ]]; then
-															user_app_verification_args=( 'notarized' 'DAFVSXZ82P' ) # Team ID of "folivora.AI GmbH"
 														elif [[ "${this_user_app_installer_name}" == 'Geekbench'* ]]; then
 															user_app_verification_args=( 'notarized' 'SRW94G4YYQ' ) # Team ID of "Primate Labs Inc."
+														elif [[ "${this_user_app_installer_name}" == 'Mactracker'* ]]; then
+															user_app_verification_args=( 'notarized' '63TP32R3AB' ) # Team ID of "Ian Page"
 														elif [[ "${this_user_app_installer_name}" == 'QA Helper' ]]; then
 															user_app_verification_args+=( 'notarized' ) # The Team ID of "Pico Mitchell" is already the default value, so just ALSO check notarization since "QA Helper" is notarized (unlike other internal testing apps).
+														elif [[ "${this_user_app_installer_name}" == 'KeyboardCleanTool' ]]; then
+															user_app_verification_args=( 'notarized' 'DAFVSXZ82P' ) # Team ID of "folivora.AI GmbH"
 														fi # All other apps should be internal testing apps signed with my Team ID (specified in the original declaration), but are NOT notarized (since it's not worth the extra time on each build).
 
 														this_archived_app_filename="$(install_app_from_archive "${user_app_verification_args[@]}" "${this_user_apps_folder}" "${this_user_app_installer}")"
@@ -1473,14 +1493,6 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 										launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.binaryfruit.DriveDx' App_Updater_CheckForUpdates -bool false # Do not check for updates.
 
 										ditto "${this_user_resources_folder}/Apps/darwin-all-versions/DriveDx.driveDxLicense" "${this_home_folder}/Library/Application Support/DriveDx/DriveDx.driveDxLicense" &> /dev/null # Do not need to "mkdir" first since "ditto" takes care of that automatically.
-
-										if [[ "$(sysctl -in hw.optional.arm64)" == '1' && "$(file "${this_user_apps_folder}/DriveDx.app/Contents/MacOS/DriveDx")" != *'executable arm64'* ]] && ! arch -x86_64 /usr/bin/true 2> /dev/null; then # https://mostlymac.blog/2022/01/13/detecting-if-rosetta-2-is-installed-on-an-apple-silicon-mac/
-											# If is running on Apple Silicon and DriveDx isn't native (as version 1.11.0 is not) and Rosetta isn't aleady installed (which it will never be),
-											# install Rosetta (which requires internet and if it fails then the tech will just be prompted to install Rosetta when DriveDx is launched).
-
-											write_to_log "Installing Rosetta for \"DriveDx\" App"
-											softwareupdate --install-rosetta --agree-to-license &> /dev/null
-										fi
 									else
 										write_to_log "WARNING: Uninstalling \"DriveDx\" App for \"${this_username}\" User Because License Not Found"
 										rm -rf "${this_user_apps_folder}/DriveDx.app"
@@ -1516,6 +1528,14 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 										fi
 									fi
 								done
+
+								if [[ -d "${this_user_apps_folder}/Mactracker.app" ]]; then
+									write_to_log "Setting Preferences for \"Mactracker\" App for \"${this_username}\" User"
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.mactrackerapp.Mactracker' 'SUCheckAtStartup' -bool false
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.mactrackerapp.Mactracker' 'WindowLocations' -dict 'MainWindow' "$(echo '<dict/>' | # Search for "<dict/>" above in this script for comments about creating the plist this way.
+										plutil -insert 'LastSelection' -integer '2' -o - -)" # Open to the "This Mac" section.
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.mactrackerapp.Mactracker' 'MultipleFindMyMac' -bool false # Do not show alert if the Model ID matches multiple models on first open of "This Mac" section (which would be on first launch).
+								fi
 
 								if [[ -d "${this_user_apps_folder}/KeyboardCleanTool.app" ]]; then
 									write_to_log "Setting Preferences for \"KeyboardCleanTool\" App for \"${this_username}\" User"
@@ -1639,7 +1659,7 @@ Save
 
 
 						# SETUP DOCK
-						# Add "QA Helper" to the front (if installed), add "DriveDx" and "Geekbench" after "QA Helper" (if installed),
+						# Add "QA Helper" to the front (if installed), add "DriveDx" and "Geekbench" and "Mactracker" after "QA Helper" (if installed),
 						# and then add "KeyboardCleanTool" after that (if installed and is a laptop),
 						# replace "Safari" with "Firefox" (if installed which it will be on macOS 10.15 Catalina and older),
 						# add "LibreOffice" after "Reminders" (if installed, which it won't be anymore but the code is left in place as an example),
@@ -1686,6 +1706,10 @@ Save
 									custom_dock_persistent_apps+=( "${dock_app_dict_for_geekbench}" )
 								fi
 							done
+
+							if dock_app_dict_for_mactracker="$(dock_app_dict_for_path "${this_user_apps_folder}/Mactracker.app")"; then
+								custom_dock_persistent_apps+=( "${dock_app_dict_for_mactracker}" )
+							fi
 
 							if $is_laptop && dock_app_dict_for_keyboard_clean_tool="$(dock_app_dict_for_path "${this_user_apps_folder}/KeyboardCleanTool.app")"; then # Add "KeyboardCleanTool" only when the Mac is a laptop.
 								custom_dock_persistent_apps+=( "${dock_app_dict_for_keyboard_clean_tool}" )

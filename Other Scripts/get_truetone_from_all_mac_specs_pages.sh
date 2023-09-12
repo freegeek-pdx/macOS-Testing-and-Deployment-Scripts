@@ -39,7 +39,7 @@ for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
 	while IFS='' read -r this_model_id_or_specs_url; do
 		if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
 			echo " (${this_model_id_or_specs_url}):"
-			truetone_element_from_page="$(curl -m 5 -sfL "${this_model_id_or_specs_url}" | xmllint --html --xpath '//*[contains(text(),"True Tone")]/text()' - 2> /dev/null)"
+			truetone_element_from_page="$(curl -m 5 -sfL "${this_model_id_or_specs_url}" | xmllint --html --xpath 'string(//*[contains(text(),"True Tone")])' - 2> /dev/null)"
 			if [[ -n "${truetone_element_from_page}" ]]; then
 				echo "Supports True Tone"
 				every_truetone_model+="${this_model_identifier}+"

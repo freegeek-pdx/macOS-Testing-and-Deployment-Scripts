@@ -102,6 +102,11 @@ repeat
 			set adminPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :admin_password' " & (quoted form of fgPasswordsPlistPath)) as text)
 		end try
 		
+		set previousAdminPassword to ""
+		try
+			set previousAdminPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :previous_admin_password' " & (quoted form of fgPasswordsPlistPath)) as text)
+		end try
+		
 		set wiFiPassword to ""
 		try
 			set wiFiPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :wifi_password' " & (quoted form of fgPasswordsPlistPath)) as text)
@@ -189,7 +194,53 @@ repeat
 											set AppleScript's text item delimiters to obfuscatedAdminPasswordPlaceholder
 											set thisScriptSourcePartsSplitAtObfuscatedAdminPasswordPlaceholder to (every text item of thisScriptSource)
 											
-											set AppleScript's text item delimiters to "x(\"" & obfuscatedAdminPassword & "\")"
+											set AppleScript's text item delimiters to "x(\"" & obfuscatedAdminPassword & "\")
+try
+	do shell script (\"id \" & (quoted form of adminUsername))
+	set verifiedAdminPassword to false
+	try
+		set verifiedAdminPassword to (\"VERIFIED ADMIN PASSWORD\" is equal to (do shell script \"echo 'VERIFIED ADMIN PASSWORD'\" user name adminUsername password adminPassword with administrator privileges))
+	end try"
+											
+											if (previousAdminPassword is not equal to "") then
+												tell me to set obfuscatedPreviousAdminPassword to shiftString(previousAdminPassword)
+												set AppleScript's text item delimiters to (AppleScript's text item delimiters & "
+	if (not verifiedAdminPassword) then
+		set adminPassword to x(\"" & obfuscatedPreviousAdminPassword & "\")
+		try
+			set verifiedAdminPassword to (\"VERIFIED ADMIN PASSWORD\" is equal to (do shell script \"echo 'VERIFIED ADMIN PASSWORD'\" user name adminUsername password adminPassword with administrator privileges))
+		end try
+	end if")
+											end if
+											
+											set AppleScript's text item delimiters to (AppleScript's text item delimiters & "
+	if (not verifiedAdminPassword) then
+		try
+			activate
+		end try
+		try
+			do shell script \"afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &\"
+		end try
+		display alert \"CRITICAL “\" & (name of me) & \"” ERROR:
+
+Failed to Verify “\" & adminUsername & \"” Admin Password\" message \"This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research.\" buttons {\"Shut Down\"} default button 1 as critical
+		tell application id \"com.apple.systemevents\" to shut down with state saving preference
+		quit
+		delay 10
+	end if
+on error
+	try
+		activate
+	end try
+	try
+		do shell script \"afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &\"
+	end try
+	display alert \"CRITICAL “\" & (name of me) & \"” ERROR:
+
+“\" & adminUsername & \"” Admin User Not Found\" message \"This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research.\" buttons {\"Quit\"} default button 1 as critical
+	quit
+	delay 10
+end try")
 											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedAdminPasswordPlaceholder as text)
 										end if
 										
@@ -232,6 +283,13 @@ end x"
 										
 										if (thisScriptSource contains "-- Build Flag: LSUIElement") then
 											do shell script "plutil -replace LSUIElement -bool true " & (quoted form of thisScriptAppInfoPlistPath)
+										end if
+										
+										if (thisScriptSource contains "-- Build Flag: CFBundleAlternateNames: [") then
+											set AppleScript's text item delimiters to "-- Build Flag: CFBundleAlternateNames: "
+											set thisScriptAppAlternateNamesPart to ((text item 2 of thisScriptSource) as text)
+											set thisScriptAppAlternateNamesJSON to ((first paragraph of thisScriptAppAlternateNamesPart) as text)
+											do shell script "plutil -replace CFBundleAlternateNames -json " & (quoted form of thisScriptAppAlternateNamesJSON) & " " & (quoted form of thisScriptAppInfoPlistPath)
 										end if
 										
 										do shell script ("
@@ -427,11 +485,15 @@ ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedNam
 mkdir -p " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/fg-snapshot-reset/Tools/")) & "
 rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/fg-snapshot-reset/Tools/" & thisScriptHyphenatedName & ".zip")) & "
 ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")) & " " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/fg-snapshot-reset/Tools/")))
-								else -- if (thisScriptName does not start with "FGreset") then
+								else
+									set userAppsDarwinVersionFolder to "darwin-all-versions"
+									if ((thisScriptName is equal to "Free Geek Snapshot Helper") or (thisScriptName is equal to "Free Geek Reset")) then
+										set userAppsDarwinVersionFolder to "darwin-ge-19"
+									end if
 									do shell script ("
-mkdir -p " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/darwin-all-versions/")) & "
-rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/darwin-all-versions/" & thisScriptHyphenatedName & ".zip")) & "
-ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")) & " " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/darwin-all-versions/")))
+mkdir -p " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/" & userAppsDarwinVersionFolder & "/")) & "
+rm -f " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/" & userAppsDarwinVersionFolder & "/" & thisScriptHyphenatedName & ".zip")) & "
+ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedName & ".zip")) & " " & (quoted form of ((POSIX path of (macLandFolder as alias)) & "fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/" & userAppsDarwinVersionFolder & "/")))
 								end if
 							end try
 						end if

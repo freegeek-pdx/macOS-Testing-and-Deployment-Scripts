@@ -2,10 +2,13 @@
 # THE FOLLOWING COMMANDS ARE INTENDED TO BE COPIED-AND-PASTED INTO TERMINAL WHEN NEEDED.
 # BUT, THIS *IS NOT NEEDED ANYMORE* SINCE "update-mac-drives.sh" CAN BE USED INSTEAD.
 
+# CREATE Sonoma INSTALLER USB (15.2 GB REQUIRED):
+sudo '/Volumes/Install macOS Sonoma beta/Install macOS Sonoma beta.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallSonoma --nointeraction
+
 # CREATE Ventura INSTALLER USB (14.8 GB REQUIRED):
 sudo '/Volumes/Install macOS Ventura/Install macOS Ventura.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallVentura --nointeraction
 
-# CREATE Monterey INSTALLER USB (14.6 GB REQUIRED):
+# CREATE Monterey INSTALLER USB (14.7 GB REQUIRED):
 sudo '/Volumes/Install macOS Monterey/Install macOS Monterey.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallMonterey --nointeraction
 
 # CREATE Big Sur INSTALLER USB (14 GB REQUIRED):

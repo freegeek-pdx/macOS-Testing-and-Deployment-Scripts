@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.2.17-1
+-- Version: 2023.9.11-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -265,7 +265,8 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			-- The MTB version is NOT stored in a user accessable location so that it cannot be super easily manually edited.
 			set currentMTBversion to doShellScriptAsAdmin("cat '/private/var/root/.mtbVersion'") -- If the file doesn't exist, it's older than 20220726 which was the first version to include this file (version 20220705 stored the file at "/Users/Shared/.mtbVersion" and no MTB version file existed before that).
 			
-			if (currentMTBversion is not equal to "20230113") then error "OUTDATED"
+			set validMTBversions to {"20230707"}
+			if (validMTBversions does not contain currentMTBversion) then error "OUTDATED"
 		on error
 			set serialNumber to ""
 			try
@@ -292,7 +293,7 @@ fi
 					activate
 				end try
 				try
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 				end try
 				display alert ("
 This " & thisDriveName & " Drive Is Outdated") message ("Deliver this " & thisDriveName & " drive to Free Geek I.T.
@@ -307,7 +308,7 @@ This " & thisDriveName & " Drive Is Outdated") message ("Deliver this " & thisDr
 					activate
 				end try
 				try
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 				end try
 				try
 					display alert ("This " & thisDriveName & " Drive Is Outdated") message ("But, this is the SOURCE MTB drive so nothing will be deleted.
@@ -516,7 +517,7 @@ echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to
 	
 	-- HIDE ADMIN USER
 	try
-		if ((do shell script ("dscl -plist . -read /Users/" & adminUsername & " IsHidden | xmllint --xpath '//string[1]/text()' -; exit 0")) is not equal to "1") then
+		if ((do shell script ("dscl -plist . -read /Users/" & adminUsername & " IsHidden | xmllint --xpath 'string(//string)' -; exit 0")) is not equal to "1") then
 			doShellScriptAsAdmin("dscl . -create /Users/" & adminUsername & " IsHidden 1")
 		end if
 	end try
@@ -698,8 +699,28 @@ killall ControlStrip
 			set currentHIToolboxAppleDictationAutoEnable to (do shell script "defaults read com.apple.HIToolbox AppleDictationAutoEnable")
 		end try
 		
-		if ((currentHIToolboxAppleDictationAutoEnable is not equal to "0")) then
+		if (currentHIToolboxAppleDictationAutoEnable is not equal to "0") then
 			do shell script "defaults write com.apple.HIToolbox AppleDictationAutoEnable -int 0"
+		end if
+	end try
+	
+	-- SET MACTRACKER TO OPEN TO "This Mac" SECTION AND TO NOT SHOW ALERT IF THE MODEL ID MATCHED MULTIPLE MODELS ON FIRST OPEN OF THE "This Mac" SECTION
+	try
+		set currentMactrackerWindowLocations to "UNKNOWN"
+		try
+			set currentMactrackerWindowLocations to (do shell script "defaults read 'com.mactrackerapp.Mactracker' 'WindowLocations'")
+		end try
+		
+		set currentMactrackerMultipleFindMyMac to "UNKNOWN"
+		try
+			set currentMactrackerMultipleFindMyMac to (do shell script "defaults read 'com.mactrackerapp.Mactracker' 'MultipleFindMyMac'")
+		end try
+		
+		if ((currentMactrackerWindowLocations does not contain "LastSelection = 2;") or (currentHIToolboxAppleDictationAutoEnable is not equal to "0")) then
+			do shell script "
+defaults write 'com.mactrackerapp.Mactracker' 'WindowLocations' -dict 'MainWindow' \"$(echo '<dict/>' | plutil -insert 'LastSelection' -integer '2' -o - -)\"
+defaults write 'com.mactrackerapp.Mactracker' 'MultipleFindMyMac' -bool false
+"
 		end if
 	end try
 	
@@ -747,10 +768,9 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 	
 	tell application id "com.apple.systemevents"
 		try
-			set currentDriveName to (name of startup disk)
-			if (currentDriveName is not equal to thisDriveName) then
-				doShellScriptAsAdmin("/usr/sbin/diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of thisDriveName))
-				if (isCatalinaOrNewer) then doShellScriptAsAdmin("/usr/sbin/diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (thisDriveName & " - Data")))
+			if ((name of startup disk) is not equal to thisDriveName) then
+				tell me to doShellScriptAsAdmin("diskutil rename / " & (quoted form of thisDriveName))
+				if (isCatalinaOrNewer) then tell me to doShellScriptAsAdmin("diskutil rename /System/Volumes/Data " & (quoted form of (thisDriveName & " - Data")))
 			end if
 		end try
 		
@@ -790,18 +810,18 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 								set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & thisWiFiInterfaceID)
 								set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 								if (getWiFiNetworkColonOffset > 0) then
-									set (end of preferredWirelessNetworks) to ("	" & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
+									set (end of preferredWirelessNetworks) to (tab & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
 								end if
 							end try
 							repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
-								if (thisPreferredWirelessNetwork starts with "	") then
+								if (thisPreferredWirelessNetwork starts with tab) then
 									set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 									if ((thisPreferredWirelessNetwork is not equal to "FG Reuse") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
 										try
 											do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
 										end try
 										try
-											doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
+											tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
 										end try
 										set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 									end if
@@ -813,7 +833,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 						end try
 						try
 							-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-							doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
+							tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
 						end try
 					end if
 				end repeat
@@ -835,7 +855,9 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 		end try
 	end repeat
 	
-	doShellScriptAsAdmin("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO")
+	try
+		doShellScriptAsAdmin("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO")
+	end try
 	
 	try
 		do shell script "defaults delete eficheck; tccutil reset SystemPolicyAllFiles"
@@ -1018,7 +1040,7 @@ killall usernoted
 	end try
 	
 	try
-		if (application id "com.apple.TMHelperAgent" is running) then
+		if (application "/System/Library/CoreServices/backupd.bundle/Contents/Resources/TMHelperAgent.app" is running) then -- if application id "com.apple.TMHelperAgent" is used then compilation could fail if TMHelperAgent hasn't been run yet this boot.
 			repeat 60 times
 				set clickedDontUseButton to false
 				with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
@@ -1042,7 +1064,7 @@ killall usernoted
 		end if
 	end try
 	
-	if ((year of the (current date)) < 2022) then
+	if ((year of the (current date)) < 2023) then
 		try
 			doShellScriptAsAdmin("systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on")
 		end try
@@ -1245,11 +1267,16 @@ on doShellScriptAsAdmin(command)
 	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
 	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
 	
-	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+	set currentDate to (current date)
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or (currentDate ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
 		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
-		set lastDoShellScriptAsAdminAuthDate to (current date)
+		set lastDoShellScriptAsAdminAuthDate to currentDate -- Set lastDoShellScriptAsAdminAuthDate to date *BEFORE* command was run since the command itself could have updated the date and the 5 minute timeout started when the command started, not when it finished.
 	else
-		set commandOutput to (do shell script command with administrator privileges)
+		set commandOutput to (do shell script command with prompt "This “" & (name of me) & "” password prompt should not have been displayed.
+
+Please inform Free Geek I.T. that you saw this password prompt.
+
+You can just press “Cancel” below to continue." with administrator privileges)
 	end if
 	
 	return commandOutput

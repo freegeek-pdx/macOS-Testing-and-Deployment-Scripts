@@ -66,6 +66,21 @@ else
 	echo 'FAILED TO RETRIEVE LATEST DRIVEDX VERSION'
 fi
 
+latest_mactracker_version="$(curl -m 5 -sfL 'https://update.mactracker.ca/appcast-b.xml' | xmllint --xpath 'string(//enclosure/@*[name()="sparkle:version"])' -)"
+if [[ -n "${latest_mactracker_version}" ]]; then
+	latest_mactracker_zip_path="${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/darwin-all-versions/Mactracker ${latest_mactracker_version}.zip"
+	if [[ -f "${latest_mactracker_zip_path}" ]]; then
+		echo "Mactracker ${latest_mactracker_version} ZIP Is Up-to-Date"
+	else
+		rm -f "${PROJECT_DIR}/Package Resources/User/fg-demo/Apps/darwin-all-versions/Mactracker"*'.zip'
+		echo "Downloading Mactracker ${latest_mactracker_version}..."
+		mkdir -p "${latest_mactracker_zip_path%/*}"
+		curl --connect-timeout 5 --progress-bar -fL "https://mactracker.ca/downloads/Mactracker_${latest_mactracker_version}.zip" -o "${latest_mactracker_zip_path}"
+	fi
+else
+	echo 'FAILED TO RETRIEVE LATEST MACTRACKER VERSION'
+fi
+
 # Download the latest Geekbench 6 for macOS 11 Big Sur and newer.
 geekbench_download_url="$(curl -m 5 -sfL 'https://www.geekbench.com/download/mac/' | xmllint --html --xpath 'string(//a[contains(@href,"Mac.zip")]/@href)' - 2> /dev/null)"
 latest_geekbench_version="$(echo "${geekbench_download_url}" | cut -d '-' -f 2)"

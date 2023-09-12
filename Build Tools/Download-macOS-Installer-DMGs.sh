@@ -23,14 +23,17 @@ readonly MIST_PATH='/usr/local/bin/mist'
 
 installer_dmgs_path="${HOME}/Documents/Programming/Free Geek/MacLand Images/macOS Installers"
 
-declare -a installer_names_to_download=( 'Big Sur' 'Monterey' 'Ventura' ) # NOT including 'High Sierra' 'Mojave' 'Catalina' anymore since the latest installers are already downloaded and they will never get any new updates.
+declare -a installer_names_to_download=( 'Big Sur' 'Monterey' 'Ventura' 'Sonoma beta' ) # NOT including 'High Sierra' 'Mojave' 'Catalina' anymore since the latest installers are already downloaded and they will never get any new updates.
 
 for this_installer_name_to_download in "${installer_names_to_download[@]}"; do
+	catalog_url='https://swscan.apple.com/content/catalogs/others/index-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog'
+
 	mist_list_options=( 'list' 'installer' "${this_installer_name_to_download}" )
 	if [[ "${this_installer_name_to_download}" == *' beta' ]]; then
+		catalog_url='https://swscan.apple.com/content/catalogs/others/index-14seed-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz'
 		mist_list_options+=( '-b' )
 	fi
-	mist_list_options+=( '-lqo' 'json' )
+	mist_list_options+=( '-c' "${catalog_url}" '-lqo' 'json' )
 
 	this_installer_info_json="$("${MIST_PATH}" "${mist_list_options[@]}")"
 
@@ -54,11 +57,11 @@ function run(argv) {
 			echo "\"${this_installer_dmg_name}\" needs to be downloaded..."
 			rm -f "${installer_dmgs_path}/Install ${this_installer_info[0]} "*'.dmg' # Delete any outdated installer dmgs.
 
-			mist_download_options=( 'download' 'installer' "${this_installer_info[0]}" 'image' )
+			mist_download_options=( 'download' 'installer' "${this_installer_info[2]}" 'image' )
 			if [[ "${this_installer_name_to_download}" == *' beta' ]]; then
 				mist_download_options+=( '-b' )
 			fi
-			mist_download_options+=( '-o' "${installer_dmgs_path}" )
+			mist_download_options+=( '-c' "${catalog_url}" '-o' "${installer_dmgs_path}" )
 
 			sudo "${MIST_PATH}" "${mist_download_options[@]}"
 		fi

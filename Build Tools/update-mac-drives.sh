@@ -29,7 +29,7 @@ if (( ${EUID:-$(id -u)} != 0 )); then
 fi
 
 
-declare -a installer_names_to_update=( 'High Sierra' 'Mojave' 'Catalina' 'Big Sur' 'Monterey' 'Ventura' )
+declare -a installer_names_to_update=( 'High Sierra' 'Mojave' 'Catalina' 'Big Sur' 'Monterey' 'Ventura' 'Sonoma beta' )
 
 for this_installer_name_to_update in "${installer_names_to_update[@]}"; do
 	found_connected_installer_for_os=false

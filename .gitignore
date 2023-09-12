@@ -19,6 +19,7 @@
 
 # Ignore if name starts with in any location:
 OLD-*
+UNUSED-*
 
 # Ignore in "Build Tools":
 Free\ Geek\ Passwords.plist

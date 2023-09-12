@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.2.17-1
+-- Version: 2023.7.7-3
 
 -- App Icon is “Donut” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -996,7 +996,7 @@ if (shouldRunGPUStressTest) then
 							set screenshotDate to (do shell script "date +'%F at %-I.%M.%S %p'")
 							do shell script "mkdir " & (quoted form of picturesFolderPath) & "; /usr/sbin/screencapture -x " & (quoted form of (picturesFolderPath & (name of me) & " Completed - Screen Shot " & screenshotDate & ".png")) & " " & (quoted form of (picturesFolderPath & (name of me) & " Completed (2nd Screen) - Screen Shot " & screenshotDate & ".png"))
 							try
-								do shell script "afplay /System/Library/Sounds/Glass.aiff"
+								do shell script "afplay /System/Library/Sounds/Glass.aiff > /dev/null 2>&1 &"
 							end try
 						on error (errorMessage) number (errorNumber)
 							if (errorNumber is equal to -128) then error errorMessage number errorNumber
@@ -1056,7 +1056,7 @@ if (shouldRunGPUStressTest) then
 						set screenshotDate to (do shell script "date +'%F at %-I.%M.%S %p'")
 						do shell script "mkdir " & (quoted form of picturesFolderPath) & "; /usr/sbin/screencapture -x " & (quoted form of (picturesFolderPath & (name of me) & " Failed 1 - Screen Shot " & screenshotDate & ".png")) & " " & (quoted form of (picturesFolderPath & (name of me) & " Failed 1 (2nd Screen) - Screen Shot " & screenshotDate & ".png"))
 						try
-							do shell script "afplay /System/Library/Sounds/Basso.aiff"
+							do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 						end try
 					on error (errorMessage) number (errorNumber)
 						if (errorNumber is equal to -128) then error errorMessage number errorNumber
@@ -1138,7 +1138,7 @@ if (shouldRunGPUStressTest) then
 					end timeout
 				end try
 				try
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 				end try
 				try
 					activate

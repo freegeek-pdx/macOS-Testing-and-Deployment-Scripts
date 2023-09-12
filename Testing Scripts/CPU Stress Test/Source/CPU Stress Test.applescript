@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.2.17-1
+-- Version: 2023.7.7-3
 
 -- App Icon is “Brain” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -586,7 +586,7 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 	try
 		if (cpuTestStatus is equal to "Passed") then
 			try
-				do shell script "afplay /System/Library/Sounds/Glass.aiff"
+				do shell script "afplay /System/Library/Sounds/Glass.aiff > /dev/null 2>&1 &"
 			end try
 			try
 				activate
@@ -596,7 +596,7 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 			exit repeat
 		else if (cpuTestStatus is equal to "Failed") then
 			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			try
 				activate
@@ -610,7 +610,7 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 ‼️ CONSULT INSTRUCTOR BEFORE CONTINUING ‼️" buttons {"Quit", "Start Over"} cancel button 1 default button 2 as critical
 		else if (cpuTestStatus is equal to "Incomplete") then
 			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			try
 				activate
@@ -622,7 +622,7 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 " buttons {"Quit", "Start Over"} cancel button 1 default button 2 as critical
 		else if (cpuTestStatus is equal to "No Longer Running") then
 			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			try
 				activate
@@ -638,7 +638,7 @@ This Mac has " & processorsDisplayCount & " with a total of " & processorTotalCo
 " buttons {"Quit", "Start Over"} cancel button 1 default button 2 as critical
 		else if (cpuTestStatus is equal to "Stopped") then
 			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			try
 				activate

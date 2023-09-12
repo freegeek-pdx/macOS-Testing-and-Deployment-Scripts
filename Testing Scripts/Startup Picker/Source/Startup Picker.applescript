@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.3.10-1
+-- Version: 2023.9.12-2
 
 -- App Icon is “Green Apple” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -149,6 +149,8 @@ considering numeric strings
 	set isBigSurOrNewer to (systemVersion ≥ "11.0")
 	set isMontereyOrNewer to (systemVersion ≥ "12.0")
 	set isVenturaOrNewer to (systemVersion ≥ "13.0")
+	set isVenturaThirteenDotThreeOrNewer to (systemVersion ≥ "13.3")
+	set isSonomaOrNewer to (systemVersion ≥ "14.0")
 end considering
 
 if (isMojaveOrNewer) then
@@ -490,7 +492,7 @@ repeat
 			activate
 		end try
 		try
-			do shell script "afplay /System/Library/Sounds/Basso.aiff"
+			do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 		end try
 		try
 			set noStartupDisksTitle to "
@@ -536,7 +538,7 @@ Are you sure you want to set “" & chosenStartupDiskName & "” as the startup 
 					activate
 				end try
 				try
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 				end try
 				try
 					display alert "
@@ -568,6 +570,9 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 	end considering
 	
 	if ((not didSetStartUpDisk) and (not didNotTryToSetStartupDisk)) then
+		set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
+		set securityAgentID to (id of application securityAgentPath)
+		
 		repeat 15 times
 			try
 				with timeout of 1 second
@@ -591,9 +596,6 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 						if ((name of window 1) is "Startup Disk") then exit repeat
 					end repeat
 				end tell
-				
-				set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
-				set securityAgentID to (id of application securityAgentPath)
 				
 				if (isCatalinaOrNewer and (not isVenturaOrNewer)) then
 					-- On Catalina, a SecurityAgent alert with "System Preferences wants to make changes." will appear IF an Encrypted Disk is present.
@@ -652,7 +654,11 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
-								set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								if (isSonomaOrNewer) then
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								else
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								end if
 								set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
 								if (numberOfStartupDisks is not 0) then
 									delay 3 -- Wait a few more seconds for disks to load since it's possible that not all startup disks are actually loaded yet.
@@ -683,13 +689,17 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 					end tell
 					
 					if (not didSetStartUpDisk) then -- If it's already selected, no need to unlock and re-select it.
-						set didAuthenticateSecurityAgent to false
+						set didAuthenticateStartupDisk to false
 						
 						repeat numberOfStartupDisks times -- The loop should be exited before even getting through numberOfStartupDisks, but want some limit so we don't get stuck in an infinite loop if something goes very wrong.
 							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 								-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
 								set frontmost to true
-								set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								if (isSonomaOrNewer) then
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								else
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								end if
 								set focused of (scroll area 1 of startupDisksSelectionGroup) to true
 								set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
 								repeat 5 times -- Click up to 5 times until the selected startup disk changed (in case some clicks get lost)
@@ -700,58 +710,156 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 								end repeat
 							end tell
 							
-							if (not didAuthenticateSecurityAgent) then
-								set didTryToAuthenticateSecurityAgent to false
-								repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
-									delay 1
-									try
-										if (application securityAgentPath is running) then
-											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
-												if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
-													repeat with thisSecurityAgentButton in (buttons of window 1)
-														if (((title of thisSecurityAgentButton) is equal to "Unlock") or ((title of thisSecurityAgentButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
-															set value of (text field 1 of window 1) to adminUsername
-															set value of (text field 2 of window 1) to adminPassword
-															click thisSecurityAgentButton
-															set didTryToAuthenticateSecurityAgent to true
-															exit repeat
-														end if
-													end repeat
+							if (not didAuthenticateStartupDisk) then
+								set didTryToAuthenticateStartupDisk to false
+								if (isVenturaThirteenDotThreeOrNewer) then
+									-- Starting on macOS 13.3 Ventura, the System Settings password authentication prompt is now handled by "LocalAuthenticationRemoteService" XPC service within a regular sheet of the System Setting app instead of the "SecurityAgent.bundle" which presented a separate app prompt window.
+									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+										repeat 60 times -- Wait for password prompt
+											delay 0.5
+											set frontmost to true
+											if ((number of sheets of window (number of windows)) is equal to 1) then exit repeat
+											delay 0.5
+										end repeat
+										
+										if ((number of sheets of window (number of windows)) is equal to 1) then
+											repeat with thisSheetButton in (buttons of sheet 1 of window (number of windows))
+												if (((name of thisSheetButton) is equal to "Unlock") or ((name of thisSheetButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
+													set value of (text field 1 of sheet 1 of window (number of windows)) to adminUsername
+													set value of (text field 2 of sheet 1 of window (number of windows)) to adminPassword
+													click thisSheetButton
+													set didTryToAuthenticateStartupDisk to true
+													exit repeat
 												end if
-												exit repeat
-											end tell
+											end repeat
 										end if
-									end try
-								end repeat
-								if (didTryToAuthenticateSecurityAgent) then
-									repeat 10 times -- Wait up to 10 seconds for SecurityAgent to exit or close the admin auth prompt to be sure the authentication was successful.
+									end tell
+									
+									if (isSonomaOrNewer) then -- On macOS 14 Sonoma beta 1 through RC, ANOTHER standalone SecurityAgent auth prompt comes up AFTER the initial LocalAuthenticationRemoteService XPC sheet prompt WHEN RUNNING AS A STANDARD USER.
+										set didTryToAuthenticateStartupDisk to false
+										repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
+											delay 1
+											try
+												if (application securityAgentPath is running) then
+													tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+														if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
+															repeat with thisSecurityAgentButton in (buttons of window 1)
+																if ((title of thisSecurityAgentButton) is equal to "OK") then
+																	set value of (text field 1 of window 1) to adminUsername
+																	set value of (text field 2 of window 1) to adminPassword
+																	click thisSecurityAgentButton
+																	set didTryToAuthenticateStartupDisk to true
+																	exit repeat
+																end if
+															end repeat
+														end if
+														exit repeat
+													end tell
+												end if
+											end try
+										end repeat
+									end if
+								else
+									repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
 										delay 1
 										try
 											if (application securityAgentPath is running) then
 												tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
-													if ((number of windows) is 0) then
-														set didAuthenticateSecurityAgent to true
+													if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
+														repeat with thisSecurityAgentButton in (buttons of window 1)
+															if (((title of thisSecurityAgentButton) is equal to "Unlock") or ((title of thisSecurityAgentButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
+																set value of (text field 1 of window 1) to adminUsername
+																set value of (text field 2 of window 1) to adminPassword
+																click thisSecurityAgentButton
+																set didTryToAuthenticateStartupDisk to true
+																exit repeat
+															end if
+														end repeat
+													end if
+													exit repeat
+												end tell
+											end if
+										end try
+									end repeat
+								end if
+								
+								if (didTryToAuthenticateStartupDisk) then
+									repeat 10 times -- Wait up to 10 seconds for sheet to close on 13.3+ (of for SecurityAgent to exit or close the admin auth prompt on 13.2.1-) to be sure the authentication was successful.
+										delay 1
+										try
+											if (isVenturaThirteenDotThreeOrNewer) then
+												tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+													if ((number of sheets of window (number of windows)) is equal to 0) then
+														set didAuthenticateStartupDisk to true
 														exit repeat
 													end if
 												end tell
+												
+												if (isSonomaOrNewer) then -- See comments above about SECOND SecurityAgent auth prompt on macOS 14 Sonoma beta 1 through RC.
+													set didAuthenticateStartupDisk to false
+													if (application securityAgentPath is running) then
+														tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+															if ((number of windows) is 0) then
+																set didAuthenticateStartupDisk to true
+																exit repeat
+															end if
+														end tell
+													else
+														set didAuthenticateStartupDisk to true
+														exit repeat
+													end if
+												end if
 											else
-												set didAuthenticateSecurityAgent to true
-												exit repeat
+												if (application securityAgentPath is running) then
+													tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+														if ((number of windows) is 0) then
+															set didAuthenticateStartupDisk to true
+															exit repeat
+														end if
+													end tell
+												else
+													set didAuthenticateStartupDisk to true
+													exit repeat
+												end if
 											end if
 										end try
 									end repeat
 								end if
 							end if
 							
-							if (didAuthenticateSecurityAgent) then
+							if (didAuthenticateStartupDisk) then
 								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
-									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+									if (isSonomaOrNewer) then
+										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+									else
+										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+									end if
 									if ((enabled of button 1 of startupDisksSelectionGroup) and ((value of static text 2 of startupDisksSelectionGroup) ends with ("“" & chosenStartupDiskName & "”."))) then
 										set didSetStartUpDisk to true
 										exit repeat
 									end if
 								end tell
 							else
+								if (isVenturaThirteenDotThreeOrNewer) then
+									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+										if ((number of sheets of window (number of windows)) is equal to 1) then
+											set frontmost to true
+											key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
+										end if
+									end tell
+									
+									if (isSonomaOrNewer) then -- The SECOND SecurityAgent prompt on macOS 14 Sonoma beta 1 through RC DOES NOT close on its own when System Settings is quit.
+										if (application securityAgentPath is running) then
+											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+												if ((number of windows) is 1) then
+													set frontmost to true
+													key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
+												end if
+											end tell
+										end if
+									end if
+								end if -- Do not need to cancel the SecurityAgent prompt since it will just be closed when System Settings is quit and will not block quitting.
+								
 								exit repeat -- If did not authenticate, better to exit this loop and start all over with System Settings being quit and re-launched instead of continuing to arrow through the Startup Disks.
 							end if
 						end repeat
@@ -833,6 +941,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 											if ((name of thisSheetButton) is equal to "Unlock") then
 												set frontmost to true
 												click thisSheetButton
+												exit repeat
 											end if
 										end repeat
 										
@@ -931,11 +1040,11 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 	try
 		try
 			if (didSetStartUpDisk) then
-				do shell script "afplay /System/Library/Sounds/Glass.aiff"
+				do shell script "afplay /System/Library/Sounds/Glass.aiff > /dev/null 2>&1 &"
 			else if (didNotTryToSetStartupDisk) then
-				do shell script "afplay /System/Library/Sounds/Pop.aiff"
+				do shell script "afplay /System/Library/Sounds/Pop.aiff > /dev/null 2>&1 &"
 			else
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end if
 		end try
 		

@@ -5,7 +5,7 @@ get_marketing_model_name() {
 	##
 	## Created by Pico Mitchell (of Free Geek)
 	##
-	## Version: 2023.1.10-1
+	## Version: 2023.5.31-1
 	##
 	## MIT License
 	##
@@ -92,11 +92,16 @@ get_marketing_model_name() {
 
 		local load_fallback_marketing_model_name=false
 
-		if (( ${#SERIAL_NUMBER} >= 11 )); then
-			# The model part of the Serial Number is the last 4 characters for 12 character serials and the last 3 characters for 11 character serials (which are very old and shouldn't actually be encountered: https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/).
-			# Starting with the 2021 MacBook Pro models, randomized 10 character Serial Numbers are now used which do not have any model specific characters, but those Macs will never get here or need to load the Marketing Model Name over the internet since they are Apple Silicon and the local Marketing Model Name will have been retrieved above.
-			local model_characters_of_serial_number="${SERIAL_NUMBER:8}"
+		if [[ -n "${SERIAL_NUMBER}" ]]; then
 			local marketing_model_name_was_cached=false
+
+			local serial_config_code=''
+			local serial_number_length="${#SERIAL_NUMBER}"
+			if (( serial_number_length == 11 || serial_number_length == 12 )); then
+				# The Configuration Code part of the Serial Number which indicates the model is the last 4 characters for 12 character serials and the last 3 characters for 11 character serials (which are very old and shouldn't actually be encountered: https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/).
+				# Starting with the 2021 MacBook Pro models, randomized 10 character Serial Numbers are now used which do not have any model specific characters, but those Macs will never get here or need to load the Marketing Model Name over the internet since they are Apple Silicon and the local Marketing Model Name will have been retrieved above.
+				serial_config_code="${SERIAL_NUMBER:8}"
+			fi
 
 			local logged_in_user_id
 			logged_in_user_id="$(echo 'show State:/Users/ConsoleUser' | scutil | awk '(($1 == "Name") && (($NF == "loginwindow") || ($NF ~ /^_/))) { exit } ($1 == "UID") { print $NF; exit }')"
@@ -105,7 +110,7 @@ get_marketing_model_name() {
 			# Both of those scenarios could be mistaken for the "root" user actually being logged in graphically if the "stat" technique is used instead of "scutil".
 			# Using "scutil" (with some "awk" filtering) can do better in both of those situations vs using "stat" to be able to return an empty string early on boot and at the login window while correctly returning the logged in user UID when a user is actually logged in (even if that is actually the root user).
 			# Early on boot (before getting to the login window), "echo 'show State:/Users/ConsoleUser' | scutil" will return "No such key" so an empty string will be returned after piping to "awk" since no "UID" field would be found.
-			# When at the intial boot login window, there will be no top level "Name" or "UID" fields, but there will be "SessionInfo" array with either the "root" user (UID 0) indicated on macOS 10.14 Mojave and older or "_windowserver" user (UID 88)
+			# When at the initial boot login window, there will be no top level "Name" or "UID" fields, but there will be "SessionInfo" array with either the "root" user (UID 0) indicated on macOS 10.14 Mojave and older or "_windowserver" user (UID 88)
 			# indicated on macOS 10.15 Catalina and newer, but those "SessionInfo" fields are NOT checked by this code. So an empty string will be properly returned when at the initial boot login window after piping to "awk".
 			# When at the login window after a user has logged out, the top level "Name" will be "loginwindow" (and "UID" will be "0") on macOS 10.15 Catalina and newer so we want to ignore it and return an empty string so that the "root" user is not
 			# considered to be logged in at the login window (on macOS 10.14 Mojave and older, the same info as the initial boot login window as described above is also shown after logout which will also result in an empty string being properly returned).
@@ -119,83 +124,91 @@ get_marketing_model_name() {
 			fi
 
 			local logged_in_user_name=''
-			if ! $is_logged_in_as_root && (( ${EUID:-$(id -u)} == 0 )); then
-				# If running as root (but not logged in graphically as root), check for the cached Marketing Model Name from the logged in user, if a user is logged it.
-				# If not found or no user is logged in, check for the cached Marketing Model Name from other users with home folders within "/Users".
-				# If runnning as root and the root user is graphically logged in (which is rare but possible), only their preferences will be checked (and cached to) just like any other running user (even though they could technically check other users preferences).
+			if [[ -n "${serial_config_code}" ]]; then
+				if ! $is_logged_in_as_root && (( ${EUID:-$(id -u)} == 0 )); then
+					# If running as root (but not logged in graphically as root), check for the cached Marketing Model Name from the logged in user, if a user is logged it.
+					# If not found or no user is logged in, check for the cached Marketing Model Name from other users with home folders within "/Users".
+					# If runnning as root and the root user is graphically logged in (which is rare but possible), only their preferences will be checked (and cached to) just like any other running user (even though they could technically check other users preferences).
 
-				if [[ -n "${logged_in_user_id}" ]]; then
-					logged_in_user_name="$(dscl /Search -search /Users UniqueID "${logged_in_user_id}" 2> /dev/null | awk '{ print $1; exit }')"
-				fi
+					if [[ -n "${logged_in_user_id}" ]]; then
+						logged_in_user_name="$(dscl /Search -search /Users UniqueID "${logged_in_user_id}" 2> /dev/null | awk '{ print $1; exit }')"
+					fi
 
-				if [[ -n "${logged_in_user_name}" ]]; then # Always check cached preferences for logged in user first so that we know whether or not it needs to be cached for the logged in user if it is already cached for another user.
-					if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING LOGGED IN USER ${logged_in_user_name} DEFAULTS"; fi
-					# Since "defaults read" has no option to traverse into keys of dictionary values, use the whole "defaults export" output and parse it with "PlistBuddy" to get at the specific key of the "CPU Names" dictionary value that we want.
-					# Using "defaults export" instead of accessing the plist file directly with "PlistBuddy" is important since preferences are not guaranteed to be written to disk if they were just set.
-					possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${model_characters_of_serial_number}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${logged_in_user_id}" sudo -u "${logged_in_user_name}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)"
+					if [[ -n "${logged_in_user_name}" ]]; then # Always check cached preferences for logged in user first so that we know whether or not it needs to be cached for the logged in user if it is already cached for another user.
+						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING LOGGED IN USER ${logged_in_user_name} DEFAULTS"; fi
+						# Since "defaults read" has no option to traverse into keys of dictionary values, use the whole "defaults export" output and parse it with "PlistBuddy" to get at the specific key of the "CPU Names" dictionary value that we want.
+						# Using "defaults export" instead of accessing the plist file directly with "PlistBuddy" is important since preferences are not guaranteed to be written to disk if they were just set.
+						possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${serial_config_code}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${logged_in_user_id}" sudo -u "${logged_in_user_name}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)"
+
+						if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
+							if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM LOGGED IN USER ${logged_in_user_name} CACHE"; fi
+							marketing_model_name="${possible_marketing_model_name}"
+							marketing_model_name_was_cached=true
+						fi
+					fi
+
+					if [[ -z "${marketing_model_name}" ]]; then # If was not cached for logged in user, check other users with home folders in "/Users" (there could technically users with home folders in other locations, but this is thorough enough for normal scenarios).
+						local this_home_folder
+						local user_name_for_home
+						local user_id_for_home
+						for this_home_folder in '/Users/'*; do
+							if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
+								user_name_for_home="$(dscl /Search -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
+
+								if [[ -n "${user_name_for_home}" ]]; then
+									user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath 'string(//string)' - 2> /dev/null)"
+
+									if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' && "${user_name_for_home}" != "${logged_in_user_name}" ]]; then # No need to check logged in user in this loop since it was already checked.
+										if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING ${this_home_folder} DEFAULTS"; fi
+										possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${serial_config_code}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${user_id_for_home}" sudo -u "${user_name_for_home}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
+
+										if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
+											if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM ${this_home_folder} CACHE"; fi
+											marketing_model_name="${possible_marketing_model_name}"
+
+											if [[ -z "${logged_in_user_name}" ]]; then # DO NOT consider the Marketing Model Name cached if there is a logged in user that it was not cached for so that it can be cached to the logged in user.
+												marketing_model_name_was_cached=true
+											elif $VERBOSE_LOGGING; then
+												>&2 echo 'DEBUG - NOT CONSIDERING IT CACHED SINCE THERE IS A LOGGED IN USER'
+											fi
+
+											break
+										fi
+									elif $VERBOSE_LOGGING; then
+										>&2 echo "DEBUG - SKIPPING ${this_home_folder} SINCE IS LOGGED IN USER"
+									fi
+								fi
+							fi
+						done
+					fi
+				else # If running as a user, won't be able to check others home folders, so only check running user preferences.
+					if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING RUNNING USER $(id -un) DEFAULTS"; fi
+					possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${serial_config_code}-en-US_US" /dev/stdin <<< "$(defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
 
 					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM LOGGED IN USER ${logged_in_user_name} CACHE"; fi
+						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM RUNNING USER $(id -un) CACHE"; fi
 						marketing_model_name="${possible_marketing_model_name}"
 						marketing_model_name_was_cached=true
 					fi
 				fi
-
-				if [[ -z "${marketing_model_name}" ]]; then # If was not cached for logged in user, check other users with home folders in "/Users" (there could technically users with home folders in other locations, but this is thorough enough for normal scenarios).
-					local this_home_folder
-					local user_name_for_home
-					local user_id_for_home
-					for this_home_folder in '/Users/'*; do
-						if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
-							user_name_for_home="$(dscl /Search -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
-
-							if [[ -n "${user_name_for_home}" ]]; then
-								user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)"
-
-								if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' && "${user_name_for_home}" != "${logged_in_user_name}" ]]; then # No need to check logged in user in this loop since it was already checked.
-									if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING ${this_home_folder} DEFAULTS"; fi
-									possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${model_characters_of_serial_number}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${user_id_for_home}" sudo -u "${user_name_for_home}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
-
-									if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-										if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM ${this_home_folder} CACHE"; fi
-										marketing_model_name="${possible_marketing_model_name}"
-
-										if [[ -z "${logged_in_user_name}" ]]; then # DO NOT consider the Marketing Model Name cached if there is a logged in user that it was not cached for so that it can be cached to the logged in user.
-											marketing_model_name_was_cached=true
-										elif $VERBOSE_LOGGING; then
-											>&2 echo 'DEBUG - NOT CONSIDERING IT CACHED SINCE THERE IS A LOGGED IN USER'
-										fi
-
-										break
-									fi
-								elif $VERBOSE_LOGGING; then
-									>&2 echo "DEBUG - SKIPPING ${this_home_folder} SINCE IS LOGGED IN USER"
-								fi
-							fi
-						fi
-					done
-				fi
-			else # If running as a user, won't be able to check others home folders, so only check running user preferences.
-				if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING RUNNING USER $(id -un) DEFAULTS"; fi
-				possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${model_characters_of_serial_number}-en-US_US" /dev/stdin <<< "$(defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
-
-				if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-					if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM RUNNING USER $(id -un) CACHE"; fi
-					marketing_model_name="${possible_marketing_model_name}"
-					marketing_model_name_was_cached=true
-				fi
 			fi
 
-			if [[ -z "${marketing_model_name}" ]]; then
+			if [[ -z "${marketing_model_name}" && -n "${serial_config_code}" ]]; then
 				local marketing_model_name_xml
-				marketing_model_name_xml="$(curl -m 5 -sfL "https://support-sp.apple.com/sp/product?cc=${model_characters_of_serial_number}" 2> /dev/null)"
+				marketing_model_name_xml="$(curl -m 5 -sfL "https://support-sp.apple.com/sp/product?cc=${serial_config_code}" 2> /dev/null)"
 
 				if [[ "${marketing_model_name_xml}" == '<?xml'* ]]; then
-					possible_marketing_model_name="$(echo "${marketing_model_name_xml}" | xmllint --xpath '//configCode/text()' - 2> /dev/null)"
+					possible_marketing_model_name="$(echo "${marketing_model_name_xml}" | xmllint --xpath 'normalize-space(//configCode)' - 2> /dev/null)"
 
 					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
 						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM \"About This Mac\" URL API: ${possible_marketing_model_name}"; fi
 						marketing_model_name="${possible_marketing_model_name}"
+
+						if [[ "${marketing_model_name}" != *[[:digit:]]* ]]; then
+							# If Marketing Model Name does not contain a digit, the "About This Mac" URL API may have just returned the Short Model Name, such as how "MacBook Air" will only be returned for *SOME* 2013 "MacBookAir6,1" or "MacBookAir6,2" serials),
+							# But, the "Specs Search" URL API will retrieve the proper full Marketing Model Name of "MacBook Air (11-inch, Mid 2013)" for the 2013 "MacBookAir6,1" and "MacBook Air (13-inch, Mid 2013)" for the 2013 "MacBookAir6,2", so fallback to using that if there are no digits in the Marketing Model Name.
+							load_fallback_marketing_model_name=true
+						fi
 					else
 						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - INVALID FROM \"About This Mac\" URL API (${possible_marketing_model_name:-N/A}): ${marketing_model_name_xml}"; fi
 
@@ -209,15 +222,16 @@ get_marketing_model_name() {
 
 			if $load_fallback_marketing_model_name || [[ -z "${marketing_model_name}" ]]; then
 				# The following URL API and JSON structure was discovered from examining how "https://support.apple.com/specs/${SERIAL_NUMBER}" loads the specs URL via JavaScript (as of August 9th, 2022 in case this breaks in the future).
-				# This alternate technique of getting the Marketing Model Name for a Serial Number from this URL API should not be necessary as the previous one should have always worked for valid serials,
-				# but including it here anyway just in case the older URL API stops working at some point and also as a reference for how this "Specs Search" URL method can be used.
+				# This alternate technique of getting the Marketing Model Name for a Serial Number from this "Specs Search" URL API should not be necessary as the previous one should have always worked for valid serials,
+				# but including it here anyway just in case the older "About This Mac" URL API stops working at some point and also as a reference for how this "Specs Search" URL API method can be used.
 				# Also worth noting that this technique also works for the new randomized 10 character serial numbers for Apple Silicon Macs, but the local Marketing Model Name will always be retrieved instead on Apple Silicon Macs.
+				# For more information about this "Specs Search" URL API, see: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_specs_url_from_serial.sh
 
 				local serial_search_results_json
-				serial_search_results_json="$(curl -m 5 -sfL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${SERIAL_NUMBER}" 2> /dev/null)"
+				serial_search_results_json="$(curl -m 10 -sfL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${SERIAL_NUMBER}" 2> /dev/null)" # I have seem this URL API timeout after 5 seconds when called multiple times rapidly (likely because of rate limiting), so give it a 10 second timeout which seems to always work.
 
 				if [[ "${serial_search_results_json}" == *'"id":'* ]]; then # A valid JSON structure containing an "id" key should always be returned, even for invalid serials.
-					possible_marketing_model_name="$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).name' -- "${serial_search_results_json}" 2> /dev/null)" # Parsing JSON with JXA: https://paulgalow.com/how-to-work-with-json-api-data-in-macos-shell-scripts & https://twitter.com/n8henrie/status/1529513429203300352
+					possible_marketing_model_name="$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).name.replace(/\s+/g, " ").trim()' -- "${serial_search_results_json}" 2> /dev/null)" # Parsing JSON with JXA: https://paulgalow.com/how-to-work-with-json-api-data-in-macos-shell-scripts & https://twitter.com/n8henrie/status/1529513429203300352
 
 					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
 						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM \"Specs Search\" URL API: ${possible_marketing_model_name}"; fi
@@ -236,13 +250,13 @@ get_marketing_model_name() {
 
 			if ! $load_fallback_marketing_model_name; then
 				if [[ -n "${marketing_model_name}" ]]; then
-					if ! $marketing_model_name_was_cached; then
+					if ! $marketing_model_name_was_cached && [[ -n "${serial_config_code}" ]]; then
 						# Cache the Marketing Model Name into the "About This Mac" preference key...
 							# for the running user (if not running as root, unless graphically logged in as root) if the Marketing Model Name was downloaded,
 							# OR if running as root, for the logged in user (if a user is logged in) and the Marketing Model Name was downloaded or was loaded from another users cache,
 							# OR for the first valid home folder detected within "/Users" if running as root and there is no user logged in and the Marketing Model Name was downloaded.
 
-						local cpu_name_key_for_serial="${model_characters_of_serial_number}-en-US_US"
+						local cpu_name_key_for_serial="${serial_config_code}-en-US_US"
 						local quoted_marketing_model_name_for_defaults
 						quoted_marketing_model_name_for_defaults="$([[ "${marketing_model_name}" =~ [\(\)] ]] && echo "'${marketing_model_name}'" || echo "${marketing_model_name}")"
 						# If the model contains parentheses, "defaults write" has trouble with it and the value needs to be specially quoted: https://apple.stackexchange.com/questions/300845/how-do-i-handle-e-g-correctly-escape-parens-in-a-defaults-write-key-val#answer-300853
@@ -259,7 +273,7 @@ get_marketing_model_name() {
 										user_name_for_home="$(dscl /Search -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
 
 										if [[ -n "${user_name_for_home}" ]]; then
-											user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null)"
+											user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath 'string(//string)' - 2> /dev/null)"
 
 											if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' ]]; then
 												user_id_for_cache="${user_id_for_home}"
@@ -301,7 +315,7 @@ get_marketing_model_name() {
 				fi
 			fi
 		else
-			marketing_model_name="${MODEL_IDENTIFIER} (Invalid Serial Number for Marketing Model Name)"
+			marketing_model_name="${MODEL_IDENTIFIER} (No Serial Number for Marketing Model Name)"
 			load_fallback_marketing_model_name=true
 		fi
 
@@ -332,7 +346,7 @@ get_marketing_model_name() {
 
 	if $INCLUDE_MODEL_PART_NUMBER && { $IS_APPLE_SILICON || [[ -n "$(ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1)" ]]; }; then # The "M####LL/A" style Model Part Number is only be accessible in software on Apple Silicon or T2 Macs.
 		local possible_model_part_number
-		possible_model_part_number="$(/usr/libexec/remotectl dumpstate | awk '($1 == "RegionInfo") { if ($NF == "=>") { region_info = "LL/A" } else { region_info = $NF } } ($1 == "ModelNumber") { print $NF region_info; exit }')" # I have seen a T2 Mac without any "RegionInfo" specified, so just assume "LL/A" (USA) in that case.
+		possible_model_part_number="$(/usr/libexec/remotectl dumpstate | awk '($1 == "RegionInfo") { if ($NF == "=>") { region_info = "LL/A" } else { region_info = $NF } } ($1 == "ModelNumber") { if ($NF ~ /\//) { print $NF } else { print $NF region_info } exit }')" # I have seen a T2 Mac without any "RegionInfo" specified, so just assume "LL/A" (USA) in that case.
 		if [[ "${possible_model_part_number}" == *'/'* ]]; then
 			marketing_model_name+=" / ${possible_model_part_number}"
 		fi

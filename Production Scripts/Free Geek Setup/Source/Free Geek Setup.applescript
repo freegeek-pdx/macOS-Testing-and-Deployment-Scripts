@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.3.10-1
+-- Version: 2023.9.12-2
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -145,6 +145,8 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		set isBigSurElevenDotThreeOrNewer to (systemVersion ≥ "11.3") -- For "nvram -c" on Apple Silicon
 		set isMontereyOrNewer to (systemVersion ≥ "12.0")
 		set isVenturaOrNewer to (systemVersion ≥ "13.0")
+		set isVenturaThirteenDotThreeOrNewer to (systemVersion ≥ "13.3")
+		set isSonomaOrNewer to (systemVersion ≥ "14.0")
 		
 		if (isHighSierraOrNewer and (not isMojaveOrNewer)) then
 			set osName to "macOS 10.13 High Sierra"
@@ -156,8 +158,10 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			set osName to "macOS 11 Big Sur"
 		else if (isMontereyOrNewer and (not isVenturaOrNewer)) then
 			set osName to "macOS 12 Monterey"
-		else if (isVenturaOrNewer and (systemVersion < "14.0")) then
+		else if (isVenturaOrNewer and (not isSonomaOrNewer)) then
 			set osName to "macOS 13 Ventura"
+		else if (isSonomaOrNewer and (systemVersion < "15.0")) then
+			set osName to "macOS 14 Sonoma"
 		end if
 	end considering
 	
@@ -235,27 +239,6 @@ killall ControlStrip
 		end if
 	end try
 	
-	-- Verify adminUsername can do admin things.
-	set adminCanDoAdminThings to false
-	try
-		set adminCanDoAdminThings to ("CAN DO ADMIN THINGS" is equal to doShellScriptAsAdmin("echo 'CAN DO ADMIN THINGS'"))
-	end try
-	
-	if (not adminCanDoAdminThings) then
-		try
-			activate
-		end try
-		try
-			do shell script "afplay /System/Library/Sounds/Basso.aiff"
-		end try
-		display alert "CRITICAL “" & (name of me) & "” ERROR:
-
-“" & adminUsername & "” Does Not Have Admin Privileges" message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Shut Down"} default button 1 as critical
-		tell application id "com.apple.systemevents" to shut down with state saving preference
-		quit
-		delay 10
-	end if
-	
 	try
 		(("/Users/Shared/.fgResetSnapshotLost" as POSIX file) as alias)
 		((("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app") as POSIX file) as alias)
@@ -313,6 +296,16 @@ killall ControlStrip
 		end try
 	end if
 	
+	set hasT2chip to false
+	try
+		set hasT2chip to ((do shell script "ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
+	end try
+	
+	set isAppleSilicon to false
+	try
+		set isAppleSilicon to ((do shell script "sysctl -in hw.optional.arm64") is equal to "1")
+	end try
+	
 	try
 		set globalTCCdbPath to "/Library/Application Support/com.apple.TCC/TCC.db" -- For more info about the TCC.db structure, see "fg-install-os" script and https://www.rainforestqa.com/blog/macos-tcc-db-deep-dive
 		set whereAllowedOrAuthValue to "allowed = 1"
@@ -320,8 +313,12 @@ killall ControlStrip
 		set globalTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of globalTCCdbPath) & " 'SELECT client,service FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the global TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access.
 		
 		set bundleIDofFreeGeekSetupApp to currentBundleIdentifier
+		set bundleIDofFreeGeekUpdaterApp to "org.freegeek.Free-Geek-Updater"
+		set bundleIDofFreeGeekSnapshotHelperApp to "org.freegeek.Free-Geek-Snapshot-Helper"
 		set bundleIDofFreeGeekDemoHelperApp to "org.freegeek.Free-Geek-Demo-Helper"
 		set bundleIDofCleanupAfterQACompleteApp to "org.freegeek.Cleanup-After-QA-Complete"
+		set bundleIDofKeyboardTestApp to "org.freegeek.Keyboard-Test"
+		set bundleIDofFreeGeekResetApp to "org.freegeek.Free-Geek-Reset"
 		
 		if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceAccessibility")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Accessibility Access")
 		if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceAccessibility")) then error "“Free Geek Demo Helper” DOES NOT HAVE REQUIRED Accessibility Access"
@@ -332,8 +329,36 @@ killall ControlStrip
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceSystemPolicyAllFiles")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access") -- This should not be possible to hit since reading the global TCC.db would have errored if this app didn't have FDA, but check anyways.
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Demo Helper” DOES NOT HAVE REQUIRED Full Disk Access"
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofCleanupAfterQACompleteApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Cleanup After QA Complete” DOES NOT HAVE REQUIRED Full Disk Access"
-			if (isBigSurOrNewer) then -- Free Geek Snapshot Helper IS NOT used on macOS 10.15 Catalina and older (it's only used on macOS 11 Big Sur and newer).
-				if (globalTCCallowedAppsAndServices does not contain ("org.freegeek.Free-Geek-Snapshot-Helper|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Snapshot Helper” DOES NOT HAVE REQUIRED Full Disk Access"
+			
+			set snapshotHelperIsInstalled to false
+			try
+				((("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app") as POSIX file) as alias)
+				set snapshotHelperIsInstalled to true -- MUST NOT check TCC permissions in this "try" since the "error" would get caught instead of being thrown to the parent "try".
+			end try
+			
+			set freeGeekResetIsInstalled to false
+			try
+				((("/Users/" & demoUsername & "/Applications/Free Geek Reset.app") as POSIX file) as alias)
+				set freeGeekResetIsInstalled to true -- MUST NOT check TCC permissions in this "try" since the "error" would get caught instead of being thrown to the parent "try".
+			end try
+			
+			if (snapshotHelperIsInstalled) then
+				-- "Free Geek Snapshot Helper" will be installed on macOS 10.15 Catalina and newer unless the Mac is not a T2 or Apple Silicon and running macOS 12 Monterey or newer which will use the "Erase All Content & Settings" reset via "Free Geek Reset" as described below.
+				
+				if (isBigSurOrNewer) then
+					-- When the Snapshot Reset is setup on macOS 10.15 Catalina and newer, "Free Geek Snapshot Helper" will always be installed, but it is only used to mount the reset Snapshot (which requires Full Disk Access) on macOS 11 Big Sur and newer, since mounting the Snapshot on macOS 10.15 Catalina does not help (see CAVEAT notes in "fg-snapshot-preserver" script).
+					-- But, it is still installed on macOS 10.15 Catalina to be used as an alert GUI if the reset Snapshot is lost which does not needs FDA TCC permissions, and no reset Snapshot was created on macOS 10.14 Mojave and older where a custom "fgreset" script used to be used instead (but we no longer install macOS 10.14 Mojave and older anyways).
+					
+					if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSnapshotHelperApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Snapshot Helper” DOES NOT HAVE REQUIRED Full Disk Access"
+				end if
+			else if (freeGeekResetIsInstalled and isMontereyOrNewer and (hasT2chip or isAppleSilicon)) then
+				-- "Free Geek Reset" will always be installed on macOS 10.15 Catalina or newer, but it only needs these TCC permissions on T2 or Apple Silicon Macs running macOS 12 Monterey or newer
+				-- since that is where "Erase Assistant" which can perform "Erase All Content & Settings" is available, which "Free Geek Reset" automates.
+				-- When running on pre-T2 Macs or when running macOS 11 Big Sur or older where "Erase All Content & Settings" is not available, "Free Geek Reset" will still be installed,
+				-- but it will just show instructions for the Snapshot Reset and allow auto-rebooting into recoverOS by setting an NVRAM key, which does not require these TCC permissions.
+				
+				if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekResetApp & "|kTCCServiceAccessibility")) then error "“Free Geek Reset” DOES NOT HAVE REQUIRED Accessibility Access"
+				if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekResetApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Reset” DOES NOT HAVE REQUIRED Full Disk Access"
 			end if
 			
 			set userTCCdbPath to ((POSIX path of (path to library folder from user domain)) & "Application Support/com.apple.TCC/TCC.db")
@@ -358,24 +383,37 @@ killall ControlStrip
 				if (userTCCallowedAppsAndServices does not contain (bundleIDofCleanupAfterQACompleteApp & "|kTCCServiceAppleEvents|" & bundleIDofFinderApp)) then error "“Cleanup After QA Complete” WAS NOT GRANTED REQUIRED AppleEvents/Automation Access for “Finder”"
 				
 				-- See comments below about both Microphone AND AppleEvents-QuickTime permissions for QA Helper.
-				if (userTCCallowedAppsAndServices does not contain (bundleIDofQAHelperApp & "|kTCCServiceMicrophone|UNUSED")) then set userTCCpermissionAlreadyGranted to false
-				if (userTCCallowedAppsAndServices does not contain (bundleIDofQAHelperApp & "|kTCCServiceAppleEvents|" & bundleIDofQuickTimeApp)) then set userTCCpermissionAlreadyGranted to false
+				if (userTCCallowedAppsAndServices does not contain (bundleIDofQAHelperApp & "|kTCCServiceMicrophone|UNUSED")) then error "“QA Helper” WAS NOT GRANTED REQUIRED Microphone Access"
+				if (userTCCallowedAppsAndServices does not contain (bundleIDofQAHelperApp & "|kTCCServiceAppleEvents|" & bundleIDofQuickTimeApp)) then error "“QA Helper” WAS NOT GRANTED REQUIRED AppleEvents/Automation Access for “System Events”"
 				if (not isBigSurOrNewer) then -- See comments below about QuickTime needing manual Microphone access on Mojave and Catalina, but not Big Sur and newer.
-					if (userTCCallowedAppsAndServices does not contain (bundleIDofQuickTimeApp & "|kTCCServiceMicrophone|UNUSED")) then set userTCCpermissionAlreadyGranted to false
+					if (userTCCallowedAppsAndServices does not contain (bundleIDofQuickTimeApp & "|kTCCServiceMicrophone|UNUSED")) then error "“QuickTime Player” WAS NOT GRANTED REQUIRED Microphone Access"
+				else if (isVenturaOrNewer and (not hasT2chip) and (not isAppleSilicon)) then
+					-- See comments below about apps unneccessarily prompting for Microphone on pre-T2 Macs running Ventura.
+					set userTCCunauthorizedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of userTCCdbPath) & " 'SELECT client,service FROM access WHERE (auth_value = 0)'"))) -- This SELECT command on the user TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access (but that should never happen because we couldn't get this far without FDA).
+					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceMicrophone")) then error "“Free Geek Setup” WAS NOT DENIED Microphone Access"
+					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekUpdaterApp & "|kTCCServiceMicrophone")) then error "“Free Geek Updater” WAS NOT DENIED Microphone Access"
+					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekSnapshotHelperApp & "|kTCCServiceMicrophone")) then error "“Free Geek Snapshot Helper” WAS NOT DENIED Microphone Access"
+					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceMicrophone")) then error "“Free Geek Demo Helper” WAS NOT DENIED Microphone Access"
+					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofCleanupAfterQACompleteApp & "|kTCCServiceMicrophone")) then error "“Cleanup After QA Complete” WAS NOT DENIED Microphone Access"
+					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofKeyboardTestApp & "|kTCCServiceMicrophone")) then error "“Keyboard Test” WAS NOT DENIED Microphone Access"
 				end if
 			on error checkUserTCCErrorMessage
 				if (didJustGrantUserTCC) then error checkUserTCCErrorMessage
 				
-				-- The following csreq (Code Signing Requirement) hex strings were generated by the "generate_csreq_hex_for_tcc_db.jxa" script in the "Other Scripts" folder.
+				-- The following csreq (Code Signing Requirement) hex strings were generated by https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/generate_csreq_hex_for_tcc_db.jxa
 				-- See comments in the "generate_csreq_hex_for_tcc_db.jxa" script for some important detailed information about these csreq hex strings (and https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
 				
 				-- The following apps are the CLIENT apps that will be sending AppleEvents (or accessing the Microphone).
 				-- Including the csreq for the client seems to NOT actually be required when initially setting the TCC permissions and macOS will fill them out when the app launches for the first time.
 				-- But, that would reduce security by allowing any app that's first to launch with the specified Bundle Identifier to be granted the specified TCC permissions (even though fraudulent apps spoofing our Bundle IDs isn't a risk in our environment).
 				set csreqForFreeGeekSetupApp to "fade0c00000000a80000000100000006000000020000001c6f72672e667265656765656b2e467265652d4765656b2d5365747570000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
+				set csreqForFreeGeekUpdaterApp to "fade0c00000000ac0000000100000006000000020000001e6f72672e667265656765656b2e467265652d4765656b2d557064617465720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
+				set csreqForFreeGeekSnapshotHelperApp to "fade0c00000000b4000000010000000600000002000000266f72672e667265656765656b2e467265652d4765656b2d536e617073686f742d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForFreeGeekDemoHelperApp to "fade0c00000000b0000000010000000600000002000000226f72672e667265656765656b2e467265652d4765656b2d44656d6f2d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForCleanupAfterQACompleteApp to "fade0c00000000b4000000010000000600000002000000266f72672e667265656765656b2e436c65616e75702d41667465722d51412d436f6d706c6574650000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
+				set csreqForKeyboardTestApp to "fade0c00000000a80000000100000006000000020000001a6f72672e667265656765656b2e4b6579626f6172642d546573740000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForQAHelperApp to "fade0c00000000a4000000010000000600000002000000166f72672e667265656765656b2e51412d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
+				set csreqForFreeGeekResetApp to "fade0c00000000a80000000100000006000000020000001c6f72672e667265656765656b2e467265652d4765656b2d5265736574000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				
 				-- The following apps are the TARGET (or INDIRECT OBJECT) apps that the clients will be sending AppleEvents to.
 				-- Like the csreq's for the client, they also seem to not actually be required for the target/indirect_object, BUT if the indirect_object_code_identity is omitted, the permissions DON'T show up in the TCC Automation section of System Preferences even though the permissions still work (tested on both Catalina and Monterey).
@@ -389,27 +427,49 @@ killall ControlStrip
 				
 				set currentUnixTime to (do shell script "date '+%s'")
 				
+				set footerFields to ""
+				if (isSonomaOrNewer) then set footerFields to (",NULL,NULL,'UNUSED'," & currentUnixTime)
+				
 				set setUserTCCpermissionsCommands to "BEGIN TRANSACTION;"
 				
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekSetupApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekSetupApp & "',NULL,0,'" & bundleIDofSystemEventsApp & "',X'" & csreqForSystemEventsApp & "',NULL," & currentUnixTime & ");")
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekSetupApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekSetupApp & "',NULL,0,'" & bundleIDofFinderApp & "',X'" & csreqForFinderApp & "',NULL," & currentUnixTime & ");")
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekSetupApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekSetupApp & "',NULL,0,'" & bundleIDofSystemPreferencesOrSettingsApp & "',X'" & csreqForSystemPreferencesOrSettingsApp & "',NULL," & currentUnixTime & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekSetupApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekSetupApp & "',NULL,0,'" & bundleIDofSystemEventsApp & "',X'" & csreqForSystemEventsApp & "',NULL," & currentUnixTime & footerFields & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekSetupApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekSetupApp & "',NULL,0,'" & bundleIDofFinderApp & "',X'" & csreqForFinderApp & "',NULL," & currentUnixTime & footerFields & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekSetupApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekSetupApp & "',NULL,0,'" & bundleIDofSystemPreferencesOrSettingsApp & "',X'" & csreqForSystemPreferencesOrSettingsApp & "',NULL," & currentUnixTime & footerFields & ");")
 				
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekDemoHelperApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekDemoHelperApp & "',NULL,0,'" & bundleIDofSystemEventsApp & "',X'" & csreqForSystemEventsApp & "',NULL," & currentUnixTime & ");")
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekDemoHelperApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekDemoHelperApp & "',NULL,0,'" & bundleIDofFinderApp & "',X'" & csreqForFinderApp & "',NULL," & currentUnixTime & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekDemoHelperApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekDemoHelperApp & "',NULL,0,'" & bundleIDofSystemEventsApp & "',X'" & csreqForSystemEventsApp & "',NULL," & currentUnixTime & footerFields & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekDemoHelperApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekDemoHelperApp & "',NULL,0,'" & bundleIDofFinderApp & "',X'" & csreqForFinderApp & "',NULL," & currentUnixTime & footerFields & ");")
 				
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofCleanupAfterQACompleteApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForCleanupAfterQACompleteApp & "',NULL,0,'" & bundleIDofSystemEventsApp & "',X'" & csreqForSystemEventsApp & "',NULL," & currentUnixTime & ");")
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofCleanupAfterQACompleteApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForCleanupAfterQACompleteApp & "',NULL,0,'" & bundleIDofFinderApp & "',X'" & csreqForFinderApp & "',NULL," & currentUnixTime & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofCleanupAfterQACompleteApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForCleanupAfterQACompleteApp & "',NULL,0,'" & bundleIDofSystemEventsApp & "',X'" & csreqForSystemEventsApp & "',NULL," & currentUnixTime & footerFields & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofCleanupAfterQACompleteApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForCleanupAfterQACompleteApp & "',NULL,0,'" & bundleIDofFinderApp & "',X'" & csreqForFinderApp & "',NULL," & currentUnixTime & footerFields & ");")
+				
+				if (freeGeekResetIsInstalled) then
+					-- Always grant "Free Geek Reset" AppleEvents/Automation TCC permissions for "System Events" (even if "Full Disk Access" and "Accessibility" TCC permissions were not granted above) since it needs them to quit all apps before auto-rebooting into Recovery even if only used with the Snapshot Reset technique.
+					-- And, of course, if it is used for the "Erase All Content & Settings" reset, then "System Events" AppleEvents/Automation TCC permissions are needed to automate the "Erase Assistant" app (and also to quit all apps).
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofFreeGeekResetApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForFreeGeekResetApp & "',NULL,0,'" & bundleIDofSystemEventsApp & "',X'" & csreqForSystemEventsApp & "',NULL," & currentUnixTime & footerFields & ");")
+				end if
 				
 				-- On pre-T2 Macs, Java (QA Helper) can access the Microphone to be able to do the Microphone Test.
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofQAHelperApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForQAHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofQAHelperApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForQAHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 				-- On T2 and Apple Silcon Macs, Java (QA Helper) seems to not be able to request Microphone access and also can't even access the Microphone when permission is manually granted, so QuickTime automation will be used instead when the Microphone can't be accessed (since QuickTime can access the Microphone).
-				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofQAHelperApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForQAHelperApp & "',NULL,0,'" & bundleIDofQuickTimeApp & "',X'" & csreqForQuickTimeApp & "',NULL," & currentUnixTime & ");")
+				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceAppleEvents','" & bundleIDofQAHelperApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForQAHelperApp & "',NULL,0,'" & bundleIDofQuickTimeApp & "',X'" & csreqForQuickTimeApp & "',NULL," & currentUnixTime & footerFields & ");")
 				-- Even though QA Helper should only need one or the other of Microphone or AppleEvents-QuickTime access, always grant both just in case (especially if things change in the future and a newer version Java can access the Microphone on T2 and Apple Silicon Macs).
+				
 				if (not isBigSurOrNewer) then
 					-- On Mojave and Catalina, QuickTime must be manually granted Microphone access, but on Big Sur and newer it's automatically granted access by macOS.
 					-- But, T2 Macs will never be allowed to install Catalina or older since the first admin cannot be prevented from being granted a Secure Token on those versions which would break Snapshot resetting, but keep this here just to be thorough since we are also always granted QA Helper AppleEvents-QuickTime access.
-					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofQuickTimeApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForQuickTimeApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & ");")
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofQuickTimeApp & "',0," & allowedOrAuthorizedFields & ",1,X'" & csreqForQuickTimeApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+				else if (isVenturaOrNewer and (not hasT2chip) and (not isAppleSilicon)) then
+					-- On macOS 13 Ventura, BUT ONLY on pre-T2 Macs, certain audio-related actions are prompting for Microphone access even though they don't actually access the microphone and continue to work properly when microphone access is DENIED.
+					-- So, pre-deny Microphone access for all these apps so that the technician is never interrupted with these unnecessary prompts and the apps are not granted access they do not actually need.
+					-- Here are some commands I found which prompt for Microphone access but still work when access is denied: AppleScript "set volume", shell command "afplay ...", shell command "system_profiler SPAudioDataType" (and there may be others I haven't encountered).
+					
+					set unauthorizedFields to "0,3"
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekSetupApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekSetupApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekUpdaterApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekUpdaterApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekSnapshotHelperApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekSnapshotHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekDemoHelperApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekDemoHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofCleanupAfterQACompleteApp & "',0," & unauthorizedFields & ",1,X'" & csreqForCleanupAfterQACompleteApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofKeyboardTestApp & "',0," & unauthorizedFields & ",1,X'" & csreqForKeyboardTestApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 				end if
 				
 				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "COMMIT;")
@@ -439,7 +499,7 @@ killall ControlStrip
 				activate
 			end try
 			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			display alert ("CRITICAL “" & (name of me) & "” TCC ERROR:
 
@@ -593,6 +653,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 							if ((name of thisSheetButton) is equal to "Turn Off Screen Lock") then
 								set frontmost to true
 								click thisSheetButton
+								exit repeat
 							end if
 						end repeat
 						
@@ -612,11 +673,6 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 			end timeout
 		end try
 	end if
-	
-	set isAppleSilicon to false
-	try
-		set isAppleSilicon to ((do shell script "sysctl -in hw.optional.arm64") is equal to "1")
-	end try
 	
 	-- CLEAR NVRAM (just for house cleaning purposes, this doesn't clear SIP).
 	-- This must be done BEFORE setting the Startup Disk, since that is stored in NVRAM.
@@ -674,6 +730,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 						if ((name of window 1) is "Startup Disk") then exit repeat
 					end repeat
 				end tell
+				
 				if (isCatalinaOrNewer and (not isVenturaOrNewer)) then
 					-- On Catalina, a SecurityAgent alert with "System Preferences wants to make changes." will appear IF an Encrypted Disk is present.
 					-- OR if Big Sur is installed on some drive, whose Sealed System Volume is unable to be mounted (ERROR -69808) and makes System Preferences think it needs to try again with admin privileges.
@@ -731,7 +788,11 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
-								set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								if (isSonomaOrNewer) then
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								else
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								end if
 								set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
 								if (numberOfStartupDisks is not 0) then
 									delay 3 -- Wait a few more seconds for disks to load since it's possible that not all startup disks are actually loaded yet.
@@ -762,13 +823,17 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 					end tell
 					
 					if (not didSetStartUpDisk) then -- If it's already selected, no need to unlock and re-select it.
-						set didAuthenticateSecurityAgent to false
+						set didAuthenticateStartupDisk to false
 						
 						repeat numberOfStartupDisks times -- The loop should be exited before even getting through numberOfStartupDisks, but want some limit so we don't get stuck in an infinite loop if something goes very wrong.
 							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 								-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
 								set frontmost to true
-								set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								if (isSonomaOrNewer) then
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								else
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+								end if
 								set focused of (scroll area 1 of startupDisksSelectionGroup) to true
 								set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
 								repeat 5 times -- Click up to 5 times until the selected startup disk changed (in case some clicks get lost)
@@ -779,58 +844,156 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 								end repeat
 							end tell
 							
-							if (not didAuthenticateSecurityAgent) then
-								set didTryToAuthenticateSecurityAgent to false
-								repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
-									delay 1
-									try
-										if (application securityAgentPath is running) then
-											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
-												if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
-													repeat with thisSecurityAgentButton in (buttons of window 1)
-														if (((title of thisSecurityAgentButton) is equal to "Unlock") or ((title of thisSecurityAgentButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
-															set value of (text field 1 of window 1) to adminUsername
-															set value of (text field 2 of window 1) to adminPassword
-															click thisSecurityAgentButton
-															set didTryToAuthenticateSecurityAgent to true
-															exit repeat
-														end if
-													end repeat
+							if (not didAuthenticateStartupDisk) then
+								set didTryToAuthenticateStartupDisk to false
+								if (isVenturaThirteenDotThreeOrNewer) then
+									-- Starting on macOS 13.3 Ventura, the System Settings password authentication prompt is now handled by "LocalAuthenticationRemoteService" XPC service within a regular sheet of the System Setting app instead of the "SecurityAgent.bundle" which presented a separate app prompt window.
+									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+										repeat 60 times -- Wait for password prompt
+											delay 0.5
+											set frontmost to true
+											if ((number of sheets of window (number of windows)) is equal to 1) then exit repeat
+											delay 0.5
+										end repeat
+										
+										if ((number of sheets of window (number of windows)) is equal to 1) then
+											repeat with thisSheetButton in (buttons of sheet 1 of window (number of windows))
+												if (((name of thisSheetButton) is equal to "Unlock") or ((name of thisSheetButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
+													set value of (text field 1 of sheet 1 of window (number of windows)) to adminUsername
+													set value of (text field 2 of sheet 1 of window (number of windows)) to adminPassword
+													click thisSheetButton
+													set didTryToAuthenticateStartupDisk to true
+													exit repeat
 												end if
-												exit repeat
-											end tell
+											end repeat
 										end if
-									end try
-								end repeat
-								if (didTryToAuthenticateSecurityAgent) then
-									repeat 10 times -- Wait up to 10 seconds for SecurityAgent to exit or close the admin auth prompt to be sure the authentication was successful.
+									end tell
+									
+									if (isSonomaOrNewer) then -- On macOS 14 Sonoma beta 1 through RC, ANOTHER standalone SecurityAgent auth prompt comes up AFTER the initial LocalAuthenticationRemoteService XPC sheet prompt WHEN RUNNING AS A STANDARD USER.
+										set didTryToAuthenticateStartupDisk to false
+										repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
+											delay 1
+											try
+												if (application securityAgentPath is running) then
+													tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+														if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
+															repeat with thisSecurityAgentButton in (buttons of window 1)
+																if ((title of thisSecurityAgentButton) is equal to "OK") then
+																	set value of (text field 1 of window 1) to adminUsername
+																	set value of (text field 2 of window 1) to adminPassword
+																	click thisSecurityAgentButton
+																	set didTryToAuthenticateStartupDisk to true
+																	exit repeat
+																end if
+															end repeat
+														end if
+														exit repeat
+													end tell
+												end if
+											end try
+										end repeat
+									end if
+								else
+									repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
 										delay 1
 										try
 											if (application securityAgentPath is running) then
 												tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
-													if ((number of windows) is 0) then
-														set didAuthenticateSecurityAgent to true
+													if ((number of windows) is 1) then -- In previous code I've written, I commented that I could not reliably get any SecurityAgent windows or UI elements, but this seems to work well in Ventura and I also tested getting the contents of a SecurityAgent window on Monterey and it worked as well, so not certain what OS it didn't work for in the past (didn't bother testing older OSes or updating any other SecurityAgent code).
+														repeat with thisSecurityAgentButton in (buttons of window 1)
+															if (((title of thisSecurityAgentButton) is equal to "Unlock") or ((title of thisSecurityAgentButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
+																set value of (text field 1 of window 1) to adminUsername
+																set value of (text field 2 of window 1) to adminPassword
+																click thisSecurityAgentButton
+																set didTryToAuthenticateStartupDisk to true
+																exit repeat
+															end if
+														end repeat
+													end if
+													exit repeat
+												end tell
+											end if
+										end try
+									end repeat
+								end if
+								
+								if (didTryToAuthenticateStartupDisk) then
+									repeat 10 times -- Wait up to 10 seconds for sheet to close on 13.3+ (of for SecurityAgent to exit or close the admin auth prompt on 13.2.1-) to be sure the authentication was successful.
+										delay 1
+										try
+											if (isVenturaThirteenDotThreeOrNewer) then
+												tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+													if ((number of sheets of window (number of windows)) is equal to 0) then
+														set didAuthenticateStartupDisk to true
 														exit repeat
 													end if
 												end tell
+												
+												if (isSonomaOrNewer) then -- See comments above about SECOND SecurityAgent auth prompt on macOS 14 Sonoma beta 1 through RC.
+													set didAuthenticateStartupDisk to false
+													if (application securityAgentPath is running) then
+														tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+															if ((number of windows) is 0) then
+																set didAuthenticateStartupDisk to true
+																exit repeat
+															end if
+														end tell
+													else
+														set didAuthenticateStartupDisk to true
+														exit repeat
+													end if
+												end if
 											else
-												set didAuthenticateSecurityAgent to true
-												exit repeat
+												if (application securityAgentPath is running) then
+													tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+														if ((number of windows) is 0) then
+															set didAuthenticateStartupDisk to true
+															exit repeat
+														end if
+													end tell
+												else
+													set didAuthenticateStartupDisk to true
+													exit repeat
+												end if
 											end if
 										end try
 									end repeat
 								end if
 							end if
 							
-							if (didAuthenticateSecurityAgent) then
+							if (didAuthenticateStartupDisk) then
 								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
-									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+									if (isSonomaOrNewer) then
+										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+									else
+										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+									end if
 									if ((enabled of button 1 of startupDisksSelectionGroup) and ((value of static text 2 of startupDisksSelectionGroup) ends with ("“" & nameOfBootedDisk & "”."))) then
 										set didSetStartUpDisk to true
 										exit repeat
 									end if
 								end tell
 							else
+								if (isVenturaThirteenDotThreeOrNewer) then
+									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+										if ((number of sheets of window (number of windows)) is equal to 1) then
+											set frontmost to true
+											key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
+										end if
+									end tell
+									
+									if (isSonomaOrNewer) then -- The SECOND SecurityAgent prompt on macOS 14 Sonoma beta 1 through RC DOES NOT close on its own when System Settings is quit.
+										if (application securityAgentPath is running) then
+											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+												if ((number of windows) is 1) then
+													set frontmost to true
+													key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
+												end if
+											end tell
+										end if
+									end if
+								end if -- Do not need to cancel the SecurityAgent prompt since it will just be closed when System Settings is quit and will not block quitting.
+								
 								exit repeat -- If did not authenticate, better to exit this loop and start all over with System Settings being quit and re-launched instead of continuing to arrow through the Startup Disks.
 							end if
 						end repeat
@@ -912,6 +1075,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 											if ((name of thisSheetButton) is equal to "Unlock") then
 												set frontmost to true
 												click thisSheetButton
+												exit repeat
 											end if
 										end repeat
 										
@@ -1008,6 +1172,38 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 	end if
 	
 	try
+		if (hasT2chip) then
+			if ((do shell script "nvram '94B73556-2197-4702-82A8-3E1337DAFBFB:AppleSecureBootPolicy'") does not end with "%02") then -- https://github.com/dortania/OpenCore-Legacy-Patcher/blob/b85256d9708a299b9f7ea15cb3456248a1a666b7/resources/utilities.py#L242 & https://macadmins.slack.com/archives/CGXNNJXJ9/p1686766296067939?thread_ts=1686766055.849109&cid=CGXNNJXJ9
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+				end try
+				display alert "CRITICAL “" & (name of me) & "” ERROR:
+
+Startup Securty IS REDUCED on this T2 Mac." message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Quit"} default button 1 as critical
+				quit
+				delay 10
+			end if
+		else if (isAppleSilicon) then
+			if (doShellScriptAsAdmin("bputil -d") does not contain "(smb0): absent") then
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+				end try
+				display alert "CRITICAL “" & (name of me) & "” ERROR:
+
+Startup Securty IS REDUCED on this Apple Silicon Mac." message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Quit"} default button 1 as critical
+				quit
+				delay 10
+			end if
+		end if
+	end try
+	
+	try
 		if ((do shell script "csrutil status") is not equal to "System Integrity Protection status: enabled.") then
 			try
 				activate
@@ -1018,7 +1214,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 				-- So, fully stop with an error if somehow SIP is NOT enabled on an Apple Silicon Mac.
 				-- (Also, SIP will be checked during "fg-snapshot-reset" and error if it's NOT enabled.)
 				try
-					do shell script "afplay /System/Library/Sounds/Basso.aiff"
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 				end try
 				display alert "CRITICAL “" & (name of me) & "” ERROR:
 
@@ -1085,7 +1281,7 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 		end if
 	end try
 	
-	-- Wait for internet before checking Remote Management and EFI Firmware since AllowList may need to be update, and before installing Rosetta on Apple Silicon, as well as before launching QA Helper to ensure that QA Helper can always update itself to the latest version.
+	-- Wait for internet before checking Remote Management and EFI Firmware since AllowList may need to be update, as well as before launching QA Helper to ensure that QA Helper can always update itself to the latest version.
 	set previousProgressAdditionalDescription to (progress additional description)
 	repeat 60 times
 		try
@@ -1099,176 +1295,10 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 	end repeat
 	set progress additional description to previousProgressAdditionalDescription
 	
-	try
-		if (isAppleSilicon and ((do shell script "arch -x86_64 /usr/bin/true 2> /dev/null; echo $?") is equal to "1") and (((do shell script "file '/Users/" & demoUsername & "/Applications/QA Helper.app/Contents/MacOS/QA Helper'") does not contain ("executable arm64")) or ((do shell script "file '/Users/" & demoUsername & "/Applications/DriveDx.app/Contents/MacOS/DriveDx'") does not contain ("executable arm64")))) then
-			try -- Install Rosetta 2 if on Apple Silicon if QA Helper or DriveDx IS NOT Universal and Rosetta isn't already installed since they will need it to be able to run.
-				-- Starting with Java 17 (which has seperate downloads for Intel and Apple Silicon and normally makes seperate native apps when jpackage is used on each platform), I figured out how to make QA Helper a Univeral Binary,
-				-- but DriveDx 1.11.0 as of August 8th, 2022 is still not Univeral and will need to be run on Apple Silicon.
-				-- Rosetta should have been installed during "fg-prepare-os", but double-check since internet may not have been available then.
-				doShellScriptAsAdmin("softwareupdate --install-rosetta --agree-to-license")
-			end try
-		end if
-	end try
-	
-	set hasT2chip to false
-	try
-		set hasT2chip to ((do shell script "ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
-	end try
-	
 	set currentEFIfirmwareIsNotInAllowList to false
 	if ((not hasT2chip) and (not isAppleSilicon)) then
 		set currentEFIfirmwareIsNotInAllowList to checkEFIfirmwareIsNotInAllowList()
 	end if
-	
-	try -- Don't check Remote Management if "TESTING" flag folder exists on desktop
-		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
-	on error
-		set serialNumber to ""
-		try
-			set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
-		end try
-		
-		if (serialNumber is not equal to "") then
-			try
-				do shell script "ping -t 5 -c 1 www.apple.com" -- Only try to get DEP status if we have internet.
-				
-				delay 0.5
-				
-				set remoteManagementOutput to ""
-				try
-					try
-						set remoteManagementOutput to doShellScriptAsAdmin("profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0")
-					on error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
-						if (profilesShowDefaultUserErrorNumber is not equal to -60007) then error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
-						try
-							activate
-						end try
-						display alert "Would you like to check for
-Remote Management (ADE/DEP/MDM)?" message "Remote Management check will be skipped in 10 seconds." buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 10
-						if (gave up of result) then error number -128
-						set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" with prompt "Administrator Permission is required
-to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
-					end try
-				end try
-				
-				if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
-					try
-						set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
-					end try
-				else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
-					try
-						do shell script ("mkdir " & (quoted form of buildInfoPath))
-					end try
-					try
-						do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
-					end try
-				end if
-				
-				if (remoteManagementOutput contains " - Request too soon.") then -- Don't allow setup if rate limited and there was no previous cached output to use.
-					try
-						activate
-					end try
-					try
-						do shell script "afplay /System/Library/Sounds/Basso.aiff"
-					end try
-					set nextAllowedProfilesShowTime to "23 hours after last successful check"
-					try
-						set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
-					end try
-					display alert ("Cannot Continue Setup
-
-Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
-
-Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Shut Down"} as critical
-					tell application id "com.apple.systemevents" to shut down with state saving preference
-					
-					quit
-					delay 10
-				else if (remoteManagementOutput is not equal to "") then
-					try
-						set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
-						
-						if ((count of remoteManagementOutputParts) > 3) then
-							set remoteManagementOrganizationName to "\"Unknown Organization\""
-							set remoteManagementOrganizationContactInfo to {}
-							
-							repeat with thisRemoteManagementOutputPart in remoteManagementOutputParts
-								set organizationNameOffset to (offset of "OrganizationName = " in thisRemoteManagementOutputPart)
-								set organizationDepartmentOffset to (offset of "OrganizationDepartment = " in thisRemoteManagementOutputPart)
-								set organizationEmailOffset to (offset of "OrganizationEmail = " in thisRemoteManagementOutputPart)
-								set organizationSupportEmailOffset to (offset of "OrganizationSupportEmail = " in thisRemoteManagementOutputPart)
-								set organizationPhoneOffset to (offset of "OrganizationPhone = " in thisRemoteManagementOutputPart)
-								set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = " in thisRemoteManagementOutputPart)
-								
-								if (organizationNameOffset > 0) then
-									set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart) -- Leave quotes around Organization Name.
-									if ((remoteManagementOrganizationName does not start with "\"") or (remoteManagementOrganizationName does not end with "\"")) then set remoteManagementOrganizationName to ("\"" & remoteManagementOrganizationName & "\"") -- Or add quotes if somehow they don't exist.
-								else if (organizationDepartmentOffset > 0) then
-									set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 25) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationDepartment starts with "\"") and (remoteManagementOrganizationDepartment ends with "\"")) then set remoteManagementOrganizationDepartment to (text 2 thru -2 of remoteManagementOrganizationDepartment) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationDepartment is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationDepartment)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationDepartment
-								else if (organizationEmailOffset > 0) then
-									set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 20) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationEmail starts with "\"") and (remoteManagementOrganizationEmail ends with "\"")) then set remoteManagementOrganizationEmail to (text 2 thru -2 of remoteManagementOrganizationEmail) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationEmail
-								else if (organizationSupportEmailOffset > 0) then
-									set remoteManagementOrganizationSupportEmail to (text (organizationSupportEmailOffset + 27) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationSupportEmail starts with "\"") and (remoteManagementOrganizationSupportEmail ends with "\"")) then set remoteManagementOrganizationSupportEmail to (text 2 thru -2 of remoteManagementOrganizationSupportEmail) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationSupportEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportEmail
-								else if (organizationPhoneOffset > 0) then
-									set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 20) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationPhone starts with "\"") and (remoteManagementOrganizationPhone ends with "\"")) then set remoteManagementOrganizationPhone to (text 2 thru -2 of remoteManagementOrganizationPhone) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationPhone
-								else if (organizationSupportPhoneOffset > 0) then
-									set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 27) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationSupportPhone starts with "\"") and (remoteManagementOrganizationSupportPhone ends with "\"")) then set remoteManagementOrganizationSupportPhone to (text 2 thru -2 of remoteManagementOrganizationSupportPhone) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationSupportPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportPhone
-								end if
-							end repeat
-							
-							set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
-							if ((count of remoteManagementOrganizationContactInfo) > 0) then
-								set AppleScript's text item delimiters to (linefeed & tab & tab)
-								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as text)
-							end if
-							
-							try
-								activate
-							end try
-							try
-								do shell script "afplay /System/Library/Sounds/Basso.aiff"
-							end try
-							set remoteManagementDialogButton to "                                                       Shut Down                                                       "
-							-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
-							if (isCatalinaOrNewer) then set remoteManagementDialogButton to "Shut Down                                                                                                              "
-							display dialog "	     ⚠️     REMOTE MANAGEMENT IS ENABLED ON THIS MAC     ⚠️
-
-❌     MACS WITH REMOTE MANAGEMENT ENABLED CANNOT BE SOLD     ❌
-
-
-
-🔒	THIS MAC IS MANAGED BY " & remoteManagementOrganizationName & "
-
-🔑	ONLY " & remoteManagementOrganizationName & " CAN DISABLE REMOTE MANAGEMENT
-
-☎️	" & remoteManagementOrganizationName & " MUST BE CONTACTED BY A MANAGER:
-		" & remoteManagementOrganizationContactInfoDisplay & "
-
-🆔	THE SERIAL NUMBER FOR THIS MAC IS \"" & serialNumber & "\"
-
-
-
-		    👉 ‼️ INFORM AN INSTRUCTOR OR MANAGER ‼️ 👈" buttons {remoteManagementDialogButton} with title "Remote Management Enabled"
-							tell application id "com.apple.systemevents" to shut down with state saving preference
-							
-							quit
-							delay 10
-						end if
-					end try
-				end if
-			end try
-		end if
-	end try
 	
 	set modelIdentifier to "UNKNOWN"
 	set currentEFIfirmwareVersion to "UNKNOWN-EFI-FIRMWARE-VERSION"
@@ -1339,6 +1369,186 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	end repeat
 	do shell script "rm -f " & (quoted form of hardwareAndDriveInfoPath)
 	
+	try -- Don't check Remote Management if "TESTING" flag folder exists on desktop
+		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
+	on error
+		set serialNumber to ""
+		try
+			set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
+		end try
+		
+		if (serialNumber is not equal to "") then
+			try
+				do shell script "ping -t 5 -c 1 www.apple.com" -- Only try to get DEP status if we have internet.
+				
+				delay 0.5
+				
+				set remoteManagementOutput to ""
+				try
+					try
+						set remoteManagementOutput to doShellScriptAsAdmin("profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0")
+					on error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
+						if (profilesShowDefaultUserErrorNumber is not equal to -60007) then error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
+						try
+							activate
+						end try
+						display alert "Would you like to check for
+Remote Management (ADE/DEP/MDM)?" message "Remote Management check will be skipped in 10 seconds." buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 10
+						if (gave up of result) then error number -128
+						set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" with prompt "Administrator Permission is required
+to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
+					end try
+				end try
+				
+				if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
+					try
+						set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
+					end try
+				else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
+					try
+						do shell script ("mkdir " & (quoted form of buildInfoPath))
+					end try
+					try
+						do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
+					end try
+				end if
+				
+				if (remoteManagementOutput contains " - Request too soon.") then -- Don't allow setup if rate limited and there was no previous cached output to use.
+					try
+						activate
+					end try
+					try
+						do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+					end try
+					set nextAllowedProfilesShowTime to "23 hours after last successful check"
+					try
+						set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
+					end try
+					display alert ("Cannot Continue Setup
+
+Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
+
+Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Shut Down"} as critical
+					tell application id "com.apple.systemevents" to shut down with state saving preference
+					
+					quit
+					delay 10
+				else if (remoteManagementOutput is not equal to "") then
+					try
+						set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
+						
+						if ((count of remoteManagementOutputParts) > 3) then
+							set remoteManagementOrganizationName to "Unknown Organization"
+							set remoteManagementOrganizationContactInfo to {}
+							
+							set logRemoteManagedMacsCommand to ("curl -m 5 -sfL 'https://apps.freegeek.org/macland/log_remote_managed.php' --data-urlencode " & (quoted form of ("source=" & (name of me))) & " --data-urlencode " & (quoted form of ("model=" & modelIdentifier)) & " --data-urlencode " & (quoted form of ("serial=" & serialNumber)))
+							
+							repeat with thisRemoteManagementOutputPart in remoteManagementOutputParts
+								set organizationNameOffset to (offset of "OrganizationName = " in thisRemoteManagementOutputPart)
+								set organizationDepartmentOffset to (offset of "OrganizationDepartment = " in thisRemoteManagementOutputPart)
+								set organizationEmailOffset to (offset of "OrganizationEmail = " in thisRemoteManagementOutputPart)
+								set organizationSupportEmailOffset to (offset of "OrganizationSupportEmail = " in thisRemoteManagementOutputPart)
+								set organizationPhoneOffset to (offset of "OrganizationPhone = " in thisRemoteManagementOutputPart)
+								set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = " in thisRemoteManagementOutputPart)
+								
+								if (organizationNameOffset > 0) then
+									set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationName starts with "\"") and (remoteManagementOrganizationName ends with "\"")) then set remoteManagementOrganizationName to (text 2 thru -2 of remoteManagementOrganizationName) -- Remove quotes if they exist, which they always should since this should always be a string value.
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("organization=" & remoteManagementOrganizationName)))
+								else if (organizationDepartmentOffset > 0) then
+									set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 25) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationDepartment starts with "\"") and (remoteManagementOrganizationDepartment ends with "\"")) then set remoteManagementOrganizationDepartment to (text 2 thru -2 of remoteManagementOrganizationDepartment) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationDepartment is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationDepartment)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationDepartment
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("department=" & remoteManagementOrganizationDepartment)))
+								else if (organizationEmailOffset > 0) then
+									set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 20) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationEmail starts with "\"") and (remoteManagementOrganizationEmail ends with "\"")) then set remoteManagementOrganizationEmail to (text 2 thru -2 of remoteManagementOrganizationEmail) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationEmail
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("email=" & remoteManagementOrganizationEmail)))
+								else if (organizationSupportEmailOffset > 0) then
+									set remoteManagementOrganizationSupportEmail to (text (organizationSupportEmailOffset + 27) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationSupportEmail starts with "\"") and (remoteManagementOrganizationSupportEmail ends with "\"")) then set remoteManagementOrganizationSupportEmail to (text 2 thru -2 of remoteManagementOrganizationSupportEmail) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationSupportEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportEmail
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("support_email=" & remoteManagementOrganizationSupportEmail)))
+								else if (organizationPhoneOffset > 0) then
+									set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 20) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationPhone starts with "\"") and (remoteManagementOrganizationPhone ends with "\"")) then set remoteManagementOrganizationPhone to (text 2 thru -2 of remoteManagementOrganizationPhone) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationPhone
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("phone=" & remoteManagementOrganizationPhone)))
+								else if (organizationSupportPhoneOffset > 0) then
+									set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 27) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationSupportPhone starts with "\"") and (remoteManagementOrganizationSupportPhone ends with "\"")) then set remoteManagementOrganizationSupportPhone to (text 2 thru -2 of remoteManagementOrganizationSupportPhone) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationSupportPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportPhone
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("support_phone=" & remoteManagementOrganizationSupportPhone)))
+								end if
+							end repeat
+							
+							repeat
+								try
+									if ((do shell script logRemoteManagedMacsCommand) is equal to "DONE") then exit repeat
+								end try
+								
+								try
+									activate
+								end try
+								try
+									do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+								end try
+								display alert "Failed to Log Remote Managed Mac
+
+You must be connected to the internet to be able to log this Remote Managed Mac." message "Make sure you're connected to either the “Free Geek” or “FG Reuse” Wi-Fi network or plugged in with an Ethernet cable.
+								
+If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
+								
+Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
+								
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Try Again"} default button 1 as critical giving up after 10
+							end repeat
+							
+							set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
+							if ((count of remoteManagementOrganizationContactInfo) > 0) then
+								set AppleScript's text item delimiters to (linefeed & tab & tab)
+								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as text)
+							end if
+							
+							try
+								activate
+							end try
+							try
+								do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+							end try
+							set remoteManagementDialogButton to "                                                       Shut Down                                                       "
+							-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
+							if (isCatalinaOrNewer) then set remoteManagementDialogButton to "Shut Down                                                                                                              "
+							display dialog "	     ⚠️     REMOTE MANAGEMENT IS ENABLED ON THIS MAC     ⚠️
+
+❌     MACS WITH REMOTE MANAGEMENT ENABLED CANNOT BE SOLD     ❌
+
+
+
+🔒	THIS MAC IS MANAGED BY “" & remoteManagementOrganizationName & "”
+
+🔑	ONLY “" & remoteManagementOrganizationName & "” CAN DISABLE REMOTE MANAGEMENT
+
+☎️	“" & remoteManagementOrganizationName & "” MUST BE CONTACTED BY A MANAGER:
+		" & remoteManagementOrganizationContactInfoDisplay & "
+
+🆔	THE SERIAL NUMBER FOR THIS MAC IS “" & serialNumber & "”
+
+
+
+		    👉 ‼️ INFORM AN INSTRUCTOR OR MANAGER ‼️ 👈" buttons {remoteManagementDialogButton} with title "Remote Management Enabled"
+							tell application id "com.apple.systemevents" to shut down with state saving preference
+							
+							quit
+							delay 10
+						end if
+					end try
+				end if
+			end try
+		end if
+	end try
+	
 	set bootFilesystemType to "apfs"
 	try
 		set bootFilesystemType to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :FilesystemType' /dev/stdin <<< \"$(diskutil info -plist /)\"")))
@@ -1349,7 +1559,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 			activate
 		end try
 		try
-			do shell script "afplay /System/Library/Sounds/Basso.aiff"
+			do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 		end try
 		display alert "Since this Mac has a T2 Security Chip, macOS must be installed on an “APFS” formatted drive." message "Future macOS Updates will not be able to be installed on T2 Macs with macOS installed on a “Mac OS Extended (Journaled)” formatted drive." buttons {"Shut Down"} default button 1 as critical
 		
@@ -1362,7 +1572,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 			activate
 		end try
 		try
-			do shell script "afplay /System/Library/Sounds/Basso.aiff"
+			do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 		end try
 		display dialog "This Mac (" & modelIdentifier & ") has an NVMe internal drive installed (" & nvmeDriveModelName & "), but it did not originally ship with an NVMe drive.
 
@@ -1384,7 +1594,7 @@ The EFI Firmware will never be able to be properly updated when our customers ru
 			activate
 		end try
 		try
-			do shell script "afplay /System/Library/Sounds/Basso.aiff"
+			do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 		end try
 		
 		set updateFirmwareMesssage to "You should not normally see this alert since the EFI Firmware should have been updated during the installation process.
@@ -1408,7 +1618,7 @@ The EFI Firmware or the EFI AllowList MUST be updated before this Mac can be sol
 				
 				if (not currentEFIfirmwareIsNotInAllowList) then
 					try
-						do shell script "afplay /System/Library/Sounds/Glass.aiff"
+						do shell script "afplay /System/Library/Sounds/Glass.aiff > /dev/null 2>&1 &"
 					end try
 				end if
 			else
@@ -1570,7 +1780,7 @@ launchctl bootstrap gui/$(id -u " & demoUsername & ") " & (quoted form of demoHe
 		try
 			set pathToMe to (POSIX path of (path to me))
 			if ((offset of ".app" in pathToMe) > 0) then
-				do shell script ("tccutil reset All " & currentBundleIdentifier & "; rm -rf " & (quoted form of pathToMe)) -- Resetting TCC for specific bundle IDs should work on Mojave and newer, but does not actually work on Mojave because of a bug (http://www.openradar.me/6813106), but that's ok since we don't install Mojave and all TCC permissions will get reset by "fgreset" on High Sierra (or Mojave).
+				do shell script ("tccutil reset All " & currentBundleIdentifier & "; rm -rf " & (quoted form of pathToMe)) -- Resetting TCC for specific bundle IDs should work on Mojave and newer, but does not actually work on Mojave because of a bug (http://www.openradar.me/6813106), but that's ok since we no longer install Mojave or older anyways.
 			end if
 		end try
 	end if
@@ -1644,11 +1854,16 @@ on doShellScriptAsAdmin(command)
 	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
 	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
 	
-	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+	set currentDate to (current date)
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or (currentDate ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
 		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
-		set lastDoShellScriptAsAdminAuthDate to (current date)
+		set lastDoShellScriptAsAdminAuthDate to currentDate -- Set lastDoShellScriptAsAdminAuthDate to date *BEFORE* command was run since the command itself could have updated the date and the 5 minute timeout started when the command started, not when it finished.
 	else
-		set commandOutput to (do shell script command with administrator privileges)
+		set commandOutput to (do shell script command with prompt "This “" & (name of me) & "” password prompt should not have been displayed.
+
+Please inform Free Geek I.T. that you saw this password prompt.
+
+You can just press “Cancel” below to continue." with administrator privileges)
 	end if
 	
 	return commandOutput

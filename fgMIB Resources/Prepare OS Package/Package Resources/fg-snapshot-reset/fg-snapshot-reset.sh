@@ -23,7 +23,7 @@
 # NOTICE: This script will only exist on boot to be able to run via LaunchDaemon when booting after restoring from the reset Snapshot.
 # ALSO: fg-prepare-os will have created AppleSetupDone to not show Setup Assistant BEFORE creating the reset Snapshot so that Setup Assistant would also not show during Snapshot reset.
 
-readonly SCRIPT_VERSION='2023.3.1-1'
+readonly SCRIPT_VERSION='2023.6.16-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -75,14 +75,14 @@ launch_login_progress_app() {
 if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemon_path}" && -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' &&
 	  -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" && "$(fdesetup isactive)" == 'false' &&
 	  -f '/Users/Shared/Build Info/Prepare OS Log.txt' && "$(tail -1 '/Users/Shared/Build Info/Prepare OS Log.txt')" == *'Creating Reset Snapshot' ]]; then # "_mbsetupuser" may have a password if customized a clean install that presented Setup Assistant.
-	
+
 	if [[ -f "${SCRIPT_DIR}/log.txt" ]] && grep -qF $'\tERROR:' "${SCRIPT_DIR}/log.txt"; then
 		# If rebooted after previous error, just re-display error and do not proceed.
 
 
 		# ANNOUNCE ERROR (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
 		# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.
-		
+
 		for (( wait_to_play_seconds = 0; wait_to_play_seconds < 60; wait_to_play_seconds ++ )); do
 			osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
 			if afplay "${SCRIPT_DIR}/Announcements/fg-error-occurred.aiff" &> /dev/null; then
@@ -100,7 +100,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 		until pgrep -qax 'coreauthd'; do
 			sleep 2
 		done
-		
+
 
 		# DO NOT ALLOW SLEEP
 
@@ -110,14 +110,14 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 		# LAUNCH LOGIN PROGRESS APP
 
 		launch_login_progress_app
-		
+
 
 		# ANNOUNCE CANNOT BE SOLD AND DELIVER TO I.T. *AFTER* LOGIN WINDOW IS DISPLAYED
 
 		osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
 		afplay "${SCRIPT_DIR}/Announcements/fg-cannot-be-sold.aiff"
 		afplay "${SCRIPT_DIR}/Announcements/fg-deliver-to-it.aiff"
-		
+
 	else
 
 		write_to_log() {
@@ -126,7 +126,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 
 		# ANNOUNCE STARTING RESET (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
 		# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.
-		
+
 		write_to_log "Finishing Reset After Restoring Reset Snapshot (version ${SCRIPT_VERSION})"
 
 		for (( wait_to_play_seconds = 0; wait_to_play_seconds < 60; wait_to_play_seconds ++ )); do
@@ -137,7 +137,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 				sleep 1
 			fi
 		done
-		
+
 
 		# WAIT FOR FULL BOOT TO FINISH BEFORE RESETTING AND SHUTTING DOWN
 		# Since LaunchDaemons start so early on boot, always wait for full boot before continuing so that everything is run in a consistent state and all system services have been started.
@@ -148,7 +148,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 		until pgrep -qax 'coreauthd'; do
 			sleep 2
 		done
-		
+
 
 		# DO NOT ALLOW SLEEP WHILE RESETTING
 
@@ -165,11 +165,11 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 
 
 		if [[ "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
-			
+
 			if [[ -d "${SCRIPT_DIR}/actual-snapshot-time.txt" ]]; then
 
 				# SET TIME TO ACTUAL SNAPSHOT TIME (since it gets set to midnight before creating the reset snapshot)
-				
+
 				actual_snapshot_time="$(< "${SCRIPT_DIR}/actual-snapshot-time.txt")"
 
 				write_to_log "Resetting Time to Actual Snapshot Time (${actual_snapshot_time})"
@@ -186,7 +186,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 			systemsetup -setusingnetworktime on &> /dev/null
 			sleep 5 # Give system 5 seconds to sync to correct time before continuing.
 		fi
-		
+
 
 		# LAUNCH LOGIN PROGRESS APP
 
@@ -330,91 +330,125 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 						# Also, DO NOT clear NVRAM on Apple Silicon IF OLDER THAN macOS 11.3 Big Sur (build 20E232) since it will cause an error on reboot stating that macOS needs to be
 						# reinstalled, but can be booted properly after re-selecting the internal drive in Startup Disk (which resets the necessary "boot-volume" key which was deleted in NVRAM).
 						# This has been fixed in macOS 11.3 Big Sur by protecting the "boot-volume" key (among others) which can no longer be deleted by "nvram -c" or "nvram -d".
-						
+
 						write_to_log 'Clearing NVRAM'
 
 						nvram -c
 					fi
 
-					sip_is_enabled="$([[ "$(csrutil status)" == 'System Integrity Protection status: enabled.' ]] && echo 'true' || echo 'false')"
 
-					if ! $sip_is_enabled; then
+					# VERIFY STARTUP SECURITY FOR T2 AND APPLE SILICON MACS
+					# T2 and Apple Silicon Macs should never have been able to have Startup Security reduced since doing so requires authenticating with a Secure Token administrator,
+					# which will never exist in our testing process when doing a Snapshot Reset and also cannot have ever existed if we got this far in the reset process since it
+					# would have errored above when the Secure Token user reference would have not been able to be removed, but still check and error just in case anyways.
 
-						# ENABLE SYSTEM INTEGRITY PROTECTION (SIP)
-						# "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect (so it will be cleared on next boot to Setup Assistant).
-						# BUT, if running on Apple Silicon, "csrutil clear" requires authentication from a Secure Token admin (which won't have ever existed) to enable or disable it,
-						# so it should be impossible to be enabled during our process, but if somehow it is enabled then this reset process will fail with an error during this step.
+					startup_security_is_full=true
 
-						write_to_log 'Enabling System Integrity Protection (SIP)'
+					if [[ -n "$(ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1)" ]]; then
+						write_to_log 'Verifying T2 Startup Security'
 
-						if ! $is_apple_silicon && csrutil_clear_output="$(csrutil clear 2>&1)" && [[ "${csrutil_clear_output}" == 'Successfully cleared'* ]]; then
-							sip_is_enabled=true # Even if "csrutil clear" is successful, checking "csrutil status" again will still show it's DISABLED since we haven't rebooted yet, so we just need to update the known SIP status manually instead of checking again.
+						if [[ "$(nvram '94B73556-2197-4702-82A8-3E1337DAFBFB:AppleSecureBootPolicy' 2> /dev/null)" != *$'\t%02' ]]; then # https://github.com/dortania/OpenCore-Legacy-Patcher/blob/b85256d9708a299b9f7ea15cb3456248a1a666b7/resources/utilities.py#L242 & https://macadmins.slack.com/archives/CGXNNJXJ9/p1686766296067939?thread_ts=1686766055.849109&cid=CGXNNJXJ9
+							startup_security_is_full=false
+						fi
+					elif $is_apple_silicon; then
+						write_to_log 'Verifying Apple Silicon Startup Security'
+
+						if ! bputil -d | grep -qF '(smb0): absent'; then
+							startup_security_is_full=false
 						fi
 					fi
 
-					if $sip_is_enabled; then
 
-						# SET LANGUAGE CHOOSER AND SETUP ASSISTANT TO RUN ON NEXT BOOT
+					if $startup_security_is_full; then
 
-						write_to_log 'Setting Mac to Run "Setup Assistant" on Next Boot'
+						# VERIFY SYSTEM INTEGRITY PROTECTION (SIP)
+						# SIP should never have been disabled since it is reset during installation and throughout the testing process, but check and reset it to be extra thorough anyways.
+						# On Apple Silicon Macs, SIP cannot be disabled or re-enabled without authenticating with a Secure Token admin, but it should never be disabled since that also
+						# requires reducing Startup Security which also requires a Secure Token admin which will never have existed during testing when doing a Snapshot Reset,
+						# but still check and error just in case anyways.
 
-						rm -f '/private/var/db/.AppleSetupDone'
-						touch '/private/var/db/.RunLanguageChooserToo'
-						chown 0:0 '/private/var/db/.RunLanguageChooserToo' # Make sure this file is properly owned by root:wheel.
+						write_to_log 'Verifying System Integrity Protection (SIP)'
 
+						sip_is_enabled="$([[ "$(csrutil status)" == 'System Integrity Protection status: enabled.' ]] && echo 'true' || echo 'false')"
 
-						if [[ ! -f '/private/var/db/.AppleSetupDone' && -f '/private/var/db/.RunLanguageChooserToo' ]]; then
-						
-							# DELETE fg-snapshot-reset LAUNCH DAEMON
+						if ! $sip_is_enabled && ! $is_apple_silicon; then
 
-							rm -f "${launch_daemon_path}" # Do NOT bootout/unload the LaunchDaemon or this script will be terminated immediately. It won't be loaded anyway because it will no longer exist on next boot.
+							# ENABLE SYSTEM INTEGRITY PROTECTION (SIP)
+							# "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect (so it will be cleared on next boot to Setup Assistant).
+							# BUT, if running on Apple Silicon, "csrutil clear" requires authentication from a Secure Token admin (which won't have ever existed) to enable or disable it,
+							# so it should be impossible to be enabled during our process, but if somehow it is enabled then this reset process will fail with an error during this step.
 
+							write_to_log 'Enabling System Integrity Protection (SIP)'
 
-							# BOOTOUT & DELETE fg-error-occurred LAUNCH DAEMON
+							if csrutil_clear_output="$(csrutil clear 2>&1)" && [[ "${csrutil_clear_output}" == 'Successfully cleared'* ]]; then
+								sip_is_enabled=true # Even if "csrutil clear" is successful, checking "csrutil status" again will still show it's DISABLED since we haven't rebooted yet, so we just need to update the known SIP status manually instead of checking again.
+							fi
+						fi
 
-							launchctl bootout 'system/org.freegeek.fg-error-occurred'
-							rm -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist'
+						if $sip_is_enabled; then
 
+							# SET LANGUAGE CHOOSER AND SETUP ASSISTANT TO RUN ON NEXT BOOT
 
-							if [[ ! -f "${launch_daemon_path}" && ! -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist' ]]; then
-								
-								write_to_log 'Successfully Completed Snapshot Reset'
+							write_to_log 'Setting Mac to Run "Setup Assistant" on Next Boot'
 
-								sleep 3 # Give the Progress app a few seconds to update it's status after the LaunchDaemon file has been deleted.
-
-							
-								# ANNOUNCE COMPLETED RESET
-
-								osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
-								afplay "${SCRIPT_DIR}/Announcements/fg-completed-reset.aiff"
-								afplay "${SCRIPT_DIR}/Announcements/fg-shutting-down.aiff"
-
-
-								# DELETE fg-snapshot-reset FOLDER
-
-								rm -rf "${SCRIPT_DIR}"
+							rm -f '/private/var/db/.AppleSetupDone'
+							touch '/private/var/db/.RunLanguageChooserToo'
+							chown 0:0 '/private/var/db/.RunLanguageChooserToo' # Make sure this file is properly owned by root:wheel.
 
 
-								# DELETE ANYTHING ELSE IN SHARED FOLDER
-								# "Build Info" folder will always exist with the installation log and partial prepare log up to the point of
-								# the reset Snapshot being created, but do not save it since it won't contain any useful info for the customer.
-								# No other files or folder should normally exist at this point, but may exist when I'm debugging.
+							if [[ ! -f '/private/var/db/.AppleSetupDone' && -f '/private/var/db/.RunLanguageChooserToo' ]]; then
 
-								rm -rf '/Users/Shared/'{,.[^.],..?}*
+								# DELETE fg-snapshot-reset LAUNCH DAEMON
 
-
-								if [[ ! -d "${SCRIPT_DIR}" ]]; then
-								
-									# KILL CAFFEINATE
-
-									kill "${caffeinate_pid}" &> /dev/null
+								rm -f "${launch_daemon_path}" # Do NOT bootout/unload the LaunchDaemon or this script will be terminated immediately. It won't be loaded anyway because it will no longer exist on next boot.
 
 
-									# SHUT DOWN
+								# BOOTOUT & DELETE fg-error-occurred LAUNCH DAEMON
 
-									shutdown -h now &> /dev/null
+								launchctl bootout 'system/org.freegeek.fg-error-occurred'
+								rm -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist'
 
-									exit 0
+
+								if [[ ! -f "${launch_daemon_path}" && ! -f '/Library/LaunchDaemons/org.freegeek.fg-error-occurred.plist' ]]; then
+
+									write_to_log 'Successfully Completed Snapshot Reset'
+
+									sleep 3 # Give the Progress app a few seconds to update it's status after the LaunchDaemon file has been deleted.
+
+
+									# ANNOUNCE COMPLETED RESET
+
+									osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
+									afplay "${SCRIPT_DIR}/Announcements/fg-completed-reset.aiff"
+									afplay "${SCRIPT_DIR}/Announcements/fg-shutting-down.aiff"
+
+
+									# DELETE fg-snapshot-reset FOLDER
+
+									rm -rf "${SCRIPT_DIR}"
+
+
+									# DELETE ANYTHING ELSE IN SHARED FOLDER
+									# "Build Info" folder will always exist with the installation log and partial prepare log up to the point of
+									# the reset Snapshot being created, but do not save it since it won't contain any useful info for the customer.
+									# No other files or folder should normally exist at this point, but may exist when I'm debugging.
+
+									rm -rf '/Users/Shared/'{,.[^.],..?}*
+
+
+									if [[ ! -d "${SCRIPT_DIR}" ]]; then
+
+										# KILL CAFFEINATE
+
+										kill "${caffeinate_pid}" &> /dev/null
+
+
+										# SHUT DOWN
+
+										shutdown -h now &> /dev/null
+
+										exit 0
+									fi
 								fi
 							fi
 						fi
@@ -422,8 +456,8 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 				fi
 			fi
 		fi
-		
-			
+
+
 		# ANNOUNCE ERROR (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
 
 		write_to_log 'ERROR: Failed to Perform Previous Task'
@@ -434,10 +468,10 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 		afplay "${SCRIPT_DIR}/Announcements/fg-deliver-to-it.aiff"
 	fi
 else
-	
+
 	# ANNOUNCE ERROR (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
 	# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.
-	
+
 	for (( wait_to_play_seconds = 0; wait_to_play_seconds < 60; wait_to_play_seconds ++ )); do
 		osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
 		if afplay "${SCRIPT_DIR}/Announcements/fg-error-occurred.aiff" &> /dev/null; then

@@ -22,7 +22,7 @@
 
 # NOTICE: This script will only be installed and run via LaunchDaemon when customizing an existing clean install, such as on Apple Silicon Macs.
 
-readonly SCRIPT_VERSION='2023.3.1-1'
+readonly SCRIPT_VERSION='2023.6.16-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -80,8 +80,8 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 
 
 		# ANNOUNCE ERROR (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
-		# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.	
-		
+		# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.
+
 		for (( wait_to_play_seconds = 0; wait_to_play_seconds < 60; wait_to_play_seconds ++ )); do
 			osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
 			if afplay "${SCRIPT_DIR}/Announcements/fg-error-occurred.aiff" &> /dev/null; then
@@ -99,7 +99,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		until pgrep -qax 'coreauthd'; do
 			sleep 2
 		done
-		
+
 
 		# DO NOT ALLOW SLEEP
 
@@ -109,7 +109,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		# LAUNCH LOGIN PROGRESS APP
 
 		launch_login_progress_app
-		
+
 
 		# ANNOUNCE DELIVER TO I.T. *AFTER* LOGIN WINDOW IS DISPLAYED
 
@@ -122,7 +122,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 
 		rm -f "${launch_daemon_path}"
 		rm -rf "${SCRIPT_DIR}"
-	elif [[ -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant. 
+	elif [[ -f '/private/var/db/.AppleSetupDone' && "${EUID:-$(id -u)}" == '0' && -z "$(dscl . -list /Users ShadowHashData 2> /dev/null | awk '($1 != "_mbsetupuser") { print $1 }')" ]]; then # "_mbsetupuser" may have a password if customizing a clean install that presented Setup Assistant.
 		# Only run if running as root on a clean installation prepared by fg-install-os.
 		# IMPORTANT: fg-install-os will create AppleSetupDone to not show Setup Assistant while this script runs.
 
@@ -149,8 +149,8 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 				sleep 1
 			fi
 		done
-		
-		
+
+
 		# WAIT FOR FULL BOOT TO FINISH BEFORE STARTING CUSTOMIZATIONS
 		# Since LaunchDaemons start so early on boot, always wait for full boot before continuing so that everything is run in a consistent state and all system services have been started.
 		# Through investigation, I found that "coreauthd" is consistently the last, or nearly the last, root process to be started before the login window is displayed.
@@ -160,7 +160,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		until pgrep -qax 'coreauthd'; do
 			sleep 2
 		done
-		
+
 
 		# DO NOT ALLOW SLEEP WHILE CUSTOMIZING
 
@@ -191,19 +191,30 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		fi
 
 
+		will_create_reset_snapshot=false
+		if (( DARWIN_MAJOR_VERSION >= 19 )) && { [[ -z "$(ioreg -rc AppleSEPManager)" ]] || (( DARWIN_MAJOR_VERSION < 21 )); }; then
+			# The Snapshot Reset techinque will only be used on pre-T2 Macs or any Mac running macOS 10.15 Catalina or macOS 11 Big Sur since the "Erase All Content & Settings" (via "Erase Assistant") is not available for those Macs.
+			# For T2 or Apple Silicon Macs (determined by checking for a Secure Enclave which is present on T2 or Apple Silicon Macs, and NOT on T1 Macs or older) running macOS 12 Monterey or newer,
+			# the "Free Geek Reset" app will automate the "Erase Assistant" app to perform "Erase All Content & Settings" instead of doing the Snapshot Reset technique.
+			will_create_reset_snapshot=true
+		fi
+
 		if [[ "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then # "sudo" is needed for "systemsetup" within subshell.
-			
+
 			# MAKE SURE DATE IS SYNCED
 			# Do this BEFORE launching "Free Geek Login Progress" since going back in time after launch can make "delay" in AppleScript hang forever on macOS 11 Big Sur.
 
 			write_to_log 'Turning On Network Time'
 
 			systemsetup -setusingnetworktime on &> /dev/null
-			if (( DARWIN_MAJOR_VERSION >= 19 )); then sleep 5; fi # Give system 5 seconds to sync to correct time before turning off network time and setting to midnight for reset Snapshot.
-		fi
-		
 
-		if (( DARWIN_MAJOR_VERSION >= 19 )); then
+			if $will_create_reset_snapshot; then # Give system 5 seconds to sync to correct time before turning off network time and setting to midnight for reset Snapshot.
+				sleep 5
+			fi
+		fi
+
+
+		if $will_create_reset_snapshot; then
 
 			# SET TIME BACK TO MIDNIGHT FOR RESET SNAPSHOT
 			# Do this BEFORE starting the "fg-prepare-os" installation since going back in time during installation (within "fg-prepare-os") was making "installer" to hang forever.
@@ -248,7 +259,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 			if [[ -f "${this_install_package_path}" ]]; then
 				this_install_package_name="${this_install_package_path##*/}"
 				this_install_package_name="${this_install_package_name%.*}"
-				
+
 				write_to_log "Installing Package \"${this_install_package_name}\""
 
 				if ! installer -pkg "${this_install_package_path}" -target '/'; then
@@ -262,7 +273,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		if ! $error_installing_package; then
 
 			# DELETE LAUNCH DAEMON
-			
+
 			rm -f "${launch_daemon_path}" # Do NOT bootout/unload the LaunchDaemon or this script will be terminated immediately. It won't be loaded anyway because it will no longer exist on next boot.
 
 
@@ -292,7 +303,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 
 
 					# REBOOT
-					
+
 					shutdown -r now &> /dev/null
 
 					exit 0
@@ -315,8 +326,8 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 				defaults delete '/Library/Preferences/com.apple.loginwindow' autoLoginUser &> /dev/null
 			fi
 		fi
-		
-		
+
+
 		# ANNOUNCE ERROR (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
 
 		if ! grep -qF $'\tERROR:' "${log_path}"; then
@@ -328,10 +339,10 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-c
 		afplay "${SCRIPT_DIR}/Announcements/fg-error-occurred.aiff"
 		afplay "${SCRIPT_DIR}/Announcements/fg-deliver-to-it.aiff"
 	else
-		
+
 		# ANNOUNCE ERROR (For some reason "say" does not work on macOS 11 Big Sur when run on boot via LaunchDaemon, so saved a recording of the text instead.)
-		# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.	
-		
+		# Audio drivers (or something) need a few seconds before audio will be able to play when run early on boot via LaunchDaemon. So try for up to 60 seconds before continuing.
+
 		for (( wait_to_play_seconds = 0; wait_to_play_seconds < 60; wait_to_play_seconds ++ )); do
 			osascript -e 'set volume output volume 50 without output muted' -e 'set volume alert volume 100' &> /dev/null
 			if afplay "${SCRIPT_DIR}/Announcements/fg-error-occurred.aiff" &> /dev/null; then

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.2.17-1
+-- Version: 2023.9.12-3
 
 -- App Icon is “Studio Microphone” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -238,6 +238,19 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 end try
 
 
+if ((input volume of (get volume settings)) is equal to missing value) then
+	try
+		activate
+	end try
+	try
+		do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+	end try
+	display alert "No Microphone Detected" message "👉 IF THIS MAC IS SUPPOSED TO HAVE A MICROPHONE, THEN MICROPHONE TEST HAS FAILED ‼️" buttons {"Quit"} default button 1 as critical
+	quit
+	delay 10
+end if
+
+
 set microphoneTestDuration to 10
 set testCount to 0
 set tryAgainWithoutPrompting to false
@@ -426,9 +439,12 @@ try
 					activate
 				end try
 				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+				end try
+				try
 					display alert "Microphone Test Failed to Record
 
-👉 Microphone Test can still pass if this only happens once and the next attempt records properly." message " 
+👉 Microphone Test can still pass if this only happens once and the next attempt records properly." message "
 ❌ IF THIS HAPPENS REPEATEDLY, THEN MICROPHONE TEST FAILED ‼️" buttons {"Quit", "Test Microphone Again"} cancel button 1 default button 2 as critical
 					set tryAgainWithoutPrompting to true
 				on error

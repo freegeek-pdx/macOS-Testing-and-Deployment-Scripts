@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.2.17-1
+-- Version: 2023.7.12-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -106,6 +106,20 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		end if
 	end try
 	
+	try
+		((("/Users/" & demoUsername & "/Applications/Free Geek Reset.app") as POSIX file) as alias)
+		
+		if ((do shell script ("id -F " & (quoted form of demoUsername))) is equal to "Free Geek Reset User") then -- Quit and launch "Free Geek Reset" if it's currently running or was started but somehow not finished (since this app will launch automatically at boot and periodically, this is a safety net if "Free Geek Reset" is somehow interrupted.)
+			try
+				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+				do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Reset.app"))
+			end try
+			
+			quit
+			delay 10
+		end if
+	end try
+	
 	set systemVersion to (system version of (system info))
 	considering numeric strings
 		set isMojaveOrNewer to (systemVersion ≥ "10.14")
@@ -118,7 +132,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		set globalTCCdbPath to "/Library/Application Support/com.apple.TCC/TCC.db" -- For more info about the TCC.db structure, see "fg-install-os" script and https://www.rainforestqa.com/blog/macos-tcc-db-deep-dive
 		set whereAllowedOrAuthValue to "allowed = 1"
 		if (isBigSurOrNewer) then set whereAllowedOrAuthValue to "auth_value = 2"
-		set globalTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of globalTCCdbPath) & " 'SELECT client,service FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the global TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access.
+		set globalTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of globalTCCdbPath) & " 'SELECT client,service FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the global TCC.db will error if "Free Geek Demo Helper" doesn't have Full Disk Access.
 		
 		if (globalTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAccessibility")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Accessibility Access")
 		
@@ -127,7 +141,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			if (globalTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceSystemPolicyAllFiles")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access") -- This should not be possible to hit since reading the global TCC.db would have errored if this app didn't have FDA, but check anyways.
 			
 			set userTCCdbPath to ((POSIX path of (path to library folder from user domain)) & "Application Support/com.apple.TCC/TCC.db")
-			set userTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of userTCCdbPath) & " 'SELECT client,service,indirect_object_identifier FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the user TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access (but that should never happen because we couldn't get this far without FDA).
+			set userTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of userTCCdbPath) & " 'SELECT client,service,indirect_object_identifier FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the user TCC.db will error if "Free Geek Demo Helper" doesn't have Full Disk Access (but that should never happen because we couldn't get this far without FDA).
 			
 			if (userTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAppleEvents|com.apple.systemevents")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED AppleEvents/Automation Access for “System Events”")
 			if (userTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAppleEvents|com.apple.finder")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED AppleEvents/Automation Access for “Finder”")
@@ -140,7 +154,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 				activate
 			end try
 			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			display alert ("CRITICAL “" & (name of me) & "” TCC ERROR:
 
@@ -154,10 +168,6 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		quit
 		delay 10
 	end try
-	
-	set userLaunchAgentsPath to ((POSIX path of (path to library folder from user domain)) & "LaunchAgents/")
-	set demoHelperLaunchAgentPlistName to "org.freegeek.Free-Geek-Demo-Helper.plist"
-	set demoHelperLaunchAgentPlistPath to userLaunchAgentsPath & demoHelperLaunchAgentPlistName
 	
 	set qaCompleteHasRun to true
 	try
@@ -259,7 +269,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		
 		-- HIDE ADMIN USER
 		try
-			if ((do shell script ("dscl -plist . -read /Users/" & adminUsername & " IsHidden 2> /dev/null | xmllint --xpath '//string[1]/text()' - 2> /dev/null; exit 0")) is not equal to "1") then
+			if ((do shell script ("dscl -plist . -read /Users/" & adminUsername & " IsHidden 2> /dev/null | xmllint --xpath 'string(//string)' - 2> /dev/null; exit 0")) is not equal to "1") then
 				doShellScriptAsAdmin("dscl . -create /Users/" & adminUsername & " IsHidden 1")
 			end if
 		end try
@@ -458,7 +468,7 @@ killall ControlStrip
 				set currentHIToolboxAppleDictationAutoEnable to (do shell script "defaults read com.apple.HIToolbox AppleDictationAutoEnable")
 			end try
 			
-			if ((currentHIToolboxAppleDictationAutoEnable is not equal to "0")) then
+			if (currentHIToolboxAppleDictationAutoEnable is not equal to "0") then
 				do shell script "defaults write com.apple.HIToolbox AppleDictationAutoEnable -int 0"
 			end if
 		end try
@@ -506,8 +516,6 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 			set volume alert volume 0
 		end try
 		
-		set wirelessNetworkPasswordsToDelete to {}
-		
 		
 		set desktopPicturesFolderPath to "/System/Library/Desktop Pictures/" -- Desktop Pictures location changed to this on Catalina and AppleScript fails to return it.
 		try
@@ -522,14 +530,14 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 			set desktopPicturesFolderPath to (POSIX path of ((((dynamicDesktopPicture as POSIX file) as alias) as text) & "::")) -- Get current desktopPicturesFolderPath for future-proofing.
 		end try
 		
+		set wirelessNetworkPasswordsToDelete to {}
 		
 		tell application id "com.apple.systemevents"
 			try
 				set intendedDriveName to "Macintosh HD"
-				set currentDriveName to (name of startup disk)
-				if (currentDriveName is not equal to intendedDriveName) then
-					doShellScriptAsAdmin("/usr/sbin/diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName))
-					if (isCatalinaOrNewer) then doShellScriptAsAdmin("/usr/sbin/diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")))
+				if ((name of startup disk) is not equal to intendedDriveName) then
+					tell me to doShellScriptAsAdmin("diskutil rename / " & (quoted form of intendedDriveName))
+					if (isCatalinaOrNewer) then tell me to doShellScriptAsAdmin("diskutil rename /System/Volumes/Data " & (quoted form of (intendedDriveName & " - Data")))
 				end if
 			end try
 			
@@ -577,18 +585,18 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 									set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & thisWiFiInterfaceID)
 									set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 									if (getWiFiNetworkColonOffset > 0) then
-										set (end of preferredWirelessNetworks) to ("	" & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
+										set (end of preferredWirelessNetworks) to (tab & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
 									end if
 								end try
 								repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
-									if (thisPreferredWirelessNetwork starts with "	") then
+									if (thisPreferredWirelessNetwork starts with tab) then
 										set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 										if ((thisPreferredWirelessNetwork is not equal to "FG Reuse") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
 											try
 												do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
 											end try
 											try
-												doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
+												tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
 											end try
 											set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 										end if
@@ -601,10 +609,10 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 							try
 								if (qaCompleteHasRun) then
 									-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-									doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'Free Geek'")
+									tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'Free Geek'")
 								else
 									-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-									doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
+									tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
 								end if
 							end try
 						end if
@@ -666,11 +674,6 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 				end try
 				set warns before emptying of trash to true
 			end tell
-		end try
-		
-		try
-			(("/Applications/fgreset" as POSIX file) as alias)
-			doShellScriptAsAdmin("chflags hidden /Applications/fgreset")
 		end try
 		
 		-- DISABLE NOTIFICATIONS
@@ -820,7 +823,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end try
 		
 		try
-			if (application id "com.apple.TMHelperAgent" is running) then
+			if (application "/System/Library/CoreServices/backupd.bundle/Contents/Resources/TMHelperAgent.app" is running) then -- if application id "com.apple.TMHelperAgent" is used then compilation could fail if TMHelperAgent hasn't been run yet this boot.
 				repeat 60 times
 					set clickedDontUseButton to false
 					with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
@@ -844,28 +847,32 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			end if
 		end try
 		
+		
 		try
-			-- If "loginwindow" has any windows open, it would be an erroneous scheduled shut down prompt since if the date is set back to a reset Snapshot date during boot,
-			-- and then set back to actual time when a reset Snapshot is mounted, macOS triggers the shutdown schedule since it thinks the shutdown date has just passed.
-			-- So, just click the Cancel button to dismiss this window and not shut down (the shut down schedule will still take effect when the actual time arrives).
-			tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.loginwindow")
-				repeat with thisLoginwindowWindow in windows
-					if ((count of buttons of thisLoginwindowWindow) ≥ 2) then
-						repeat with thisLoginwindowButton in (buttons of thisLoginwindowWindow)
-							if (title of thisLoginwindowButton is "Cancel") then
-								click thisLoginwindowButton
-								exit repeat
-							end if
-						end repeat
-					end if
-				end repeat
-			end tell
+			set secondsSinceMidnight to (time of the (current date))
+			if ((secondsSinceMidnight < 63000) or (secondsSinceMidnight > 66600)) then
+				-- If "loginwindow" has any windows open when it's not between 5:30PM-6:30PM, it would be an erroneous scheduled shut down prompt since if the date is set back to a reset Snapshot date during boot,
+				-- and then set back to actual time when a reset Snapshot is mounted, macOS triggers the shutdown schedule since it thinks the shutdown date has just passed.
+				-- So, just click the Cancel button to dismiss this window and not shut down (the shut down schedule will still take effect when the actual time arrives).
+				tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.loginwindow")
+					repeat with thisLoginwindowWindow in windows
+						if ((count of buttons of thisLoginwindowWindow) ≥ 2) then
+							repeat with thisLoginwindowButton in (buttons of thisLoginwindowWindow)
+								if (title of thisLoginwindowButton is "Cancel") then
+									click thisLoginwindowButton
+									exit repeat
+								end if
+							end repeat
+						end if
+					end repeat
+				end tell
+			end if
 		end try
 		
 		try
 			(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
 		on error
-			if ((year of the (current date)) < 2022) then
+			if ((year of the (current date)) < 2023) then
 				try
 					doShellScriptAsAdmin("systemsetup -setusingnetworktime off; systemsetup -setusingnetworktime on")
 				end try
@@ -878,7 +885,8 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 		end try
 		
 		try
-			((demoHelperLaunchAgentPlistPath as POSIX file) as alias)
+			set userLaunchAgentsPath to ((POSIX path of (path to library folder from user domain)) & "LaunchAgents/")
+			(((userLaunchAgentsPath & "org.freegeek.Free-Geek-Demo-Helper.plist") as POSIX file) as alias)
 			
 			if (qaCompleteHasRun) then -- Only quit apps and if Setup has finished and installed the Demo Helper LaunchAgent and Cleanup After QA Complete has been run to help not interfere with initial setup possibilities.
 				try -- Don't quit apps if "TESTING" flag folder exists on desktop
@@ -909,6 +917,12 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 						end if
 					end try
 				end try
+				
+				-- (RE-)SET POWER ON AND SHUTDOWN SCHEDULE
+				-- This will have been set in Cleanup After QA Complete, but reset it just in case (and I believe that it must be reset [including fully canceling it first] to properly take affect if it was triggered prematurely from a time change to preserve the reset Snapshot and the prompt was closed by Demo Helper).
+				try
+					doShellScriptAsAdmin("pmset repeat cancel; pmset repeat poweron TWRFSU 9:45:00 shutdown TWRFSU 18:10:00")
+				end try
 			end if
 			
 			
@@ -922,14 +936,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 						activate
 					end try
 					
-					set linebreakOrNot to "
-"
-					set tabOrLinebreaks to "	"
+					set linebreakOrNot to linefeed
+					set tabOrLinebreaks to tab
 					if (isBigSurOrNewer) then
 						set linebreakOrNot to ""
-						set tabOrLinebreaks to "
-
-"
+						set tabOrLinebreaks to (linefeed & linefeed)
 					end if
 					
 					try
@@ -1050,14 +1061,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 						activate
 					end try
 					
-					set linebreakOrNot to "
-"
-					set tabOrLinebreaks to "	"
+					set linebreakOrNot to linefeed
+					set tabOrLinebreaks to tab
 					if (isBigSurOrNewer) then
 						set linebreakOrNot to ""
-						set tabOrLinebreaks to "
-
-"
+						set tabOrLinebreaks to (linefeed & linefeed)
 					end if
 					
 					try
@@ -1163,10 +1171,46 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 					activate
 				end try
 				
-				set contactFreeGeekDialogButton to "                                                 Shut Down                                                 "
-				-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
-				if (isCatalinaOrNewer) then set contactFreeGeekDialogButton to "Shut Down                                                                                                  "
-				display dialog "THIS MAC IS NOT READY FOR PERSONAL USE!
+				try
+					((("/Users/" & demoUsername & "/Applications/Free Geek Reset.app") as POSIX file) as alias)
+					-- The "Free Geek Reset" app can either perform an "Erase All Content & Settings" reset by automating "Erase Assistant" on T2 or Apple Silicon Macs running macOS 12 Monterey or newer,
+					-- or it will display instruction on how to perform the Snapshot Reset and auto-reboot into Recovery if is a pre-T2 Mac or running macOS 11 Big Sur or older.
+					
+					try
+						display dialog "THIS MAC IS NOT READY FOR PERSONAL USE, but you can reset this Mac yourself!
+
+It appears you've purchased a Mac from Free Geek that was not reset to be ready for you to use. This was our mistake, we apologize for the inconvenience.
+
+You WILL NOT need to return this Mac to Free Geek for it to be reset.
+
+
+This Mac is currently set up with custom settings that are not intended for personal use. A reset process must be run to remove these custom settings and prepare this Mac for you to create your own account.
+
+IF YOU SAVE YOUR PERSONAL INFORMATION ON THIS MAC BEFORE RUNNING THE RESET PROCESS, IT WILL BE PERMANENTLY DELETED ONCE THE RESET IS PERFORMED.
+
+You SHOULD NOT USE this Mac until you've reset this Mac.
+
+The reset process is only a few steps and will take less than 10 minutes.
+
+
+PLEASE CONTACT Free Geek THROUGH eBay IF YOU HAVE ANY QUESTIONS.
+If you've recieved this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form." buttons {"Shut Down                                             ", "Reset This Mac                                             "} cancel button 1 default button 2 with title (name of me) with icon caution
+						
+						try
+							-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+							do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Reset.app"))
+						end try
+					on error
+						tell application id "com.apple.systemevents" to shut down with state saving preference
+					end try
+					
+					quit
+					delay 10
+				on error
+					set contactFreeGeekDialogButton to "                                                 Shut Down                                                 "
+					-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
+					if (isCatalinaOrNewer) then set contactFreeGeekDialogButton to "Shut Down                                                                                                  "
+					display dialog "THIS MAC IS NOT READY FOR PERSONAL USE!
 PLEASE CONTACT Free Geek THROUGH eBay!
 
 It appears you've purchased a Mac from Free Geek that was not reset to be ready for you to use.
@@ -1186,11 +1230,12 @@ IF YOU SAVE YOUR PERSONAL INFORMATION ON THIS MAC BEFORE RUNNING THE RESET PROCE
 You SHOULD NOT USE this Mac until you've contacted Free Geek so that we can guide you through the reset process.
 
 The reset process is only a few steps and will take less than 10 minutes." buttons {contactFreeGeekDialogButton} default button 1 with title (name of me) with icon caution
-				
-				tell application id "com.apple.systemevents" to shut down with state saving preference
-				
-				quit
-				delay 10
+					
+					tell application id "com.apple.systemevents" to shut down with state saving preference
+					
+					quit
+					delay 10
+				end try
 			end if
 		end try
 		
@@ -1409,11 +1454,20 @@ on doShellScriptAsAdmin(command)
 	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
 	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
 	
-	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
-		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
-		set lastDoShellScriptAsAdminAuthDate to (current date)
+	set currentDate to (current date)
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or (currentDate ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+		set commandOutput to (do shell script command user name adminUsername password adminPassword with prompt "This “" & (name of me) & "” password prompt REALLY should not have been displayed.
+
+Please inform Free Geek I.T. that you saw this password prompt.
+
+You can just press “Cancel” below to continue." with administrator privileges)
+		set lastDoShellScriptAsAdminAuthDate to currentDate -- Set lastDoShellScriptAsAdminAuthDate to date *BEFORE* command was run since the command itself could have updated the date and the 5 minute timeout started when the command started, not when it finished.
 	else
-		set commandOutput to (do shell script command with administrator privileges)
+		set commandOutput to (do shell script command with prompt "This “" & (name of me) & "” password prompt should not have been displayed.
+
+Please inform Free Geek I.T. that you saw this password prompt.
+
+You can just press “Cancel” below to continue." with administrator privileges)
 	end if
 	
 	return commandOutput

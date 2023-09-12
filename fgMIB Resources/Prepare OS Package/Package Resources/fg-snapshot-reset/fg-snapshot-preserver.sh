@@ -46,7 +46,7 @@
 	# It seems that somehow the "deleted" daemon is maybe marking the reset Snapshot as unusable and preventing it from being able to show up in "Restore from Time Machine Backup" in Recovery. This seems to not be an issue on macOS 11 Big Sur though.
 	# So, ALWAYS manipulate the system date (Solution 1) to keep set to the Snapshot date on macOS 10.15 Catalina and do not bother mounting the Snapshot (since knowing the Snapshot got purged is better user feedback than it just not showing in Recovery).
 
-readonly SCRIPT_VERSION='2023.3.1-1'
+readonly SCRIPT_VERSION='2023.4.7-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
@@ -68,7 +68,7 @@ write_to_log() {
 
 write_to_log "Running Snapshot Preserver (version ${SCRIPT_VERSION})"
 
-if pgrep -qaf "${BASH_SOURCE[0]}"; then
+if pgrep -qf "${BASH_SOURCE[0]}"; then
 	# Need to check for an existing instance already running because of how this script could also be executed by a LaunchDaemon as well as
 	# "Free Geek Setup" or "Free Geek Demo Helper" which could conflict with each other and cause multiple instances to be executed at the same time.
 	# But, the LaunchDaemon schedule alone will never execute multiple instances if the previous LaunchDaemon instance is still running.

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2022.11.30-1
+-- Version: 2023.7.20-3
 
 -- App Icon is “Broom” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -154,7 +154,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		set globalTCCdbPath to "/Library/Application Support/com.apple.TCC/TCC.db" -- For more info about the TCC.db structure, see "fg-install-os" script and https://www.rainforestqa.com/blog/macos-tcc-db-deep-dive
 		set whereAllowedOrAuthValue to "allowed = 1"
 		if (isBigSurOrNewer) then set whereAllowedOrAuthValue to "auth_value = 2"
-		set globalTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of globalTCCdbPath) & " 'SELECT client,service FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the global TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access.
+		set globalTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of globalTCCdbPath) & " 'SELECT client,service FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the global TCC.db will error if "Cleanup After QA Complete" doesn't have Full Disk Access.
 		
 		if (globalTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAccessibility")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Accessibility Access")
 		
@@ -163,7 +163,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			if (globalTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceSystemPolicyAllFiles")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access") -- This should not be possible to hit since reading the global TCC.db would have errored if this app didn't have FDA, but check anyways.
 			
 			set userTCCdbPath to ((POSIX path of (path to library folder from user domain)) & "Application Support/com.apple.TCC/TCC.db")
-			set userTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of userTCCdbPath) & " 'SELECT client,service,indirect_object_identifier FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the user TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access (but that should never happen because we couldn't get this far without FDA).
+			set userTCCallowedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of userTCCdbPath) & " 'SELECT client,service,indirect_object_identifier FROM access WHERE (" & whereAllowedOrAuthValue & ")'"))) -- This SELECT command on the user TCC.db will error if "Cleanup After QA Complete" doesn't have Full Disk Access (but that should never happen because we couldn't get this far without FDA).
 			
 			if (userTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAppleEvents|com.apple.systemevents")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED AppleEvents/Automation Access for “System Events”")
 			if (userTCCallowedAppsAndServices does not contain (currentBundleIdentifier & "|kTCCServiceAppleEvents|com.apple.finder")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED AppleEvents/Automation Access for “Finder”")
@@ -176,7 +176,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 				activate
 			end try
 			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			display alert ("CRITICAL “" & (name of me) & "” TCC ERROR:
 
@@ -260,7 +260,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			activate
 		end try
 		try
-			do shell script "afplay /System/Library/Sounds/Basso.aiff"
+			do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 		end try
 		display alert "This Mac has an SSD installed,
 but TRIM is not enabled." message "
@@ -271,10 +271,6 @@ This Mac CANNOT BE SOLD in its current state, please set this Mac aside and info
 		delay 10
 	end if
 	
-	
-	set cleanupDialogButton to "   Cleanup & Shut Down   "
-	-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
-	if (isCatalinaOrNewer) then set cleanupDialogButton to "Cleanup & Shut Down      "
 	
 	set deleteTouchIDnote to ""
 	try
@@ -318,9 +314,74 @@ The following actions will be peformed:
 	⁃ Remove “QA Helper” alias from Desktop.
 	⁃ Delete “" & (name of me) & "” app.
 	
-This process cannot be undone.
+This process cannot be undone." buttons {"Don't Cleanup After QA Complete Yet", "Cleanup After QA Complete"} cancel button 1 default button 2 with title (name of me) with icon note
+	
+	set hasT2chip to false
+	try
+		set hasT2chip to ((do shell script "ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
+	end try
+	
+	set isAppleSilicon to false
+	try
+		set isAppleSilicon to ((do shell script "sysctl -in hw.optional.arm64") is equal to "1")
+	end try
+	
+	try
+		if (hasT2chip) then
+			if ((do shell script "nvram '94B73556-2197-4702-82A8-3E1337DAFBFB:AppleSecureBootPolicy'") does not end with "%02") then -- https://github.com/dortania/OpenCore-Legacy-Patcher/blob/b85256d9708a299b9f7ea15cb3456248a1a666b7/resources/utilities.py#L242 & https://macadmins.slack.com/archives/CGXNNJXJ9/p1686766296067939?thread_ts=1686766055.849109&cid=CGXNNJXJ9
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+				end try
+				display alert "CRITICAL “" & (name of me) & "” ERROR:
 
-THIS MAC WILL BE SHUT DOWN AFTER THE PROCESS IS COMPLETE." buttons {"Don't Cleanup After QA Complete Yet", cleanupDialogButton} cancel button 1 default button 2 with title (name of me) with icon note
+Startup Securty IS REDUCED on this T2 Mac." message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Quit"} default button 1 as critical
+				quit
+				delay 10
+			end if
+		else if (isAppleSilicon) then
+			if (doShellScriptAsAdmin("bputil -d") does not contain "(smb0): absent") then
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+				end try
+				display alert "CRITICAL “" & (name of me) & "” ERROR:
+
+Startup Securty IS REDUCED on this Apple Silicon Mac." message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Quit"} default button 1 as critical
+				quit
+				delay 10
+			end if
+		end if
+	end try
+	
+	try
+		if ((do shell script "csrutil status") is not equal to "System Integrity Protection status: enabled.") then
+			if (isAppleSilicon) then
+				-- If on Apple Silicon, enabling SIP requires authentication from a Secure Token admin (which won't have ever existed) to enable or disable it,
+				-- so it should be impossible to be enabled, and we wouldn't be able to disable it if it was.
+				-- So, fully stop with an error if somehow SIP is NOT enabled on an Apple Silicon Mac.
+				try
+					activate
+				end try
+				try
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+				end try
+				display alert "CRITICAL “" & (name of me) & "” ERROR:
+
+System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Quit"} default button 1 as critical
+				quit
+				delay 10
+			else
+				try
+					doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect, which does not need to happen now and will just happen after next boot.
+				end try
+			end if
+		end if
+	end try
 	
 	try -- Don't check Remote Management if "TESTING" flag folder exists on desktop
 		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
@@ -399,7 +460,7 @@ to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
 						activate
 					end try
 					try
-						do shell script "afplay /System/Library/Sounds/Basso.aiff"
+						do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 					end try
 					set nextAllowedProfilesShowTime to "23 hours after last successful check"
 					try
@@ -421,8 +482,14 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 						if ((count of remoteManagementOutputParts) > 3) then
 							set progress description to "
 ⚠️	Remote Management IS Enabled"
-							set remoteManagementOrganizationName to "\"Unknown Organization\""
+							set remoteManagementOrganizationName to "Unknown Organization"
 							set remoteManagementOrganizationContactInfo to {}
+							
+							set modelIdentifier to "N/A"
+							try
+								set modelIdentifier to (do shell script "sysctl -n hw.model")
+							end try
+							set logRemoteManagedMacsCommand to ("curl -m 5 -sfL 'https://apps.freegeek.org/macland/log_remote_managed.php' --data-urlencode " & (quoted form of ("source=" & (name of me))) & " --data-urlencode " & (quoted form of ("model=" & modelIdentifier)) & " --data-urlencode " & (quoted form of ("serial=" & serialNumber)))
 							
 							repeat with thisRemoteManagementOutputPart in remoteManagementOutputParts
 								set organizationNameOffset to (offset of "OrganizationName = " in thisRemoteManagementOutputPart)
@@ -433,29 +500,57 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 								set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = " in thisRemoteManagementOutputPart)
 								
 								if (organizationNameOffset > 0) then
-									set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart) -- Leave quotes around Organization Name.
-									if ((remoteManagementOrganizationName does not start with "\"") or (remoteManagementOrganizationName does not end with "\"")) then set remoteManagementOrganizationName to ("\"" & remoteManagementOrganizationName & "\"") -- Or add quotes if somehow they don't exist.
+									set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart)
+									if ((remoteManagementOrganizationName starts with "\"") and (remoteManagementOrganizationName ends with "\"")) then set remoteManagementOrganizationName to (text 2 thru -2 of remoteManagementOrganizationName) -- Remove quotes if they exist, which they always should since this should always be a string value.
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("organization=" & remoteManagementOrganizationName)))
 								else if (organizationDepartmentOffset > 0) then
 									set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 25) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationDepartment starts with "\"") and (remoteManagementOrganizationDepartment ends with "\"")) then set remoteManagementOrganizationDepartment to (text 2 thru -2 of remoteManagementOrganizationDepartment) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationDepartment starts with "\"") and (remoteManagementOrganizationDepartment ends with "\"")) then set remoteManagementOrganizationDepartment to (text 2 thru -2 of remoteManagementOrganizationDepartment) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
 									if ((remoteManagementOrganizationDepartment is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationDepartment)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationDepartment
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("department=" & remoteManagementOrganizationDepartment)))
 								else if (organizationEmailOffset > 0) then
 									set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 20) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationEmail starts with "\"") and (remoteManagementOrganizationEmail ends with "\"")) then set remoteManagementOrganizationEmail to (text 2 thru -2 of remoteManagementOrganizationEmail) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationEmail starts with "\"") and (remoteManagementOrganizationEmail ends with "\"")) then set remoteManagementOrganizationEmail to (text 2 thru -2 of remoteManagementOrganizationEmail) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
 									if ((remoteManagementOrganizationEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationEmail
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("email=" & remoteManagementOrganizationEmail)))
 								else if (organizationSupportEmailOffset > 0) then
 									set remoteManagementOrganizationSupportEmail to (text (organizationSupportEmailOffset + 27) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationSupportEmail starts with "\"") and (remoteManagementOrganizationSupportEmail ends with "\"")) then set remoteManagementOrganizationSupportEmail to (text 2 thru -2 of remoteManagementOrganizationSupportEmail) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationSupportEmail starts with "\"") and (remoteManagementOrganizationSupportEmail ends with "\"")) then set remoteManagementOrganizationSupportEmail to (text 2 thru -2 of remoteManagementOrganizationSupportEmail) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
 									if ((remoteManagementOrganizationSupportEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportEmail
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("support_email=" & remoteManagementOrganizationSupportEmail)))
 								else if (organizationPhoneOffset > 0) then
 									set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 20) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationPhone starts with "\"") and (remoteManagementOrganizationPhone ends with "\"")) then set remoteManagementOrganizationPhone to (text 2 thru -2 of remoteManagementOrganizationPhone) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationPhone starts with "\"") and (remoteManagementOrganizationPhone ends with "\"")) then set remoteManagementOrganizationPhone to (text 2 thru -2 of remoteManagementOrganizationPhone) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
 									if ((remoteManagementOrganizationPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationPhone
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("phone=" & remoteManagementOrganizationPhone)))
 								else if (organizationSupportPhoneOffset > 0) then
 									set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 27) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationSupportPhone starts with "\"") and (remoteManagementOrganizationSupportPhone ends with "\"")) then set remoteManagementOrganizationSupportPhone to (text 2 thru -2 of remoteManagementOrganizationSupportPhone) -- Quotes may or may not exist around this vaue depending on its type (such as string vs int), so remove them if they exist.
+									if ((remoteManagementOrganizationSupportPhone starts with "\"") and (remoteManagementOrganizationSupportPhone ends with "\"")) then set remoteManagementOrganizationSupportPhone to (text 2 thru -2 of remoteManagementOrganizationSupportPhone) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
 									if ((remoteManagementOrganizationSupportPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportPhone
+									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("support_phone=" & remoteManagementOrganizationSupportPhone)))
 								end if
+							end repeat
+							
+							repeat
+								try
+									if ((do shell script logRemoteManagedMacsCommand) is equal to "DONE") then exit repeat
+								end try
+								
+								try
+									activate
+								end try
+								try
+									do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+								end try
+								display alert "Failed to Log Remote Managed Mac
+
+You must be connected to the internet to be able to log this Remote Managed Mac." message "Make sure you're connected to either the “Free Geek” or “FG Reuse” Wi-Fi network or plugged in with an Ethernet cable.
+								
+If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
+								
+Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
+								
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Try Again"} default button 1 as critical giving up after 10
 							end repeat
 							
 							set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
@@ -468,7 +563,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 								activate
 							end try
 							try
-								do shell script "afplay /System/Library/Sounds/Basso.aiff"
+								do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 							end try
 							set remoteManagementDialogButton to "                                                       Shut Down                                                       "
 							-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
@@ -479,14 +574,14 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 
 
 
-🔒	THIS MAC IS MANAGED BY " & remoteManagementOrganizationName & "
+🔒	THIS MAC IS MANAGED BY “" & remoteManagementOrganizationName & "”
 
-🔑	ONLY " & remoteManagementOrganizationName & " CAN DISABLE REMOTE MANAGEMENT
+🔑	ONLY “" & remoteManagementOrganizationName & "” CAN DISABLE REMOTE MANAGEMENT
 
-☎️	" & remoteManagementOrganizationName & " MUST BE CONTACTED BY A MANAGER:
+☎️	“" & remoteManagementOrganizationName & "” MUST BE CONTACTED BY A MANAGER:
 		" & remoteManagementOrganizationContactInfoDisplay & "
 
-🆔	THE SERIAL NUMBER FOR THIS MAC IS \"" & serialNumber & "\"
+🆔	THE SERIAL NUMBER FOR THIS MAC IS “" & serialNumber & "”
 
 
 
@@ -674,8 +769,8 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 		set currentDriveName to intendedDriveName
 		tell application id "com.apple.systemevents" to set currentDriveName to (name of startup disk)
 		if (currentDriveName is not equal to intendedDriveName) then
-			doShellScriptAsAdmin("diskutil rename " & (quoted form of currentDriveName) & " " & (quoted form of intendedDriveName))
-			if (isCatalinaOrNewer) then doShellScriptAsAdmin("diskutil rename " & (quoted form of (currentDriveName & " - Data")) & " " & (quoted form of (intendedDriveName & " - Data")))
+			doShellScriptAsAdmin("diskutil rename / " & (quoted form of intendedDriveName))
+			if (isCatalinaOrNewer) then doShellScriptAsAdmin("diskutil rename /System/Volumes/Data " & (quoted form of (intendedDriveName & " - Data")))
 		end if
 	end try
 	
@@ -693,18 +788,18 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 							set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & thisWiFiInterfaceID)
 							set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 							if (getWiFiNetworkColonOffset > 0) then
-								set (end of preferredWirelessNetworks) to ("	" & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
+								set (end of preferredWirelessNetworks) to (tab & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
 							end if
 						end try
 						repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
-							if (thisPreferredWirelessNetwork starts with "	") then
+							if (thisPreferredWirelessNetwork starts with tab) then
 								set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 								if (thisPreferredWirelessNetwork is not equal to "Free Geek") then
 									try
 										do shell script "networksetup -setairportpower " & thisWiFiInterfaceID & " off"
 									end try
 									try
-										doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
+										tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
 									end try
 									set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 								end if
@@ -716,7 +811,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 					end try
 					try
 						-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-						doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'Free Geek'")
+						tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'Free Geek'")
 					end try
 				end if
 			end repeat
@@ -755,7 +850,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	delay 0.5
 	
 	try
-		do shell script "afplay /System/Library/Sounds/Glass.aiff"
+		do shell script "afplay /System/Library/Sounds/Glass.aiff > /dev/null 2>&1 &"
 	on error
 		beep
 	end try
@@ -763,46 +858,139 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 	-- Not sure why, but calling "activate" is failing after this point on 10.15.4 (even in "tell current application" block)
 	
 	set designedForSnapshotReset to false
-	if (isCatalinaOrNewer) then
+	try
+		(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
+		set designedForSnapshotReset to true
+	on error
 		try
-			(("/Users/Shared/.fgResetSnapshotCreated" as POSIX file) as alias)
+			(("/Users/Shared/.fgResetSnapshotLost" as POSIX file) as alias)
 			set designedForSnapshotReset to true
+			
+			((("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app") as POSIX file) as alias)
+			
+			try
+				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+				do shell script ("open -na '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
+			end try
+			
+			quit
+			delay 10
+		end try
+	end try
+	
+	set shutDownAfterCleanup to false
+	set rebootAfterCleanup to false
+	
+	try
+		activate
+	end try
+	
+	if (designedForSnapshotReset) then
+		if (not isAppleSilicon) then
+			try
+				display dialog "✅	Finished Cleaning Up After QA Complete
+
+Would you like to Snapshot Reset this Mac now?
+
+
+USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
+
+• Reboot into Recovery (will happen automatically after clicking the confirmation button below).
+
+• Choose “English” if prompted for Language in Recovery.
+
+• Select “Restore from Time Machine”.
+
+• Select “Macintosh HD” as “Restore Source” (there should only be one option).
+
+• Select the Local Snapshot with time close to midnight (there should only be one option).
+
+• Confirm restoring Snapshot." buttons {"Don't Shut Down or Reboot Into Recovery Yet", "No, Shut Down", "Yes, Reboot Into Recovery"} cancel button 2 default button 3 with title (name of me) with icon note
+				
+				if ((button returned of result) is equal to "Yes, Reboot Into Recovery") then
+					try
+						-- https://mrmacintosh.com/boot-to-internet-recovery-recovery-partition-or-diagnostics-from-macos/
+						-- https://twocanoes.com/booting-to-macos-recovery-and-diagnostics-mode/
+						-- NOTE: "internet-recovery-mode=RecoveryModeDisk" works on all pre-Apple Silicon Macs (and only boots to Recovery once), but "recovery-boot-mode=unused" only works when SIP is disabled.
+						doShellScriptAsAdmin("nvram internet-recovery-mode=RecoveryModeDisk")
+					end try
+					
+					set rebootAfterCleanup to true
+				end if
+			on error
+				set shutDownAfterCleanup to true
+			end try
+		else -- CANNOT auto-reboot into Recovery using NVRAM variables on Apple Silicon (but Apple Silicon Macs should always be doing the newer "Erase Assistant" (EAC&S) reset, but keep this here while transitioning to newer processes).
+			try
+				display dialog "✅	Finished Cleaning Up After QA Complete
+
+Don't forget to manually boot into Recovery to Snapshot Reset this Mac!
+
+
+USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
+
+• Reboot into Recovery by holding the Power button when booting until “Loading startup options…” is shown and then choose “Options”.
+
+• Choose “English” if prompted for Language in Recovery.
+
+• Select “Restore from Time Machine”.
+
+• Select “Macintosh HD” as “Restore Source” (there should only be one option).
+
+• Select the Local Snapshot with time close to midnight (there should only be one option).
+
+• Confirm restoring Snapshot." buttons {"Don't Shut Down Yet", "Shut Down Now"} cancel button 1 default button 2 with title (name of me) with icon note
+				
+				set shutDownAfterCleanup to true
+			end try
+		end if
+	else
+		set tabOrLinebreaks to tab
+		if (isBigSurOrNewer) then set tabOrLinebreaks to (linefeed & linefeed)
+		
+		try
+			((("/Users/" & demoUsername & "/Applications/Free Geek Reset.app") as POSIX file) as alias)
+			-- The "Free Geek Reset" app can either perform an "Erase All Content & Settings" reset by automating "Erase Assistant" on T2 or Apple Silicon Macs running macOS 12 Monterey or newer.
+			
+			try
+				display alert "✅" & tabOrLinebreaks & "Finished Cleaning Up
+	After QA Complete" buttons {"Don't Shut Down or Reset Yet", "Shut Down", "Reset Mac"} cancel button 2 default button 3
+				if ((button returned of result) is equal to "Reset Mac") then
+					try
+						-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+						do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Reset.app"))
+					end try
+				end if
+			on error
+				set shutDownAfterCleanup to true
+			end try
 		on error
 			try
-				(("/Users/Shared/.fgResetSnapshotLost" as POSIX file) as alias)
-				set designedForSnapshotReset to true -- Still don't want to move Setup to Shared for fgreset even if the reset Snapshot was lost since fgreset still should not be used if the Snapshot reset was intended.
+				display alert "Finished Cleaning Up
+After QA Complete" message "
+BUT THE “Free Geek Reset” APP WAS NOT FOUND TO RESET THIS MAC!
+
+This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Don't Shut Down", "Shut Down Now"} cancel button 1 default button 2 as critical
+				
+				set shutDownAfterCleanup to true
 			end try
 		end try
 	end if
 	
-	set resetMethod to "“fgreset”"
-	if designedForSnapshotReset then set resetMethod to "Snapshot Reset"
-	try
-		activate
-	end try
-	display alert "Don't forget to " & resetMethod & " this Mac!" message "Since this computer will not be turned on and running in The Free Geek Store, " & resetMethod & " must be done before delivering it to The Free Geek Store."
-	
-	try
-		try
-			activate
-		end try
-		set tabOrLinebreaks to "	"
-		if (isBigSurOrNewer) then set tabOrLinebreaks to "
-
-"
-		display alert "✅" & tabOrLinebreaks & "Finished Cleaning Up
-	After QA Complete" message "
-This Mac will Shut Down in 15 Seconds…" buttons {"Don't Shut Down", "Shut Down Now"} cancel button 1 default button 2 giving up after 15
-		
-		tell application id "com.apple.systemevents" to shut down with state saving preference
-	end try
-	
 	try
 		set pathToMe to (POSIX path of (path to me))
 		if ((offset of ".app" in pathToMe) > 0) then
-			do shell script ("tccutil reset All " & currentBundleIdentifier & "; rm -rf " & (quoted form of pathToMe)) -- Resetting TCC for specific bundle IDs should work on Mojave and newer, but does not actually work on Mojave because of a bug (http://www.openradar.me/6813106), but that's ok since we don't install Mojave and all TCC permissions will get reset by "fgreset" on High Sierra (or Mojave).
+			do shell script ("tccutil reset All " & currentBundleIdentifier & "; rm -rf " & (quoted form of pathToMe)) -- Resetting TCC for specific bundle IDs should work on Mojave and newer, but does not actually work on Mojave because of a bug (http://www.openradar.me/6813106), but that's ok since we no longer install Mojave or older anyways.
 		end if
 	end try
+	
+	tell application id "com.apple.systemevents"
+		if (shutDownAfterCleanup) then
+			shut down with state saving preference
+		else if (rebootAfterCleanup) then
+			restart with state saving preference
+		end if
+	end tell
 else
 	try
 		activate
@@ -821,11 +1009,16 @@ on doShellScriptAsAdmin(command)
 	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
 	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
 	
-	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+	set currentDate to (current date)
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or (currentDate ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
 		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
-		set lastDoShellScriptAsAdminAuthDate to (current date)
+		set lastDoShellScriptAsAdminAuthDate to currentDate -- Set lastDoShellScriptAsAdminAuthDate to date *BEFORE* command was run since the command itself could have updated the date and the 5 minute timeout started when the command started, not when it finished.
 	else
-		set commandOutput to (do shell script command with administrator privileges)
+		set commandOutput to (do shell script command with prompt "This “" & (name of me) & "” password prompt should not have been displayed.
+
+Please inform Free Geek I.T. that you saw this password prompt.
+
+You can just press “Cancel” below to continue." with administrator privileges)
 	end if
 	
 	return commandOutput

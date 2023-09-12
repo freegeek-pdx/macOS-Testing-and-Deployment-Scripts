@@ -9,7 +9,7 @@ cd "${HOME}/Documents/Programming/Free Geek/MacLand Images/" && read "?'Mac Test
 # Command to FORMAT & PARTITION fgMIB + macOS Installers + Mac Test Boot:
 # NOTE: For some reason (at least as of macOS 12.6.1 Monterey) each desired size need 0.13G added to it to result in the correct desired size. The sizes (plus 0.13G) being used for each installer are specified in the "Create macOS USB Installer Commands.txt" based on testing to find the minimum required size for each macOS version installer.
 
-read '?Enter Disk ID to Format and Partition for fgMIB + macOS Installers + Mac Test Boot: disk' disk_id && diskutil partitionDisk "disk${disk_id}" 6 GPT JHFS+ 'fgMIB' 2.13G JHFS+ 'Install macOS Catalina' 9.13G JHFS+ 'Install macOS Big Sur' 14.13G JHFS+ 'Install macOS Monterey' 14.73G JHFS+ 'Install macOS Ventura' 14.93G JHFS+ 'Mac Test Boot' 0B
+read '?Enter Disk ID to Format and Partition for fgMIB + macOS Installers + Mac Test Boot: disk' disk_id && diskutil partitionDisk "disk${disk_id}" 6 GPT JHFS+ 'fgMIB' 2.13G JHFS+ 'Install macOS Catalina' 9.13G JHFS+ 'Install macOS Big Sur' 14.13G JHFS+ 'Install macOS Monterey' 14.83G JHFS+ 'Install macOS Ventura' 14.93G JHFS+ 'Mac Test Boot' 0B
 
 
 

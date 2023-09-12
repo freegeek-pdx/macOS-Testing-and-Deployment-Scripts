@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.1.23-1
+-- Version: 2023.7.7-3
 
 -- App Icon is “Counterclockwise Arrows” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -192,7 +192,7 @@ if (appVersion is not equal to "UNKNOWN") then
 				activate
 			end try
 			try
-				do shell script "afplay /System/Library/Sounds/Basso.aiff"
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			try
 				display dialog (name of me) & " Failed to Check for Updates
@@ -417,10 +417,10 @@ end try
 						doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgUpdaterJustUpdatedItself")))
 					end try
 				else
-					do shell script "afplay /System/Library/Sounds/Basso.aiff; rm -rf " & (quoted form of appUpdateTempFilePath)
+					do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 & rm -rf " & (quoted form of appUpdateTempFilePath)
 				end if
 			on error
-				do shell script "afplay /System/Library/Sounds/Basso.aiff; rm -rf " & (quoted form of appUpdateTempFilePath)
+				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 & rm -rf " & (quoted form of appUpdateTempFilePath)
 			end try
 		end if
 	end if
@@ -750,11 +750,16 @@ on doShellScriptAsAdmin(command)
 	-- To be safe, "do shell script with administrator privileges" will be re-authenticated with the credentials every 4.5 minutes.
 	-- NOTICE: "do shell script" calls are intentionally NOT in "try" blocks since detecting and catching those errors may be critical to the code calling the "doShellScriptAsAdmin" function.
 	
-	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or ((current date) ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
+	set currentDate to (current date)
+	if ((lastDoShellScriptAsAdminAuthDate is equal to 0) or (currentDate ≥ (lastDoShellScriptAsAdminAuthDate + 270))) then -- 270 seconds = 4.5 minutes.
 		set commandOutput to (do shell script command user name adminUsername password adminPassword with administrator privileges)
-		set lastDoShellScriptAsAdminAuthDate to (current date)
+		set lastDoShellScriptAsAdminAuthDate to currentDate -- Set lastDoShellScriptAsAdminAuthDate to date *BEFORE* command was run since the command itself could have updated the date and the 5 minute timeout started when the command started, not when it finished.
 	else
-		set commandOutput to (do shell script command with administrator privileges)
+		set commandOutput to (do shell script command with prompt "This “" & (name of me) & "” password prompt should not have been displayed.
+
+Please inform Free Geek I.T. that you saw this password prompt.
+
+You can just press “Cancel” below to continue." with administrator privileges)
 	end if
 	
 	return commandOutput

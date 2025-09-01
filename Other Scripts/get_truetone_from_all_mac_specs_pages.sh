@@ -21,14 +21,14 @@
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
-declare -a all_mac_identification_pages=() # All Mac identification pages are listed on https://support.apple.com/HT213325 as well as in the "On the product or its packaging" section of https://support.apple.com/HT201581
-all_mac_identification_pages+=( 'HT201300' ) # MacBook Pro
-all_mac_identification_pages+=( 'HT201862' ) # MacBook Air
-all_mac_identification_pages+=( 'HT201608' ) # MacBook
-all_mac_identification_pages+=( 'HT201634' ) # iMac
-#all_mac_identification_pages+=( 'HT201894' ) # Mac mini
-#all_mac_identification_pages+=( 'HT213073' ) # Mac Studio
-#all_mac_identification_pages+=( 'HT202888' ) # Mac Pro
+declare -a all_mac_identification_pages=() # All Mac identification pages are listed on https://support.apple.com/102604 as well as in the "Product or packaging" section of https://support.apple.com/102767
+all_mac_identification_pages+=( '108052' ) # MacBook Pro
+all_mac_identification_pages+=( '102869' ) # MacBook Air
+all_mac_identification_pages+=( '103257' ) # MacBook
+all_mac_identification_pages+=( '108054' ) # iMac
+#all_mac_identification_pages+=( '102852' ) # Mac mini
+#all_mac_identification_pages+=( '102231' ) # Mac Studio
+#all_mac_identification_pages+=( '102887' ) # Mac Pro
 
 every_truetone_model=''
 
@@ -39,18 +39,18 @@ for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
 	while IFS='' read -r this_model_id_or_specs_url; do
 		if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
 			echo " (${this_model_id_or_specs_url}):"
-			truetone_element_from_page="$(curl -m 5 -sfL "${this_model_id_or_specs_url}" | xmllint --html --xpath 'string(//*[contains(text(),"True Tone")])' - 2> /dev/null)"
+			truetone_element_from_page="$(curl -m 5 -sfL "${this_model_id_or_specs_url}" | xmllint --html --xpath 'string(//*[contains(text(),"True") and contains(text(),"Tone")])' - 2> /dev/null)" # NOTE: Check for each word separately to handle with or without a non-breaking space between the words.
 			if [[ -n "${truetone_element_from_page}" ]]; then
 				echo "Supports True Tone"
 				every_truetone_model+="${this_model_identifier}+"
 			else
 				echo "DOES NOT SUPPORT True Tone"
 			fi
-		else
+		elif [[ "${this_model_id_or_specs_url}" == *','* ]]; then
 			this_model_identifier="${this_model_id_or_specs_url}"
-			echo -en "\n${this_model_identifier}"
+			echo -en "\n\n${this_model_identifier}"
 		fi
-	done < <(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')
+	done < <(echo "${this_mac_idenification_page_source}" | sed s'/<\/p><p/<\/p>\n<p/g' | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("</b>", "", $NF); gsub("</p>", "", $NF); print ""; print $NF } /Tech Specs/ { for (f = 1; f <= NF; f ++) { if (($f ~ /support.apple.com/) && !($f ~ /\/specs$/)) { print "https:" $f; break } else if (($f ~ /^\//) && !($f ~ /\./)) { print "https://support.apple.com" $f; break } } }')
 	# echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur
 done
 
@@ -60,7 +60,7 @@ echo "\"${every_truetone_model//$'\n'/", "}\""
 
 echo ''
 
-# Example output from 2/1/23:
+# Example output from 5/15/25:
 
 # Supports True Tone
-# "Mac14,2", "Mac14,5", "Mac14,6", "Mac14,7", "Mac14,9", "Mac14,10", "MacBookAir8,2", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2"
+# "Mac14,2", "Mac14,5", "Mac14,6", "Mac14,7", "Mac14,9", "Mac14,10", "Mac14,15", "Mac15,3", "Mac15,4", "Mac15,5", "Mac15,6", "Mac15,7", "Mac15,8", "Mac15,9", "Mac15,10", "Mac15,11", "Mac15,12", "Mac15,13", "Mac16,1", "Mac16,2", "Mac16,3", "Mac16,5", "Mac16,6", "Mac16,7", "Mac16,8", "Mac16,12", "Mac16,13", "MacBookAir8,2", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2"

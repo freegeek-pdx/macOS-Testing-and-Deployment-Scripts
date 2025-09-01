@@ -20,7 +20,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-readonly SCRIPT_VERSION='2023.9.12-1'
+readonly SCRIPT_VERSION='2025.6.11-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -54,6 +54,21 @@ if echo "${current_process_list}" | grep -qi '[s]tartosinstall\|[I]nstallAssista
 fi
 
 
+BOOTED_BUILD_VERSION="$(sw_vers -buildVersion)"
+readonly BOOTED_BUILD_VERSION
+BOOTED_DARWIN_MAJOR_VERSION="$(echo "${BOOTED_BUILD_VERSION}" | cut -c -2 | tr -dc '[:digit:]')" # 18 = 10.14, 19 = 10.15, 20 = 11.0, 21 = 12.0, 22 = 13.0, 23 = 14.0, etc. ("uname -r" is not available in recoveryOS).
+readonly BOOTED_DARWIN_MAJOR_VERSION
+
+HAS_T2_CHIP="$([[ "$1" == 'debugT2' || -n "$(ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1)" ]] && echo 'true' || echo 'false')"
+if $HAS_T2_CHIP && [[ "$1" == 'debugNoT2' ]]; then HAS_T2_CHIP=false; fi
+readonly HAS_T2_CHIP
+
+if $HAS_T2_CHIP && (( BOOTED_DARWIN_MAJOR_VERSION < 20 )); then # "startosinstall" can error with exit code 18 when trying to install newer versions of macOS when booted into older Internet Recovery versions.
+	>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} \"fg-install-os\" MUST run from a newer recoveryOS version on T2 Macs.\n\n    ${ANSI_PURPLE}Reboot holding ${ANSI_BOLD}Command+Option+R${ANSI_PURPLE} to boot into a newer recoveryOS version.${CLEAR_ANSI}\n\n"
+	exit 1
+fi
+
+
 install_log_path='/private/tmp/Install OS Log.txt'
 
 write_to_log() {
@@ -64,11 +79,6 @@ write_to_log "Starting Install OS (version ${SCRIPT_VERSION} / recoveryOS $(sw_v
 
 SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
-
-BOOTED_BUILD_VERSION="$(sw_vers -buildVersion)"
-readonly BOOTED_BUILD_VERSION
-BOOTED_DARWIN_MAJOR_VERSION="$(echo "${BOOTED_BUILD_VERSION}" | cut -c -2 | tr -dc '[:digit:]')" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc. ("uname -r" is not available in recoveryOS).
-readonly BOOTED_DARWIN_MAJOR_VERSION
 
 pmset -a sleep 0 displaysleep 0 &> /dev/null # Disable sleep in recoveryOS.
 
@@ -128,10 +138,6 @@ readonly MODEL_ID
 
 readonly MODEL_ID_NAME="${MODEL_ID//[0-9,]/}" # Need use this whenever comparing along with Model ID numbers since there could be false matches for the newer "MacXX,Y" style Model IDs if I used SHORT_MODEL_NAME in those conditions instead (which I used to do).
 readonly MODEL_ID_NUMBER="${MODEL_ID//[^0-9,]/}"
-
-HAS_T2_CHIP="$([[ "$1" == 'debugT2' || -n "$(ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1)" ]] && echo 'true' || echo 'false')"
-if $HAS_T2_CHIP && [[ "$1" == 'debugNoT2' ]]; then HAS_T2_CHIP=false; fi
-readonly HAS_T2_CHIP
 
 IS_APPLE_SILICON="$([[ "$1" == 'debugAS' || "$(sysctl -in hw.optional.arm64)" == '1' ]] && echo 'true' || echo 'false')"
 if $IS_APPLE_SILICON && [[ "$1" == 'debugNoAS' ]]; then IS_APPLE_SILICON=false; fi
@@ -416,9 +422,10 @@ load_specs_overview() {
 				# If the "About This Mac" URL API (used above) failed or only returned the Short Model Name (such as how "MacBook Air" will only be returned for *SOME* 2013 "MacBookAir6,1" or "MacBookAir6,2" serials),
 				# fallback on using the "Specs Search" URL API (used below) to retrieve the Marketing Model Name (since it will return "MacBook Air (11-inch, Mid 2013)" for the 2013 "MacBookAir6,1" and "MacBook Air (13-inch, Mid 2013)" for the 2013 "MacBookAir6,2").
 				# For more information about this "Specs Search" URL API, see: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_specs_url_from_serial.sh
+				# IMPORTANT: On May 15th, 2025, "https://km.support.apple.com/kb/index?page=categorydata" started returning 403 Forbidden! But other active "page" values that are still used on other parts of their site still work, so I think this was intentionally taken down.
 
 				local serial_search_results_json
-				serial_search_results_json="$(curl -m 10 -sfL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${SERIAL}" 2> /dev/null)" # I have seem this URL API timeout after 5 seconds when called multiple times rapidly (likely because of rate limiting), so give it a 10 second timeout which seems to always work.
+				serial_search_results_json="$(curl -m 10 -sfL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${SERIAL}" 2> /dev/null)" # I have seen this URL API timeout after 5 seconds when called multiple times rapidly (likely because of rate limiting), so give it a 10 second timeout which seems to always work.
 
 				if [[ "${serial_search_results_json}" == *'"name"'* ]]; then
 					possible_downloaded_marketing_model_name="$(echo "${serial_search_results_json}" | awk -F '"' '($2 == "name") { print $4; exit }' | trim_and_squeeze_whitespace)" # "osascript" for JSON parsing via JXA doesn't exist in recoveryOS, so just use "awk" instead.
@@ -532,7 +539,7 @@ check_and_prompt_for_power_adapter_for_laptops() {
     ${ANSI_PURPLE}Plug in a ${ANSI_BOLD}Power Adapter${ANSI_PURPLE} and then press ${ANSI_BOLD}Return${ANSI_PURPLE} to continue.${CLEAR_ANSI}
 "
 		local power_adapter_testing_bypass
-		read -r power_adapter_testing_bypass
+		read -rt 15 power_adapter_testing_bypass
 
 		if [[ "${power_adapter_testing_bypass}" == 'TESTING' ]]; then
 			break
@@ -543,7 +550,7 @@ check_and_prompt_for_power_adapter_for_laptops() {
 set_date_time_from_internet() {
 	# Have to manually retrieve correct date/time and use the "date" command to set time in recoveryOS: https://www.alansiu.net/2020/08/05/setting-the-date-time-in-macos-10-14-recovery-mode/
 	local actual_date_time
-	actual_date_time="$(curl -m 5 -sfL 'http://worldtimeapi.org/api/ip.txt' 2> /dev/null | awk -F ': ' '($1 == "utc_datetime") { print $NF; exit }')" # Time gets set as UTC when using "date" command in recoveryOS.
+	actual_date_time="$(curl -m 5 -sfL 'http://api.freegeek.org/datetime?utc_only')" # Time gets set as UTC when using "date" command in recoveryOS.
 	# Always use "http" even though "https" could be used on macOS 10.12 Sierra and older or macOS 10.15 Catalina and newer since "libcurl" supports "https" on those versions,
 	# while "libcurl" doesn't support "https" macOS 10.13 High Sierra and macOS 10.14 Mojave for some reason (it's odd that older versions do support it though).
 	# Regardless, "http" is always used since this is to set the correct date and time and if the date is too far in the past "https" will fail anyways while "http" never will.
@@ -578,7 +585,7 @@ set_date_time_and_prompt_for_internet_if_year_not_correct() {
     If it takes more than a few minutes, please inform Free Geek I.T.${CLEAR_ANSI}
 "
 			local set_date_testing_bypass
-			read -r set_date_testing_bypass
+			read -rt 15 set_date_testing_bypass
 
 			set_date_time_from_internet
 
@@ -657,6 +664,8 @@ copy_customization_resources() {
 				touch "${install_volume_path}/private/var/db/.AppleSetupDone"
 				chown 0:0 "${install_volume_path}/private/var/db/.AppleSetupDone" "${install_volume_path}/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist" # Make sure these files are properly owned by root:wheel after installation.
 
+				rm -f "${install_volume_path}/private/var/db/.AppleSetupTermsOfService" # Starting in macOS 15.4 Sequoia, this file may exist by default and is DELETED when the "Terms and Conditions" are manually agreed to during Setup Assistant. So, delete it so that the T&C Setup Assistant screen is not shown when we are trying to totally skip Setup Assistant.
+
 				write_to_log 'Copied Customization Resources'
 
 				return 0
@@ -726,7 +735,12 @@ create_custom_global_tcc_database() {
 			allowed_or_authorized_fields='2,4'
 			footer_fields="NULL,0,'UNUSED',NULL,0,${current_unix_time}"
 		else # New fields were added to the "access" table in macOS 14 Sonoma.
-			create_global_tcc_db_commands+="INSERT INTO admin VALUES('version',29);"
+			if (( installed_os_darwin_major_version >= 24 )); then # The TCC.db version was changed in macOS 15 Sequoia, but the table structure is the same as macOS 14 Sonoma.
+				create_global_tcc_db_commands+="INSERT INTO admin VALUES('version',30);"
+			else
+				create_global_tcc_db_commands+="INSERT INTO admin VALUES('version',29);"
+			fi
+			
 			create_global_tcc_db_commands+="CREATE TABLE access (service TEXT NOT NULL, client TEXT NOT NULL, client_type INTEGER NOT NULL, auth_value INTEGER NOT NULL, auth_reason INTEGER NOT NULL, auth_version INTEGER NOT NULL, csreq BLOB, policy_id INTEGER, indirect_object_identifier_type INTEGER, indirect_object_identifier TEXT NOT NULL DEFAULT 'UNUSED', indirect_object_code_identity BLOB, flags INTEGER, last_modified INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER)), pid INTEGER, pid_version INTEGER, boot_uuid TEXT NOT NULL DEFAULT 'UNUSED', last_reminded INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER)), PRIMARY KEY (service, client, client_type, indirect_object_identifier), FOREIGN KEY (policy_id) REFERENCES policies(id) ON DELETE CASCADE ON UPDATE CASCADE);"
 			allowed_or_authorized_fields='2,4'
 			footer_fields="NULL,0,'UNUSED',NULL,0,${current_unix_time},NULL,NULL,'UNUSED',${current_unix_time}"
@@ -803,7 +817,7 @@ fi
 
 # Connect to Wi-Fi, but do not bother waiting for connection to finish.
 # Internet is required with T2 Macs since bridgeOS firmware could need to be downloaded.
-wifi_ssid='FG Reuse'
+wifi_ssid='FG Staff'
 wifi_password='[COPY RESOURCES SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]'
 
 while read -ra this_network_hardware_ports_line_elements; do
@@ -840,6 +854,11 @@ if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count == 0 )) ; then
 	global_install_notes+="\n    ${ANSI_YELLOW}${ANSI_BOLD}WARNING:${ANSI_YELLOW} No customization packages detected. Clean installation will be peformed.
     ${ANSI_RED}${ANSI_BOLD}!!! THIS SHOULD NOT HAVE HAPPENED !!!${ANSI_PURPLE} Please inform Free Geek I.T.${CLEAR_ANSI}"
 	write_to_log 'WARNING: Clean Installation Will Be Peformed Because No Packages Detected - THIS SHOULD NOT HAVE HAPPENED'
+fi
+
+is_clean_install=false
+if $CLEAN_INSTALL_REQUESTED || (( customization_packages_count == 0 )); then
+	is_clean_install=true
 fi
 
 
@@ -953,6 +972,7 @@ if (( ${#install_drive_choices[@]} == 0 )) || [[ -z "${install_drive_choices_dis
 	exit 1
 fi
 
+fusion_drive_recommended_note='' # TODO: Should this part of "global_install_notes" instead? Or is the extra emphasis good?
 if diskutil 2>&1 | grep -q '^     resetFusion' && (( ${#fusion_drive_choices[@]} == 2 )); then
 
 	# CHECK IF CAN CREATE FUSION DRIVE AND ADD TO "install_drive_choices_display" IF SO (Doing this while "Detecting Drives" is still being displayed.)
@@ -966,12 +986,13 @@ if diskutil 2>&1 | grep -q '^     resetFusion' && (( ${#fusion_drive_choices[@]}
 
 	if (( internal_ssd_count == 2 || ( internal_ssd_count == 1 && internal_hdd_count == 1 ) )); then
 		install_drive_choices+=( 'diskF' )
-		install_drive_choices_display="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}diskF:${ANSI_PURPLE} Create Fusion Drive ${ANSI_YELLOW}(Will ${ANSI_BOLD}ERASE BOTH${ANSI_YELLOW} Internal Drives)${CLEAR_ANSI}\n      ${ANSI_YELLOW}${ANSI_BOLD}NOTE:${ANSI_YELLOW} Creating a Fusion Drive is ${ANSI_BOLD}RECOMMENDED${ANSI_YELLOW} Over Installing On One Drive${CLEAR_ANSI}${install_drive_choices_display}"
+		fusion_drive_recommended_note="\n\n    ${ANSI_YELLOW}${ANSI_BOLD}NOTE:${ANSI_YELLOW} Creating a Fusion Drive is ${ANSI_BOLD}RECOMMENDED${ANSI_YELLOW} Over Installing On One Drive${CLEAR_ANSI}\n"
+		install_drive_choices_display="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}diskF:${ANSI_PURPLE} Create Fusion Drive ${ANSI_YELLOW}(Will ${ANSI_BOLD}ERASE BOTH${ANSI_YELLOW} Internal Drives)${CLEAR_ANSI}${install_drive_choices_display}"
 	fi
 fi
 
 
-if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f "${SCRIPT_DIR}/customization-resources/fg-install-packages.sh" ]]; then
+if ! $is_clean_install && [[ -f "${SCRIPT_DIR}/customization-resources/fg-install-packages.sh" ]]; then
 
 	# DETECT CLEAN INSTALLATIONS AND OFFER TO CUSTOMIZE IF FOUND
 
@@ -1046,6 +1067,10 @@ if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f
 								this_volume_os_name="macOS ${this_volume_os_version} Ventura"
 							elif [[ "${this_volume_os_version}" == '14'* ]]; then
 								this_volume_os_name="macOS ${this_volume_os_version} Sonoma"
+							elif [[ "${this_volume_os_version}" == '15'* ]]; then
+								this_volume_os_name="macOS ${this_volume_os_version} Sequoia"
+							elif [[ "${this_volume_os_version}" == '16'* || "${this_volume_os_version}" == '26'* ]]; then
+								this_volume_os_name="macOS ${this_volume_os_version} Tahoe"
 							fi
 
 							# "fg-prepare-os" script is only made to support macOS 10.13 High Sierra and newer, so do not allow installation on any macOS version that is not named above.
@@ -1098,10 +1123,10 @@ if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f
 								else
 									echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} ${this_volume_disk_id} Is Not an Internal Drive${CLEAR_ANSI}"
 								fi
-							elif $HAS_SEP; then
+							elif $HAS_SEP && [[ "${this_volume_os_version}" == '10.'* ]]; then
 								echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Would Not Be Able to Peform Reset of This macOS Version on SEP Mac${CLEAR_ANSI}"
 							else
-								echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} macOS ${this_volume_os_version} Is Not Supported${CLEAR_ANSI}"
+								echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} macOS ${this_volume_os_version} Is Not Yet Supported for Customization${CLEAR_ANSI}"
 							fi
 						else
 							echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Unable to Extract macOS Version${CLEAR_ANSI}"
@@ -1123,53 +1148,61 @@ clean_install_to_customize_drive_name=''
 
 if (( ${#clean_install_choices[@]} > 0 )); then
 	clean_install_choices_display+="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}N:${ANSI_PURPLE} None, Erase and Re-Install Instead${CLEAR_ANSI}"
+	customizing_recommended_note="\n    ${ANSI_YELLOW}${ANSI_BOLD}NOTE:${ANSI_YELLOW} Customizing an Existing Clean Installation is ${ANSI_BOLD}RECOMMENDED${ANSI_YELLOW}\n          ${ANSI_BOLD}UNLESS${ANSI_YELLOW} the Existing Clean Install Is ${ANSI_BOLD}NOT${ANSI_YELLOW} the Latest Major Version${CLEAR_ANSI}\n"
 
 	last_choose_clean_install_error=''
 	until [[ -n "${clean_install_to_customize_volume}" ]]; do
 		load_specs_overview
 		ansi_clear_screen
 		echo -e "${FG_MIB_HEADER}${specs_overview}"
-		echo -e "\n  ${ANSI_UNDERLINE}Choose Clean Installation to Customize:${CLEAR_ANSI}${last_choose_clean_install_error}${clean_install_choices_display}"
+		echo -e "\n  ${ANSI_UNDERLINE}Choose Clean Installation to Customize:${CLEAR_ANSI}\n${customizing_recommended_note}${last_choose_clean_install_error}${clean_install_choices_display}"
 
 		echo -en "\n  Enter the ${ANSI_BOLD}Index of Clean Installation${CLEAR_ANSI} to Customize (or ${ANSI_BOLD}\"N\" to Re-Install${CLEAR_ANSI}): "
 		read -r chosen_clean_install_index
 
-		if [[ "${chosen_clean_install_index}" =~ ^[Nn] ]]; then # Do not confirm NOT customizing, just continue to erase and re-install prompts.
-			break
+		if [[ "${chosen_clean_install_index}" =~ ^[Nn] ]]; then
+			echo -en "${customizing_recommended_note}\n  Enter ${ANSI_BOLD}\"N\"${CLEAR_ANSI} Again to Confirm Erasing and Re-Installing${CLEAR_ANSI}: "
+			read -r confirmed_erase_and_reinstall
+
+			if [[ "${confirmed_erase_and_reinstall}" =~ ^[Nn] ]]; then
+				break
+			else
+				last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Did Not Confirm Erasing and Re-Installing ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${CLEAR_ANSI}"
+			fi
 		else
 			chosen_clean_install_index="${chosen_clean_install_index//[^0-9]/}" # Remove all non-digits.
 			if [[ "${chosen_clean_install_index}" == '0'* ]]; then
 				chosen_clean_install_index="$(( 10#${chosen_clean_install_index} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
 			fi
-		fi
 
-		if [[ -n "${chosen_clean_install_index}" ]] && (( chosen_clean_install_index < ${#clean_install_choices[@]} )); then
-			IFS=':' read -rd '' possible_clean_install_os_name possible_clean_install_drive_name possible_clean_install_to_customize_volume < <(echo -n "${clean_install_choices[chosen_clean_install_index]}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
+			if [[ -n "${chosen_clean_install_index}" ]] && (( chosen_clean_install_index < ${#clean_install_choices[@]} )); then
+				IFS=':' read -rd '' possible_clean_install_os_name possible_clean_install_drive_name possible_clean_install_to_customize_volume < <(echo -n "${clean_install_choices[chosen_clean_install_index]}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
 
-			echo -en "\n  Enter ${ANSI_BOLD}${chosen_clean_install_index}${CLEAR_ANSI} Again to Confirm Customizing ${ANSI_BOLD}${possible_clean_install_os_name}${CLEAR_ANSI}\n  at ${ANSI_BOLD}\"${possible_clean_install_to_customize_volume}\"${CLEAR_ANSI} on ${ANSI_BOLD}${possible_clean_install_drive_name}${CLEAR_ANSI}: "
-			read -r confirmed_clean_install_index
+				echo -en "\n  Enter ${ANSI_BOLD}${chosen_clean_install_index}${CLEAR_ANSI} Again to Confirm Customizing ${ANSI_BOLD}${possible_clean_install_os_name}${CLEAR_ANSI}\n  at ${ANSI_BOLD}\"${possible_clean_install_to_customize_volume}\"${CLEAR_ANSI} on ${ANSI_BOLD}${possible_clean_install_drive_name}${CLEAR_ANSI}: "
+				read -r confirmed_clean_install_index
 
-			confirmed_clean_install_index="${confirmed_clean_install_index//[^0-9]/}" # Remove all non-digits.
-			if [[ "${confirmed_clean_install_index}" == '0'* ]]; then
-				confirmed_clean_install_index="$(( 10#${confirmed_clean_install_index} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
-			fi
-
-			if [[ "${chosen_clean_install_index}" == "${confirmed_clean_install_index}" ]]; then
-				if [[ -d "${possible_clean_install_to_customize_volume}" ]]; then
-					clean_install_to_customize_volume="${possible_clean_install_to_customize_volume}"
-					clean_install_to_customize_os_name="${possible_clean_install_os_name}"
-					clean_install_to_customize_drive_name="${possible_clean_install_drive_name}"
-				else
-					last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Selected Clean Installation No Longer Exists ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${ANSI_RED}\n     ${ANSI_BOLD}PATH:${ANSI_RED} ${possible_clean_install_to_customize_volume}${CLEAR_ANSI}"
-					write_to_log "ERROR: Selected Clean Installation (${possible_clean_install_to_customize_volume}) No Longer Exists"
+				confirmed_clean_install_index="${confirmed_clean_install_index//[^0-9]/}" # Remove all non-digits.
+				if [[ "${confirmed_clean_install_index}" == '0'* ]]; then
+					confirmed_clean_install_index="$(( 10#${confirmed_clean_install_index} ))" # Remove any leading zeros (https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale).
 				fi
+
+				if [[ "${chosen_clean_install_index}" == "${confirmed_clean_install_index}" ]]; then
+					if [[ -d "${possible_clean_install_to_customize_volume}" ]]; then
+						clean_install_to_customize_volume="${possible_clean_install_to_customize_volume}"
+						clean_install_to_customize_os_name="${possible_clean_install_os_name}"
+						clean_install_to_customize_drive_name="${possible_clean_install_drive_name}"
+					else
+						last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Selected Clean Installation No Longer Exists ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${ANSI_RED}\n     ${ANSI_BOLD}PATH:${ANSI_RED} ${possible_clean_install_to_customize_volume}${CLEAR_ANSI}"
+						write_to_log "ERROR: Selected Clean Installation (${possible_clean_install_to_customize_volume}) No Longer Exists"
+					fi
+				else
+					last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Did Not Confirm Index ${ANSI_BOLD}${chosen_clean_install_index}${ANSI_PURPLE} ${ANSI_BOLD}(CHOOSE AGAIN)${CLEAR_ANSI}"
+				fi
+			elif [[ -n "${chosen_clean_install_index}" ]]; then
+				last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Index ${ANSI_BOLD}${chosen_clean_install_index}${ANSI_RED} Is Not a Valid Choice ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${CLEAR_ANSI}"
 			else
-				last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Did Not Confirm Index ${ANSI_BOLD}${chosen_clean_install_index}${ANSI_PURPLE} ${ANSI_BOLD}(CHOOSE AGAIN)${CLEAR_ANSI}"
+				last_choose_clean_install_error=''
 			fi
-		elif [[ -n "${chosen_clean_install_index}" ]]; then
-			last_choose_clean_install_error="\n\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} Index ${ANSI_BOLD}${chosen_clean_install_index}${ANSI_RED} Is Not a Valid Choice ${ANSI_PURPLE}${ANSI_BOLD}(CHOOSE AGAIN)${CLEAR_ANSI}"
-		else
-			last_choose_clean_install_error=''
 		fi
 	done
 fi
@@ -1253,18 +1286,23 @@ ansi_clear_screen
 echo -e "${FG_MIB_HEADER}${specs_overview}\n\n  ${ANSI_CYAN}${ANSI_BOLD}Detecting macOS Installers...${CLEAR_ANSI}"
 
 readonly MODEL_ID_MAJOR_NUMBER="${MODEL_ID_NUMBER%%,*}"
-SUPPORTS_HIGH_SIERRA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '10' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '3' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '4' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '5' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
-readonly SUPPORTS_HIGH_SIERRA
-SUPPORTS_CATALINA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '13' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '5' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
-readonly SUPPORTS_CATALINA # macOS 10.15 Catalina supports the same models as macOS 10.14 Mojave (except for the MacPro5,1 with a Metal-capable GPU which maxes out at Mojave and is not included in the "SUPPORTS_CATALINA" conditions and is only included in the "SUPPORTS_HIGH_SIERRA" conditions since MacPro5,1 and Mojave installations are handled specially when they are done).
-SUPPORTS_BIG_SUR="$([[ ( "${MODEL_ID}" == 'iMac14,4' ) || ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '15' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '11' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
-readonly SUPPORTS_BIG_SUR
-SUPPORTS_MONTEREY="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '16' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID}" == 'MacBookPro11,4' ) || ( "${MODEL_ID}" == 'MacBookPro11,5' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '12' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
-readonly SUPPORTS_MONTEREY
-SUPPORTS_VENTURA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '18' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '10' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '14' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
-readonly SUPPORTS_VENTURA
-SUPPORTS_SONOMA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '19' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '15' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
-readonly SUPPORTS_SONOMA
+SUPPORTS_MACOS_10_13_HIGH_SIERRA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '10' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '3' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '4' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '5' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
+readonly SUPPORTS_MACOS_10_13_HIGH_SIERRA
+SUPPORTS_MACOS_10_15_CATALINA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '13' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '5' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
+readonly SUPPORTS_MACOS_10_15_CATALINA # macOS 10.15 Catalina supports the same models as macOS 10.14 Mojave (except for the MacPro5,1 with a Metal-capable GPU which maxes out at Mojave and is not included in the "SUPPORTS_MACOS_10_15_CATALINA" conditions and is only included in the "SUPPORTS_MACOS_10_13_HIGH_SIERRA" conditions since MacPro5,1 and Mojave installations are handled specially when they are done).
+SUPPORTS_MACOS_11_BIG_SUR="$([[ ( "${MODEL_ID}" == 'iMac14,4' ) || ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '15' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '11' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) ]] && echo 'true' || echo 'false')"
+readonly SUPPORTS_MACOS_11_BIG_SUR
+SUPPORTS_MACOS_12_MONTEREY="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '16' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID}" == 'MacBookPro11,4' ) || ( "${MODEL_ID}" == 'MacBookPro11,5' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '12' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '6' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
+readonly SUPPORTS_MACOS_12_MONTEREY
+SUPPORTS_MACOS_13_VENTURA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '18' ) || ( "${MODEL_ID_NAME}" == 'MacBook' && "${MODEL_ID_MAJOR_NUMBER}" -ge '10' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '14' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
+readonly SUPPORTS_MACOS_13_VENTURA
+SUPPORTS_MACOS_14_SONOMA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '19' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '15' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
+readonly SUPPORTS_MACOS_14_SONOMA
+SUPPORTS_MACOS_15_SEQUOIA="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '19' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '15' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '8' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'iMacPro' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
+readonly SUPPORTS_MACOS_15_SEQUOIA
+SUPPORTS_MACOS_26_TAHOE="$([[ ( "${MODEL_ID_NAME}" == 'iMac' && "${MODEL_ID_MAJOR_NUMBER}" -ge '20' ) || ( "${MODEL_ID}" == 'MacBookPro16,1' ) || ( "${MODEL_ID}" == 'MacBookPro16,2' ) || ( "${MODEL_ID}" == 'MacBookPro16,4' ) || ( "${MODEL_ID_NAME}" == 'MacBookPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '17' ) || ( "${MODEL_ID_NAME}" == 'MacBookAir' && "${MODEL_ID_MAJOR_NUMBER}" -ge '10' ) || ( "${MODEL_ID_NAME}" == 'Macmini' && "${MODEL_ID_MAJOR_NUMBER}" -ge '9' ) || ( "${MODEL_ID_NAME}" == 'MacPro' && "${MODEL_ID_MAJOR_NUMBER}" -ge '7' ) || ( "${MODEL_ID_NAME}" == 'Mac' ) ]] && echo 'true' || echo 'false')"
+readonly SUPPORTS_MACOS_26_TAHOE
+
 
 declare -a os_installer_choices=()
 os_installer_choices_display=''
@@ -1285,10 +1323,12 @@ for this_os_installer_search_group_prefixes in '/Volumes/Image ' '/Volumes/Insta
 			this_os_installer_app_path="${this_os_installer_path%.app/*}.app"
 			this_os_installer_darwin_major_version="$(PlistBuddy -c 'Print :DTSDKBuild' "${this_os_installer_app_path}/Contents/Info.plist" 2> /dev/null | cut -c -2 | tr -dc '[:digit:]')"
 			if [[ -n "${this_os_installer_darwin_major_version}" ]] && (( this_os_installer_darwin_major_version >= 10 )); then
-				if $IS_APPLE_SILICON && (( this_os_installer_darwin_major_version < 20 )); then
+				if ! $is_clean_install && (( this_os_installer_darwin_major_version > 25 )); then
+					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} This macOS Version Is Not Yet Supported for Customization${CLEAR_ANSI}"
+				elif $IS_APPLE_SILICON && (( this_os_installer_darwin_major_version < 20 )); then
 					# Do not allow Apple Silicon Mac to install macOS 10.15 Catalina and older since Apple Silicon support was introduced with macOS 11 Big Sur.
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} This macOS Version Is Not Supported on Apple Silicon Macs${CLEAR_ANSI}"
-				elif $HAS_T2_CHIP && ! $CLEAN_INSTALL_REQUESTED && (( this_os_installer_darwin_major_version < 20 )); then
+				elif $HAS_T2_CHIP && ! $is_clean_install && (( this_os_installer_darwin_major_version < 20 )); then
 					# Do not allow T2 Macs to install macOS 10.15 Catalina and older (unless doing a clean install) since Secure Tokens cannot be prevented and cannot be removed
 					# during Snapshot reset (on macOS 10.15 Catalina) and the last Secure Token admin could also not be removed by the custom "fgreset" which was used on macOS 10.14 Mojave and older.
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Would Not Be Able to Peform Reset of This macOS Version on T2 Macs${CLEAR_ANSI}"
@@ -1323,7 +1363,9 @@ for this_os_installer_search_group_prefixes in '/Volumes/Image ' '/Volumes/Insta
 
 			if (( this_os_installer_darwin_major_version >= 10 )); then
 				this_os_installer_version="10.$(( this_os_installer_darwin_major_version - 4 ))"
-				if (( this_os_installer_darwin_major_version >= 20 )); then # Darwin 20 and newer are macOS 11 and newer.
+				if (( this_os_installer_darwin_major_version >= 25 )); then # Darwin 25 and newer are macOS 26 and newer.
+					this_os_installer_version="$(( this_os_installer_darwin_major_version + 1 ))"
+				elif (( this_os_installer_darwin_major_version >= 20 )); then # Darwin 20 through 24 are macOS 11 through 15.
 					this_os_installer_version="$(( this_os_installer_darwin_major_version - 9 ))"
 				fi
 
@@ -1337,12 +1379,14 @@ for this_os_installer_search_group_prefixes in '/Volumes/Image ' '/Volumes/Insta
 			if [[ -f "${this_os_installer_app_path}/Contents/SharedSupport/SharedSupport.dmg" || -f "${this_os_installer_app_path}/Contents/SharedSupport/InstallESD.dmg" ]]; then
 				# Full installer apps will contain "SharedSupport.dmg" (on macOS 11 Big Sur and newer) or "InstallESD.dmg" (on macOS 10.15 Catalina or older).
 
-				if { ! $SUPPORTS_HIGH_SIERRA && [[ "${this_os_installer_name}" == *' High Sierra'* ]]; } ||
-					{ ! $SUPPORTS_CATALINA && [[ "${this_os_installer_name}" == *' Mojave'* || "${this_os_installer_name}" == *' Catalina'* ]]; } || # See comments when "SUPPORTS_CATALINA" is set for Catalina/Mojave support information.
-					{ ! $SUPPORTS_BIG_SUR && [[ "${this_os_installer_name}" == *' Big Sur'* ]]; } ||
-					{ ! $SUPPORTS_MONTEREY && [[ "${this_os_installer_name}" == *' Monterey'* ]]; } ||
-					{ ! $SUPPORTS_VENTURA && [[ "${this_os_installer_name}" == *' Ventura'* ]]; } ||
-					{ ! $SUPPORTS_SONOMA && [[ "${this_os_installer_name}" == *' Sonoma'* ]]; }; then
+				if { ! $SUPPORTS_MACOS_10_13_HIGH_SIERRA && [[ "${this_os_installer_name}" == *' High Sierra'* ]]; } ||
+					{ ! $SUPPORTS_MACOS_10_15_CATALINA && [[ "${this_os_installer_name}" == *' Mojave'* || "${this_os_installer_name}" == *' Catalina'* ]]; } || # See comments when "SUPPORTS_MACOS_10_15_CATALINA" is set for Catalina/Mojave support information.
+					{ ! $SUPPORTS_MACOS_11_BIG_SUR && [[ "${this_os_installer_name}" == *' Big Sur'* ]]; } ||
+					{ ! $SUPPORTS_MACOS_12_MONTEREY && [[ "${this_os_installer_name}" == *' Monterey'* ]]; } ||
+					{ ! $SUPPORTS_MACOS_13_VENTURA && [[ "${this_os_installer_name}" == *' Ventura'* ]]; } ||
+					{ ! $SUPPORTS_MACOS_14_SONOMA && [[ "${this_os_installer_name}" == *' Sonoma'* ]]; } ||
+					{ ! $SUPPORTS_MACOS_15_SEQUOIA && [[ "${this_os_installer_name}" == *' Sequoia'* ]]; } ||
+					{ ! $SUPPORTS_MACOS_26_TAHOE && [[ "${this_os_installer_name}" == *' Tahoe'* || "${this_os_installer_name}" == *' Beta'* ]]; }; then
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Model Does Not Support ${this_os_installer_name}${CLEAR_ANSI}"
 				elif [[ "$(strip_ansi_styles "${os_installer_choices_display}")" == *": ${this_os_installer_name}"* ]]; then
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"
@@ -1375,26 +1419,31 @@ for this_os_installer_search_group_prefixes in '/Volumes/Image ' '/Volumes/Insta
 	fi
 done
 
-# Include any stub installers (one will always be in recoveryOS root filesystem) as choices if a full installer for the same version has not already been found.
-is_first_stub_os_installer=true
-for this_stub_installer_info in "${stub_os_installers_info[@]}"; do
-	IFS=':' read -rd '' this_os_installer_name this_os_installer_usage_notes this_os_installer_path < <(echo -n "${this_stub_installer_info}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
+if $is_clean_install || $IS_APPLE_SILICON; then
+	# Include any stub installers (one will always be in recoveryOS root filesystem) as choices if a full installer for the same version has not already been found
+	# ONLY IF doing a clean install or an Apple Silicon install (with or without customizations). For some reason using "startosinstall --installpackage" with a STUB installer
+	# DOES NOT include/install the specified packages and just does a clean install (a customized install on Apple Silicon does not use "startosinstall" though).
 
-	# Do not need to check if model supports stub installer version since stubs should only be for an already booted version.
-	if [[ -n "${this_os_installer_name}" && -n "${this_os_installer_usage_notes}" && -n "${this_os_installer_path}" ]]; then # "this_os_installer_usage_notes" will always at least contain "Internet Required".
-		if [[ "$(strip_ansi_styles "${os_installer_choices_display}")" != *": ${this_os_installer_name}"* ]]; then
-			if $is_first_stub_os_installer; then
-				os_installer_choices_display+=$'\n'
-				is_first_stub_os_installer=false
+	is_first_stub_os_installer=true
+	for this_stub_installer_info in "${stub_os_installers_info[@]}"; do
+		IFS=':' read -rd '' this_os_installer_name this_os_installer_usage_notes this_os_installer_path < <(echo -n "${this_stub_installer_info}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
+
+		# Do not need to check if model supports stub installer version since stubs should only be for an already booted version.
+		if [[ -n "${this_os_installer_name}" && -n "${this_os_installer_usage_notes}" && -n "${this_os_installer_path}" ]]; then # "this_os_installer_usage_notes" will always at least contain "Internet Required".
+			if [[ "$(strip_ansi_styles "${os_installer_choices_display}")" != *": ${this_os_installer_name}"* ]]; then
+				if $is_first_stub_os_installer; then
+					os_installer_choices_display+=$'\n'
+					is_first_stub_os_installer=false
+				fi
+
+				os_installer_choices_display+="\n    ${ANSI_PURPLE}${ANSI_BOLD}${#os_installer_choices[@]}:${ANSI_PURPLE} ${this_os_installer_name}${CLEAR_ANSI} (${this_os_installer_usage_notes})"
+				os_installer_choices+=( "${this_os_installer_path}" )
+			else
+				echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_path%.app/*}.app\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"
 			fi
-
-			os_installer_choices_display+="\n    ${ANSI_PURPLE}${ANSI_BOLD}${#os_installer_choices[@]}:${ANSI_PURPLE} ${this_os_installer_name}${CLEAR_ANSI} (${this_os_installer_usage_notes})"
-			os_installer_choices+=( "${this_os_installer_path}" )
-		else
-			echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_path%.app/*}.app\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"
 		fi
-	fi
-done
+	done
+fi
 
 
 # PROMPT TO CHOOSE INSTALLER (only if more than one installer is available)
@@ -1478,6 +1527,7 @@ if (( os_installer_choices_count > 0 )); then
 				this_os_installer_usage_note="Selected installer ${ANSI_BOLD}is a stub${CLEAR_ANSI}, full installer will be downloaded."
 			elif [[ "${this_os_installer_usage_note}" == 'Clean Install Only' ]]; then
 				this_os_installer_usage_note="Selected installer ${ANSI_BOLD}does not support${CLEAR_ANSI} including customization packages."
+				is_clean_install=true
 			fi
 			global_install_notes+="\n    - ${this_os_installer_usage_note}"
 		done <<< "${os_installer_usage_notes}&" # NOTE: MUST include a trailing/terminating "&" so that the last last value doesn't get lost by the "while read" loop.
@@ -1512,7 +1562,7 @@ check_and_prompt_for_internet_for_stubs_and_t2_or_as_macs() {
     It may take a few moments for the internet connection to be established.
     If it takes more than a few minutes, please inform Free Geek I.T.${CLEAR_ANSI}
 "
-			read -r
+			read -rt 15
 		done
 	fi
 }
@@ -1693,7 +1743,7 @@ if $IS_APPLE_SILICON; then
 	fi
 
 	confirm_continue_response=''
-	until [[ "${confirm_continue_response}" == 'Y' ]]; do
+	until [[ "${confirm_continue_response}" =~ ^[Yy] ]]; do
 		load_specs_overview
 		ansi_clear_screen
 		echo -e "${FG_MIB_HEADER}${specs_overview}"
@@ -1702,7 +1752,7 @@ if $IS_APPLE_SILICON; then
 		if $erase_mac_has_been_run; then
 			write_to_log 'Detected "Erase Mac" Has Been Run on Apple Silicon'
 			echo -e "\n  ${ANSI_UNDERLINE}${os_installer_name} Is Ready to Be ${ANSI_BOLD}MANUALLY INSTALLED${CLEAR_ANSI}\n  ${ANSI_UNDERLINE}On This Apple Silicon Mac:${CLEAR_ANSI}"
-			echo -en "\n    ${ANSI_PURPLE}Enter ${ANSI_BOLD}Y${ANSI_PURPLE} to ${ANSI_UNDERLINE}PREPARE $($CLEAN_INSTALL_REQUESTED && echo 'INSTALLATION' || echo 'CUSTOMIZATIONS') AND VIEW INSTRUCTIONS${ANSI_PURPLE}\n    or Enter ${ANSI_BOLD}N${ANSI_PURPLE} to ${ANSI_UNDERLINE}EXIT${ANSI_PURPLE}:${CLEAR_ANSI} "
+			echo -en "\n    ${ANSI_PURPLE}Enter ${ANSI_BOLD}Y${ANSI_PURPLE} to ${ANSI_UNDERLINE}PREPARE $($is_clean_install && echo 'INSTALLATION' || echo 'CUSTOMIZATIONS') AND VIEW INSTRUCTIONS${ANSI_PURPLE}\n    or Enter ${ANSI_BOLD}N${ANSI_PURPLE} to ${ANSI_UNDERLINE}EXIT${ANSI_PURPLE}:${CLEAR_ANSI} "
 		else
 			write_to_log 'Detected "Erase Mac" Must Be Run Manually on Apple Silicon'
 			echo -e "\n  ${ANSI_UNDERLINE}Apple Silicon Macs Must Be ${ANSI_BOLD}MANUALLY ERASED${CLEAR_ANSI}\n  ${ANSI_UNDERLINE}Before ${ANSI_BOLD}INSTALLING${CLEAR_ANSI}${ANSI_UNDERLINE} ${os_installer_name}:${CLEAR_ANSI}"
@@ -1711,8 +1761,7 @@ if $IS_APPLE_SILICON; then
 
 		read -r confirm_continue_response
 
-		confirm_continue_response="$(echo "${confirm_continue_response}" | tr '[:lower:]' '[:upper:]')"
-		if [[ "${confirm_continue_response}" == 'N' ]]; then
+		if [[ "${confirm_continue_response}" =~ ^[Nn] ]]; then
 			echo -e '\n'
 			exit 0
 		fi
@@ -1773,7 +1822,7 @@ if $IS_APPLE_SILICON; then
 			exit 1
 		fi
 
-		if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )) && [[ -f "${SCRIPT_DIR}/customization-resources/fg-install-packages.sh" ]]; then
+		if ! $is_clean_install && [[ -f "${SCRIPT_DIR}/customization-resources/fg-install-packages.sh" ]]; then
 
 			# PREPARE CUSTOMIZATION RESOURCES
 
@@ -1851,8 +1900,8 @@ if $IS_APPLE_SILICON; then
     ${ANSI_PURPLE}${ANSI_BOLD}Now, the ${os_installer_name} installation must be started manually.${CLEAR_ANSI}
 
     The ${ANSI_BOLD}Install Assistant${CLEAR_ANSI} app has been opened in the background.
-    $($CLEAN_INSTALL_REQUESTED &&
-		echo "Clean installation will be peformed since \"$1\" argument has been used." ||
+    $($is_clean_install &&
+		echo "Clean installation will be peformed$($CLEAN_INSTALL_REQUESTED && echo " since \"$1\" argument has been used")." ||
 		echo "Even though it will look like you're starting a clean install process,
     it will be a customized install because of the preparation that's been done.")
 
@@ -1942,7 +1991,7 @@ else
 		ansi_clear_screen
 		echo -e "${FG_MIB_HEADER}${specs_overview}"
 		if [[ -n "${global_install_notes}" ]]; then echo -e "\n${global_install_notes}\n"; fi
-		echo -e "\n  ${ANSI_UNDERLINE}Choose Drive to ${ANSI_BOLD}COMPLETELY ERASE${CLEAR_ANSI}${ANSI_UNDERLINE} and ${ANSI_BOLD}INSTALL${CLEAR_ANSI}${ANSI_UNDERLINE} ${os_installer_name} Onto:${CLEAR_ANSI}${last_choose_drive_error}${install_drive_choices_display}"
+		echo -e "\n  ${ANSI_UNDERLINE}Choose Drive to ${ANSI_BOLD}COMPLETELY ERASE${CLEAR_ANSI}${ANSI_UNDERLINE} and ${ANSI_BOLD}INSTALL${CLEAR_ANSI}${ANSI_UNDERLINE} ${os_installer_name} Onto:${CLEAR_ANSI}${fusion_drive_recommended_note}${last_choose_drive_error}${install_drive_choices_display}"
 
 		echo -en "\n  Enter the ${ANSI_BOLD}ID of Drive${CLEAR_ANSI} to ${ANSI_UNDERLINE}COMPLETELY ERASE${CLEAR_ANSI}\n  and ${ANSI_UNDERLINE}INSTALL${CLEAR_ANSI} ${ANSI_BOLD}${os_installer_name}${CLEAR_ANSI} Onto: disk"
 		read -r chosen_disk_id_number
@@ -1958,7 +2007,11 @@ else
 		if [[ " ${install_drive_choices[*]} " == *" disk${chosen_disk_id_number} "* ]]; then
 			install_drive_name="$(strip_ansi_styles "${install_drive_choices_display}" | grep -m 1 "^    disk${chosen_disk_id_number}:")"
 			install_drive_name="${install_drive_name#*: }"
-			if [[ "${install_drive_name}" == 'Create Fusion Drive'* ]]; then install_drive_name='Fusion Drive'; fi
+			if [[ "${install_drive_name}" == 'Create Fusion Drive'* ]]; then
+				install_drive_name='Fusion Drive'
+			elif [[ -n "${fusion_drive_recommended_note}" ]]; then
+				echo -en "${fusion_drive_recommended_note#*\n}"
+			fi
 
 			echo -en "\n  Enter ${ANSI_BOLD}disk${chosen_disk_id_number}${CLEAR_ANSI} Again to Confirm ${ANSI_UNDERLINE}COMPLETELY ERASING${CLEAR_ANSI} and ${ANSI_UNDERLINE}INSTALLING${CLEAR_ANSI}\n  ${ANSI_BOLD}${os_installer_name}${CLEAR_ANSI} Onto ${ANSI_BOLD}${install_drive_name}${CLEAR_ANSI}: disk"
 			read -r confirmed_disk_id_number
@@ -2231,7 +2284,7 @@ else
 
 	if grep -qU -e '--installpackage, ' "${os_installer_path}"; then
 		# The "installpackage" argument is supported on macOS 10.13 High Sierra and newer.
-		if ! $CLEAN_INSTALL_REQUESTED && (( customization_packages_count > 0 )); then
+		if ! $is_clean_install; then
 			for this_customization_package_path in "${customization_packages[@]}"; do
 				os_installer_options+=( '--installpackage' "${this_customization_package_path}" )
 			done
@@ -2244,7 +2297,7 @@ else
 		os_installer_options+=( '--forcequitapps' )
 	fi
 
-	if ! $CLEAN_INSTALL_REQUESTED; then
+	if ! $is_clean_install; then
 		# See the "Now, FOR THE UPGRADE/RE-INSTALL TRICK!" section in the "ABOUT PERFORMING MANUALLY ASSISTED CUSTOMIZED CLEAN INSTALL ON APPLE SILICON" notes above about
 		# why the next file and folder creation commands are CRITICAL to be able to place a customized global TCC.db (which is SIP protected location when booted into the installed OS)
 		# in a way that it will be preserved during the installation process (via "startosinstall") and adopted by the installed OS (see comments in "create_custom_global_tcc_database" function for more info).

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.7.20-3
+-- Version: 2025.8.20-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: CFBundleAlternateNames: ["FG Reset", "fgreset", "Reset"]
@@ -245,6 +245,7 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 	considering numeric strings
 		set isMontereyOrNewer to (systemVersion ≥ "12.0")
 		set isVenturaOrNewer to (systemVersion ≥ "13.0")
+		set isTahoeOrNewer to (systemVersion ≥ "16.0")
 	end considering
 	
 	if (not isMontereyOrNewer) then
@@ -409,7 +410,38 @@ NOTE: You may need to select a language when rebooted into Recovery before Activ
 	end if
 	
 	try
+		doShellScriptAsAdmin("pmset repeat cancel") -- Cancel power schedule so that scheduled shut down doesn't interrupt reset (even though that timing would be increadibly rare).
+	end try
+	
+	try
 		activate
+	end try
+	
+	-- DISABLE CAPS LOCK IF ENABLED: https://forum.latenightsw.com/t/toggle-capslock/4319/11
+	-- So that passwords are not typed in caps
+	try
+		run script "ObjC.import(\"IOKit\");
+ObjC.import(\"CoreServices\");
+
+(() => {
+    var ioConnect = Ref();
+    var keystate = Ref();
+
+    $.IOServiceOpen(
+        $.IOServiceGetMatchingService(
+            $.kIOMasterPortDefault,
+            $.IOServiceMatching(
+                $.kIOHIDSystemClass
+            )
+        ),
+        $.mach_task_self_,
+        $.kIOHIDParamConnectType,
+        ioConnect
+    );
+    $.IOHIDSetModifierLockState(ioConnect, $.kIOHIDCapsLockState, 0);
+    $.IOServiceClose(ioConnect);
+	
+})();" in "JavaScript"
 	end try
 	
 	set eraseAssistantAppID to (id of application eraseAssistantAppPath)
@@ -461,7 +493,14 @@ NOTE: You may need to select a language when rebooted into Recovery before Activ
 		repeat 10 times -- Wait up to 10 seconds for auth prompt to close if was successful.
 			try
 				tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is eraseAssistantAppID)
-					if ((value of static text 1 of window 1) is equal to "Erase All Content & Settings") then
+					set eraseAssistantWindowHeaderTextValue to ""
+					if (isTahoeOrNewer) then
+						set eraseAssistantWindowHeaderTextValue to (value of static text 1 of scroll area 1 of window 1)
+					else
+						set eraseAssistantWindowHeaderTextValue to (value of static text 1 of window 1)
+					end if
+					
+					if (eraseAssistantWindowHeaderTextValue is equal to "Erase All Content & Settings") then
 						set didAuthenticateEraseAssistant to true
 						exit repeat
 					end if
@@ -560,179 +599,233 @@ on checkRemoteManagement()
 		if (serialNumber is not equal to "") then
 			try
 				repeat
-					try
-						do shell script "ping -t 5 -c 1 www.apple.com" -- Require that internet is connected DEP status to get checked.
-						exit repeat
-					on error
+					repeat
 						try
-							display dialog "You must be connected to the internet to be able to check for Remote Management.
+							do shell script "ping -t 5 -c 1 www.apple.com" -- Require that internet is connected DEP status to get checked.
+							exit repeat
+						on error
+							try
+								display dialog "You must be connected to the internet to be able to check for Remote Management.
 
 The rest of “" & (name of me) & "” cannot be run and this Mac CANNOT BE SOLD until it has been confirmed that Remote Management is not enabled on this Mac.
 
 
-Make sure you're connected to either the “Free Geek” or “FG Reuse” Wi-Fi network or plugged in with an Ethernet cable.
+Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
 
 If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
 
 Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
 
 If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Quit", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
-						on error
-							quit
-							delay 10
+							on error
+								quit
+								delay 10
+							end try
+						end try
+					end repeat
+					
+					set progress total steps to -1
+					set progress description to "
+🔒	Checking for Remote Management"
+					delay 0.5
+					
+					set checkRemoteManagedMacsLogCommand to ("curl --connect-timeout 5 -sfL " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED CHECK REMOTE MANAGED MACS LOG URL]") & " --data-urlencode " & (quoted form of ("serial=" & serialNumber)))
+					set remoteManagedMacIsAlreadyLogged to false
+					try
+						set remoteManagedMacIsAlreadyLogged to ((do shell script checkRemoteManagedMacsLogCommand) is equal to "ALREADY LOGGED")
+					end try
+					
+					set remoteManagementOutput to ""
+					try
+						try
+							set remoteManagementOutput to doShellScriptAsAdmin("profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0")
+						on error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
+							if (profilesShowDefaultUserErrorNumber is not equal to -60007) then error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
+							try
+								activate
+							end try
+							display alert "Would you like to check for
+Remote Management (ADE/DEP/MDM)?" message "Remote Management check will be skipped in 10 seconds." buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 10
+							if (gave up of result) then error number -128
+							set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" with prompt "Administrator Permission is required
+to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
 						end try
 					end try
-				end repeat
-				
-				set progress total steps to -1
-				set progress description to "
-🔒	Checking for Remote Management"
-				delay 0.5
-				
-				set remoteManagementOutput to ""
-				try
-					try
-						set remoteManagementOutput to doShellScriptAsAdmin("profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0")
-					on error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
-						if (profilesShowDefaultUserErrorNumber is not equal to -60007) then error profilesShowDefaultUserErrorMessage number profilesShowDefaultUserErrorNumber
+					
+					if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
+						try
+							set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
+						end try
+					else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
+						try
+							do shell script ("mkdir " & (quoted form of buildInfoPath))
+						end try
+						try
+							do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
+						end try
+					end if
+					
+					if (remoteManagementOutput contains " - Request too soon.") then -- Don't allow completion if rate limited and there was no previous cached output to use.
+						set progress description to "
+❌	UNABLE to Check for Remote Management"
 						try
 							activate
 						end try
-						display alert "Would you like to check for
-Remote Management (ADE/DEP/MDM)?" message "Remote Management check will be skipped in 10 seconds." buttons {"No", "Yes"} cancel button 1 default button 2 giving up after 10
-						if (gave up of result) then error number -128
-						set remoteManagementOutput to (do shell script "profiles renew -type enrollment; profiles show -type enrollment 2>&1; exit 0" with prompt "Administrator Permission is required
-to check for Remote Management (ADE/DEP/MDM)." with administrator privileges)
-					end try
-				end try
-				
-				if (remoteManagementOutput contains " - Request too soon.") then -- macOS 12.3 adds client side "profiles show" rate limiting of once every 23 hours: https://derflounder.wordpress.com/2022/03/22/profiles-command-includes-client-side-rate-limitation-for-certain-functions-on-macos-12-3/
-					try
-						set remoteManagementOutput to (do shell script ("cat " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))))
-					end try
-				else if (remoteManagementOutput is not equal to "") then -- So always cache the last "profiles show" output so we can show the last valid results in case it's checked again within 23 hours.
-					try
-						do shell script ("mkdir " & (quoted form of buildInfoPath))
-					end try
-					try
-						do shell script ("echo " & (quoted form of remoteManagementOutput) & " > " & (quoted form of (buildInfoPath & ".fgLastRemoteManagementCheckOutput"))) with administrator privileges -- DO NOT specify username and password in case it was prompted for. This will still work within 5 minutes of the last authenticated admin permissions run though.
-					end try
-				end if
-				
-				if (remoteManagementOutput contains " - Request too soon.") then -- Don't allow completion if rate limited and there was no previous cached output to use.
-					set progress description to "
-❌	UNABLE to Check for Remote Management"
-					try
-						activate
-					end try
-					try
-						do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
-					end try
-					set nextAllowedProfilesShowTime to "23 hours after last successful check"
-					try
-						set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
-					end try
-					display alert ("Cannot Reset This Mac
+						try
+							do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+						end try
+						set nextAllowedProfilesShowTime to "23 hours after last successful check"
+						try
+							set nextAllowedProfilesShowTime to ("at " & (do shell script "date -jv +23H -f '%FT%TZ %z' \"$(plutil -extract lastProfilesShowFetchTime raw /private/var/db/ConfigurationProfiles/Settings/.profilesFetchTimerCheck) +0000\" '+%-I:%M:%S %p on %D'"))
+						end try
+						display alert ("Cannot Reset This Mac
 
 Unable to Check Remote Management Because of Once Every 23 Hours Rate Limiting
 
-Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform Free Geek I.T." buttons {"Shut Down"} as critical
-					tell application id "com.apple.systemevents" to shut down with state saving preference
-					
-					quit
-					delay 10
-				else if (remoteManagementOutput is not equal to "") then
-					try
-						set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
+Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Shut Down"} as critical
+						tell application id "com.apple.systemevents" to shut down with state saving preference
 						
-						if ((count of remoteManagementOutputParts) > 3) then
-							set progress description to "
+						quit
+						delay 10
+					else if (remoteManagementOutput is not equal to "") then
+						try
+							set remoteManagementOutputParts to (paragraphs of remoteManagementOutput)
+							
+							if ((count of remoteManagementOutputParts) > 3) then
+								set progress description to "
 ⚠️	Remote Management IS Enabled"
-							set remoteManagementOrganizationName to "Unknown Organization"
-							set remoteManagementOrganizationContactInfo to {}
-							
-							set modelIdentifier to "N/A"
-							try
-								set modelIdentifier to (do shell script "sysctl -n hw.model")
-							end try
-							set logRemoteManagedMacsCommand to ("curl -m 5 -sfL 'https://apps.freegeek.org/macland/log_remote_managed.php' --data-urlencode " & (quoted form of ("source=" & (name of me))) & " --data-urlencode " & (quoted form of ("model=" & modelIdentifier)) & " --data-urlencode " & (quoted form of ("serial=" & serialNumber)))
-							
-							repeat with thisRemoteManagementOutputPart in remoteManagementOutputParts
-								set organizationNameOffset to (offset of "OrganizationName = " in thisRemoteManagementOutputPart)
-								set organizationDepartmentOffset to (offset of "OrganizationDepartment = " in thisRemoteManagementOutputPart)
-								set organizationEmailOffset to (offset of "OrganizationEmail = " in thisRemoteManagementOutputPart)
-								set organizationSupportEmailOffset to (offset of "OrganizationSupportEmail = " in thisRemoteManagementOutputPart)
-								set organizationPhoneOffset to (offset of "OrganizationPhone = " in thisRemoteManagementOutputPart)
-								set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = " in thisRemoteManagementOutputPart)
+								set remoteManagementOrganizationName to "Unknown Organization"
+								set remoteManagementOrganizationContactInfo to {}
 								
-								if (organizationNameOffset > 0) then
-									set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationName starts with "\"") and (remoteManagementOrganizationName ends with "\"")) then set remoteManagementOrganizationName to (text 2 thru -2 of remoteManagementOrganizationName) -- Remove quotes if they exist, which they always should since this should always be a string value.
-									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("organization=" & remoteManagementOrganizationName)))
-								else if (organizationDepartmentOffset > 0) then
-									set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 25) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationDepartment starts with "\"") and (remoteManagementOrganizationDepartment ends with "\"")) then set remoteManagementOrganizationDepartment to (text 2 thru -2 of remoteManagementOrganizationDepartment) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationDepartment is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationDepartment)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationDepartment
-									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("department=" & remoteManagementOrganizationDepartment)))
-								else if (organizationEmailOffset > 0) then
-									set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 20) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationEmail starts with "\"") and (remoteManagementOrganizationEmail ends with "\"")) then set remoteManagementOrganizationEmail to (text 2 thru -2 of remoteManagementOrganizationEmail) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationEmail
-									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("email=" & remoteManagementOrganizationEmail)))
-								else if (organizationSupportEmailOffset > 0) then
-									set remoteManagementOrganizationSupportEmail to (text (organizationSupportEmailOffset + 27) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationSupportEmail starts with "\"") and (remoteManagementOrganizationSupportEmail ends with "\"")) then set remoteManagementOrganizationSupportEmail to (text 2 thru -2 of remoteManagementOrganizationSupportEmail) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationSupportEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportEmail
-									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("support_email=" & remoteManagementOrganizationSupportEmail)))
-								else if (organizationPhoneOffset > 0) then
-									set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 20) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationPhone starts with "\"") and (remoteManagementOrganizationPhone ends with "\"")) then set remoteManagementOrganizationPhone to (text 2 thru -2 of remoteManagementOrganizationPhone) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationPhone
-									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("phone=" & remoteManagementOrganizationPhone)))
-								else if (organizationSupportPhoneOffset > 0) then
-									set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 27) thru -2 of thisRemoteManagementOutputPart)
-									if ((remoteManagementOrganizationSupportPhone starts with "\"") and (remoteManagementOrganizationSupportPhone ends with "\"")) then set remoteManagementOrganizationSupportPhone to (text 2 thru -2 of remoteManagementOrganizationSupportPhone) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
-									if ((remoteManagementOrganizationSupportPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportPhone
-									set logRemoteManagedMacsCommand to (logRemoteManagedMacsCommand & " --data-urlencode " & (quoted form of ("support_phone=" & remoteManagementOrganizationSupportPhone)))
-								end if
-							end repeat
-							
-							repeat
+								set shortModelName to "UNKNOWN MAC"
 								try
-									if ((do shell script logRemoteManagedMacsCommand) is equal to "DONE") then exit repeat
+									set shortModelName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:machine_name' /dev/stdin <<< \"$(system_profiler -xml SPHardwareDataType)\"")))
 								end try
+								set modelIdentifier to "UNKNOWN MODEL ID"
+								try
+									set modelIdentifier to (do shell script "sysctl -n hw.model")
+								end try
+								
+								set logRemoteManagedMacCommand to ("curl --connect-timeout 5 -sfL " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED LOG REMOTE MANAGED MAC URL]") & " --data-urlencode " & (quoted form of ("source=" & (name of me))) & " --data-urlencode " & (quoted form of ("model=" & shortModelName & " (" & modelIdentifier & ")")) & " --data-urlencode " & (quoted form of ("serial=" & serialNumber)))
+								
+								repeat with thisRemoteManagementOutputPart in remoteManagementOutputParts
+									set organizationNameOffset to (offset of "OrganizationName = " in thisRemoteManagementOutputPart)
+									set organizationDepartmentOffset to (offset of "OrganizationDepartment = " in thisRemoteManagementOutputPart)
+									set organizationEmailOffset to (offset of "OrganizationEmail = " in thisRemoteManagementOutputPart)
+									set organizationSupportEmailOffset to (offset of "OrganizationSupportEmail = " in thisRemoteManagementOutputPart)
+									set organizationPhoneOffset to (offset of "OrganizationPhone = " in thisRemoteManagementOutputPart)
+									set organizationSupportPhoneOffset to (offset of "OrganizationSupportPhone = " in thisRemoteManagementOutputPart)
+									
+									if (organizationNameOffset > 0) then
+										set remoteManagementOrganizationName to (text (organizationNameOffset + 19) thru -2 of thisRemoteManagementOutputPart)
+										if ((remoteManagementOrganizationName starts with "\"") and (remoteManagementOrganizationName ends with "\"")) then set remoteManagementOrganizationName to (text 2 thru -2 of remoteManagementOrganizationName) -- Remove quotes if they exist, which they always should since this should always be a string value.
+										set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("organization=" & remoteManagementOrganizationName)))
+									else if (organizationDepartmentOffset > 0) then
+										set remoteManagementOrganizationDepartment to (text (organizationDepartmentOffset + 25) thru -2 of thisRemoteManagementOutputPart)
+										if ((remoteManagementOrganizationDepartment starts with "\"") and (remoteManagementOrganizationDepartment ends with "\"")) then set remoteManagementOrganizationDepartment to (text 2 thru -2 of remoteManagementOrganizationDepartment) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+										if ((remoteManagementOrganizationDepartment is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationDepartment)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationDepartment
+										set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("department=" & remoteManagementOrganizationDepartment)))
+									else if (organizationEmailOffset > 0) then
+										set remoteManagementOrganizationEmail to (text (organizationEmailOffset + 20) thru -2 of thisRemoteManagementOutputPart)
+										if ((remoteManagementOrganizationEmail starts with "\"") and (remoteManagementOrganizationEmail ends with "\"")) then set remoteManagementOrganizationEmail to (text 2 thru -2 of remoteManagementOrganizationEmail) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+										if ((remoteManagementOrganizationEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationEmail
+										set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("email=" & remoteManagementOrganizationEmail)))
+									else if (organizationSupportEmailOffset > 0) then
+										set remoteManagementOrganizationSupportEmail to (text (organizationSupportEmailOffset + 27) thru -2 of thisRemoteManagementOutputPart)
+										if ((remoteManagementOrganizationSupportEmail starts with "\"") and (remoteManagementOrganizationSupportEmail ends with "\"")) then set remoteManagementOrganizationSupportEmail to (text 2 thru -2 of remoteManagementOrganizationSupportEmail) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+										if ((remoteManagementOrganizationSupportEmail is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportEmail)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportEmail
+										set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("support_email=" & remoteManagementOrganizationSupportEmail)))
+									else if (organizationPhoneOffset > 0) then
+										set remoteManagementOrganizationPhone to (text (organizationPhoneOffset + 20) thru -2 of thisRemoteManagementOutputPart)
+										if ((remoteManagementOrganizationPhone starts with "\"") and (remoteManagementOrganizationPhone ends with "\"")) then set remoteManagementOrganizationPhone to (text 2 thru -2 of remoteManagementOrganizationPhone) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+										if ((remoteManagementOrganizationPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationPhone
+										set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("phone=" & remoteManagementOrganizationPhone)))
+									else if (organizationSupportPhoneOffset > 0) then
+										set remoteManagementOrganizationSupportPhone to (text (organizationSupportPhoneOffset + 27) thru -2 of thisRemoteManagementOutputPart)
+										if ((remoteManagementOrganizationSupportPhone starts with "\"") and (remoteManagementOrganizationSupportPhone ends with "\"")) then set remoteManagementOrganizationSupportPhone to (text 2 thru -2 of remoteManagementOrganizationSupportPhone) -- Quotes may or may not exist around this value depending on its type (such as string vs int), so remove them if they exist.
+										if ((remoteManagementOrganizationSupportPhone is not equal to "") and (remoteManagementOrganizationContactInfo does not contain remoteManagementOrganizationSupportPhone)) then set (end of remoteManagementOrganizationContactInfo) to remoteManagementOrganizationSupportPhone
+										set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("support_phone=" & remoteManagementOrganizationSupportPhone)))
+									end if
+								end repeat
+								
+								if (not remoteManagedMacIsAlreadyLogged) then
+									set remoteManagedMacPID to ""
+									repeat
+										try
+											activate
+										end try
+										try
+											do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+										end try
+										
+										set invalidPIDnote to ""
+										
+										if (remoteManagedMacPID is not equal to "") then
+											set invalidPIDnote to "
+❌	“" & remoteManagedMacPID & "” IS NOT A VALID PID - TRY AGAIN
+"
+										end if
+										
+										set remoteManagedMacPIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
+" & invalidPIDnote & "
+Enter the PID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacPID buttons {"Log Remote Managed Mac Without PID", "Log Remote Managed Mac"} default button 2)
+										
+										set remoteManagedMacPID to (text returned of remoteManagedMacPIDreply)
+										
+										if ((button returned of remoteManagedMacPIDreply) ends with "Without PID") then
+											set remoteManagedMacPID to "N/A"
+										end if
+										
+										if ((remoteManagedMacPID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacPID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
+											set remoteManagedMacPID to (do shell script "echo " & (quoted form of remoteManagedMacPID) & " | tr '[:lower:]' '[:upper:]'")
+											set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacPID)))
+											exit repeat
+										end if
+									end repeat
+									
+									repeat
+										set logRemoteManagedMacResult to "UNKNOWN ERROR"
+										try
+											set logRemoteManagedMacResult to (do shell script logRemoteManagedMacCommand)
+											if (logRemoteManagedMacResult ends with "LOGGED") then exit repeat
+										end try
+										
+										try
+											activate
+										end try
+										try
+											do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+										end try
+										display alert "Failed to Log Remote Managed Mac
+
+ERROR: " & logRemoteManagedMacResult & "
+
+You must be connected to the internet to be able to log this Remote Managed Mac." message "Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
+
+If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
+
+Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
+
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Try Again"} default button 1 as critical giving up after 10
+									end repeat
+								else
+									try
+										do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+									end try
+								end if
+								
+								set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
+								if ((count of remoteManagementOrganizationContactInfo) > 0) then
+									set AppleScript's text item delimiters to (linefeed & tab & tab)
+									set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as text)
+								end if
+								
+								set remoteManagementDialogButton to "Shut Down                                                                                                              "
 								
 								try
 									activate
 								end try
-								try
-									do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
-								end try
-								display alert "Failed to Log Remote Managed Mac
-
-You must be connected to the internet to be able to log this Remote Managed Mac." message "Make sure you're connected to either the “Free Geek” or “FG Reuse” Wi-Fi network or plugged in with an Ethernet cable.
-								
-If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
-								
-Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
-								
-If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Try Again"} default button 1 as critical giving up after 10
-							end repeat
-							
-							set remoteManagementOrganizationContactInfoDisplay to "NO CONTACT INFORMATION"
-							if ((count of remoteManagementOrganizationContactInfo) > 0) then
-								set AppleScript's text item delimiters to (linefeed & tab & tab)
-								set remoteManagementOrganizationContactInfoDisplay to (remoteManagementOrganizationContactInfo as text)
-							end if
-							
-							try
-								activate
-							end try
-							try
-								do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
-							end try
-							set remoteManagementDialogButton to "Shut Down                                                                                                              "
-							display dialog "	     ⚠️     REMOTE MANAGEMENT IS ENABLED ON THIS MAC     ⚠️
+								display dialog "	     ⚠️     REMOTE MANAGEMENT IS ENABLED ON THIS MAC     ⚠️
 
 ❌     MACS WITH REMOTE MANAGEMENT ENABLED CANNOT BE SOLD     ❌
 
@@ -749,22 +842,93 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 
 
 
-		    👉 ‼️ INFORM AN INSTRUCTOR OR MANAGER ‼️ 👈" buttons {remoteManagementDialogButton} with title "Remote Management Enabled"
+	     📝     THIS MAC AND CONTACT INFO HAS BEEN LOGGED     ✅" buttons {remoteManagementDialogButton} with title "Remote Management Enabled"
+								tell application id "com.apple.systemevents" to shut down with state saving preference
+								
+								quit
+								delay 10
+							else if ((remoteManagementOutput does not contain "Error fetching Device Enrollment configuration") or (remoteManagementOutput contains "Client is not DEP enabled.") or (remoteManagementOutput contains "Bad response from apsd: Connection interrupted")) then -- NOTE: This "Bad response from apsd" error will often be returned when the device IS NOT Remote Managed, so don't show it as an error so that technicians don't get confused.
+								if (remoteManagedMacIsAlreadyLogged) then
+									set markPreviouslyRemoteManagedMacAsRemovedCommand to ("curl --connect-timeout 5 -sfL " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED MARK PREVIOUSLY REMOTE MANAGED MAC AS REMOVED URL]") & " --data-urlencode " & (quoted form of ("serial=" & serialNumber)))
+									
+									repeat
+										set markPreviouslyRemoteManagedMacAsRemovedResult to "UNKNOWN ERROR"
+										try
+											set markPreviouslyRemoteManagedMacAsRemovedResult to (do shell script markPreviouslyRemoteManagedMacAsRemovedCommand)
+											if (markPreviouslyRemoteManagedMacAsRemovedResult ends with "REMOVED") then exit repeat
+										end try
+										
+										try
+											activate
+										end try
+										try
+											do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+										end try
+										display alert "Failed to Mark Previously Remote Managed Mac As Removed
+
+ERROR: " & markPreviouslyRemoteManagedMacAsRemovedResult & "
+
+You must be connected to the internet to be able to mark this previously Remote Managed Mac as removed." message "Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
+
+If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
+
+Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
+
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Try Again"} default button 1 as critical giving up after 10
+									end repeat
+								end if
+								
+								set progress description to "
+👍	Remote Management IS NOT Enabled"
+								delay 2
+								
+								exit repeat
+							else
+								set progress description to "
+❌	FAILED to Check for Remote Management"
+								try
+									activate
+								end try
+								try
+									do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+								end try
+								try
+									display alert "Cannot Reset This Mac
+
+Failed to Check Remote Management" message (remoteManagementOutput & "
+
+This should not have happened, please inform Free Geek I.T.") buttons {"Shut Down", "Try Again"} cancel button 1 default button 2 as critical
+								on error
+									tell application id "com.apple.systemevents" to shut down with state saving preference
+									
+									quit
+									delay 10
+								end try
+							end if
+						end try
+					else
+						set progress description to "
+❌	FAILED to Check for Remote Management"
+						try
+							activate
+						end try
+						try
+							do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
+						end try
+						try
+							display alert "Cannot Reset This Mac
+
+Failed to Check Remote Management" message "An UNKNOWN ERROR occurred.
+
+This should not have happened, please inform Free Geek I.T." buttons {"Shut Down", "Try Again"} cancel button 1 default button 2 as critical
+						on error
 							tell application id "com.apple.systemevents" to shut down with state saving preference
 							
 							quit
 							delay 10
-						else
-							set progress description to "
-👍	Remote Management IS NOT Enabled"
-							delay 2
-						end if
-					end try
-				else
-					set progress description to "
-❌	FAILED to Check for Remote Management"
-					delay 2
-				end if
+						end try
+					end if
+				end repeat
 			end try
 		end if
 	end try
@@ -811,11 +975,11 @@ on clearNVRAMandCheckStartupSecurityAndClearSIP()
 	try
 		if (hasT2chip) then
 			if ((do shell script "nvram '94B73556-2197-4702-82A8-3E1337DAFBFB:AppleSecureBootPolicy'") does not end with "%02") then -- https://github.com/dortania/OpenCore-Legacy-Patcher/blob/b85256d9708a299b9f7ea15cb3456248a1a666b7/resources/utilities.py#L242 & https://macadmins.slack.com/archives/CGXNNJXJ9/p1686766296067939?thread_ts=1686766055.849109&cid=CGXNNJXJ9
-				errorAndQuit("Startup Securty IS REDUCED on this T2 Mac.") -- "Erase Assistant" (EAC&S) reset will error and not allow running if Startup Security is reduced on a T2 Mac.
+				errorAndQuit("Startup Security IS REDUCED on this T2 Mac.") -- "Erase Assistant" (EAC&S) reset will error and not allow running if Startup Security is reduced on a T2 Mac.
 			end if
 		else if (isAppleSilicon) then
 			if (doShellScriptAsAdmin("bputil -d") does not contain "(smb0): absent") then
-				errorAndQuit("Startup Securty IS REDUCED on this Apple Silicon Mac.") -- "Erase Assistant" (EAC&S) reset will actually still work with Startup Security reduced on an Apple Silicon Mac and it will set it back to "Full", but error anyways since this shouldn't happen.
+				errorAndQuit("Startup Security IS REDUCED on this Apple Silicon Mac.") -- "Erase Assistant" (EAC&S) reset will actually still work with Startup Security reduced on an Apple Silicon Mac and it will set it back to "Full", but error anyways since this shouldn't happen.
 			end if
 		end if
 	end try

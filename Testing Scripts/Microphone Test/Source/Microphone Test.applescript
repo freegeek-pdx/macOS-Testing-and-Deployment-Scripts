@@ -16,9 +16,9 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.9.12-3
+-- Version: 2024.11.11-1
 
--- App Icon is “Studio Microphone” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
+-- App Icon is “Studio Microphone” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 use AppleScript version "2.7"

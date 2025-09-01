@@ -1,7 +1,7 @@
 /*
 * By: Pico Mitchell
 * For: MacLand @ Free Geek
-* Last Updated: September 8th, 2022
+* Last Updated: June 12th, 2024
 *
 * MIT License
 *
@@ -28,7 +28,7 @@ try {
 	resetButton.outerHTML = '<div id="logo"><a href="https://www.keyboardtester.com/" target="_blank">KeyboardTester.com</a></div>' + resetButton.outerHTML
 
 	document.getElementById('soundSelect').selectedIndex = 0
-	
+
 	const testTextarea = document.getElementById('testarea')
 	testTextarea.placeholder = `🏆 The best way to test a keyboard is to TYPE ACTUAL WORDS and make sure that exactly what you typed
 shows up in this text box and that each key below this text box turns green as you type it.
@@ -36,6 +36,7 @@ shows up in this text box and that each key below this text box turns green as y
 When a key is pressed on the keyboard, it will momentarily turn ✴️ orange and then turn ❇️ green in this window.
 
 👇 SCROLL DOWN FOR MORE KEYBOARD TESTING TIPS 👇
+
 
 🚫 You SHOULD NOT just slide your finger across the keyboard to hit every key.
 With water damaged keyboards, it’s common that one key on the keyboard may trigger the wrong key, or multiple keys.
@@ -56,12 +57,12 @@ Type while using these keys to make sure they are working properly.
 
 	testTextarea.outerHTML = '<input type="text" id="hidden_text_before" onfocus="go_testarea()">' + testTextarea.outerHTML
 	document.getElementById('testarea').addEventListener('blur', function(thisEvent) { thisEvent.target.focus() })
-	
+
 	const leftOptionKey = document.getElementById('key18')
 	const leftCommandKey = document.getElementById('key91')
 	const rightOptionKey = document.getElementById('key18b')
 	const rightCommandKey = document.getElementById('key93')
-	
+
 	leftOptionKey.parentNode.insertBefore(leftOptionKey, leftCommandKey)
 	rightCommandKey.parentNode.insertBefore(rightCommandKey, rightOptionKey)
 
@@ -104,8 +105,22 @@ Type while using these keys to make sure they are working properly.
 }
 
 function checkEveryKeyPressed() {
+	// Remove all ad "script", "ins", and "iframe" tags in this loop (every 1 second) because they seem to not all load immediately and not all at once.
+	const scriptElements = document.getElementsByTagName('script')
+	for (const thisScriptElement of scriptElements)
+		if (thisScriptElement.src.includes('googlesyndication') || thisScriptElement.src.includes('googletagmanager'))
+			thisScriptElement.remove()
+
+	const insElements = document.getElementsByTagName('ins')
+	for (const thisInsElement of insElements)
+		thisInsElement.remove()
+
+	const iframeElements = document.getElementsByTagName('iframe')
+	for (const thisIframeElement of iframeElements)
+		thisIframeElement.remove()
+
 	const everyKey = ['key27', 'key112', 'key113', 'key114', 'key115', 'key116', 'key117', 'key118', 'key119', 'key120', 'key121', 'key122', 'key123', 'key192', 'key49', 'key50', 'key51', 'key52', 'key53', 'key54', 'key55', 'key56', 'key57', 'key48', 'key173', 'key61', 'key8', 'key9', 'key81', 'key87', 'key69', 'key82', 'key84', 'key89', 'key85', 'key73', 'key79', 'key80', 'key219', 'key221', 'key220', 'key20', 'key65', 'key83', 'key68', 'key70', 'key71', 'key72', 'key74', 'key75', 'key76', 'keycolon', 'key222', 'key13', 'key16', 'key90', 'key88', 'key67', 'key86', 'key66', 'key78', 'key77', 'key188', 'key190', 'key191', 'key16b', 'key91', 'key18', 'key32', 'key18b', 'key93', 'key17b', 'key38', 'key37', 'key40', 'key39']
-	
+
 	let everyKeyIsPressed = true
 	for (let i = 0; i < everyKey.length; i ++)
 		if (document.getElementById(everyKey[i]).className == 'key_un') {

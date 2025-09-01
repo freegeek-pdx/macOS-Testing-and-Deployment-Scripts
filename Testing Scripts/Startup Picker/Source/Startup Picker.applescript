@@ -16,9 +16,9 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.9.12-2
+-- Version: 2025.8.20-1
 
--- App Icon is “Green Apple” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
+-- App Icon is “Green Apple” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 use AppleScript version "2.7"
@@ -298,6 +298,9 @@ set supportsCatalina to false
 set supportsBigSur to false
 set supportsMonterey to false
 set supportsVentura to false
+set supportsSonoma to false
+set supportsSequoia to false
+set supportsTahoe to false
 
 set modelInfoPath to tmpPath & "modelInfo.plist"
 try
@@ -320,6 +323,12 @@ try
 		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 16)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 9)) or ((modelIdentifierName is equal to "MacBookPro") and ((modelIdentifierNumber is equal to "11,4") or (modelIdentifierNumber is equal to "11,5") or (modelIdentifierMajorNumber ≥ 12))) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 7)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 7)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 6)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsMonterey to true
 		
 		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 18)) or ((modelIdentifierName is equal to "MacBook") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 14)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 7)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsVentura to true
+		
+		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 19)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 15)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 7)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsSonoma to true
+		
+		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 19)) or ((modelIdentifierName is equal to "MacBookPro") and (modelIdentifierMajorNumber ≥ 15)) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 9)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 8)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 7)) or (modelIdentifierName is equal to "iMacPro") or (modelIdentifierName is equal to "Mac")) then set supportsSequoia to true
+		
+		if (((modelIdentifierName is equal to "iMac") and (modelIdentifierMajorNumber ≥ 20)) or ((modelIdentifierName is equal to "MacBookPro") and ((modelIdentifierNumber is equal to "16,1") or (modelIdentifierNumber is equal to "16,2") or (modelIdentifierNumber is equal to "16,4") or (modelIdentifierMajorNumber ≥ 17))) or ((modelIdentifierName is equal to "MacBookAir") and (modelIdentifierMajorNumber ≥ 10)) or ((modelIdentifierName is equal to "Macmini") and (modelIdentifierMajorNumber ≥ 9)) or ((modelIdentifierName is equal to "MacPro") and (modelIdentifierMajorNumber ≥ 7)) or (modelIdentifierName is equal to "Mac")) then set supportsTahoe to true
 	end tell
 on error (modelInfoErrorMessage)
 	log "Model Info Error: " & modelInfoErrorMessage
@@ -327,7 +336,14 @@ end try
 do shell script "rm -f " & (quoted form of modelInfoPath)
 
 set supportedOS to "OS X 10.11 El Capitan"
-if (supportsVentura) then
+if (supportsTahoe) then
+	set supportedOS to "macOS 15 Sequoia
+✅ WILL SUPPORT macOS 26 Tahoe"
+else if (supportsSequoia) then
+	set supportedOS to "macOS 15 Sequoia"
+else if (supportsSonoma) then
+	set supportedOS to "macOS 14 Sonoma"
+else if (supportsVentura) then
 	set supportedOS to "macOS 13 Ventura"
 else if (supportsMonterey) then
 	set supportedOS to "macOS 12 Monterey"
@@ -387,7 +403,13 @@ repeat
 			considering numeric strings
 				if (osVersion ≥ "10.12") then
 					set macOSname to "macOS"
-					if ((osVersion ≥ "13.0") and (not supportsVentura)) then
+					if ((osVersion ≥ "16.0") and (not supportsTahoe)) then
+						set startupDiskIsCompatibleWithMac to false
+					else if ((osVersion ≥ "15.0") and (not supportsSequoia)) then
+						set startupDiskIsCompatibleWithMac to false
+					else if ((osVersion ≥ "14.0") and (not supportsSonoma)) then
+						set startupDiskIsCompatibleWithMac to false
+					else if ((osVersion ≥ "13.0") and (not supportsVentura)) then
 						set startupDiskIsCompatibleWithMac to false
 					else if ((osVersion ≥ "12.0") and (not supportsMonterey)) then
 						set startupDiskIsCompatibleWithMac to false
@@ -570,6 +592,33 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 	end considering
 	
 	if ((not didSetStartUpDisk) and (not didNotTryToSetStartupDisk)) then
+		-- DISABLE CAPS LOCK IF ENABLED: https://forum.latenightsw.com/t/toggle-capslock/4319/11
+		-- So that passwords are not typed in caps
+		try
+			run script "ObjC.import(\"IOKit\");
+ObjC.import(\"CoreServices\");
+
+(() => {
+    var ioConnect = Ref();
+    var keystate = Ref();
+
+    $.IOServiceOpen(
+        $.IOServiceGetMatchingService(
+            $.kIOMasterPortDefault,
+            $.IOServiceMatching(
+                $.kIOHIDSystemClass
+            )
+        ),
+        $.mach_task_self_,
+        $.kIOHIDParamConnectType,
+        ioConnect
+    );
+    $.IOHIDSetModifierLockState(ioConnect, $.kIOHIDCapsLockState, 0);
+    $.IOServiceClose(ioConnect);
+	
+})();" in "JavaScript"
+		end try
+		
 		set securityAgentPath to "/System/Library/Frameworks/Security.framework/Versions/A/MachServices/SecurityAgent.bundle"
 		set securityAgentID to (id of application securityAgentPath)
 		
@@ -735,7 +784,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 										end if
 									end tell
 									
-									if (isSonomaOrNewer) then -- On macOS 14 Sonoma beta 1 through RC, ANOTHER standalone SecurityAgent auth prompt comes up AFTER the initial LocalAuthenticationRemoteService XPC sheet prompt WHEN RUNNING AS A STANDARD USER.
+									if (isSonomaOrNewer) then -- On macOS 14 Sonoma, ANOTHER standalone SecurityAgent auth prompt comes up AFTER the initial LocalAuthenticationRemoteService XPC sheet prompt WHEN RUNNING AS A STANDARD USER.
 										set didTryToAuthenticateStartupDisk to false
 										repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
 											delay 1
@@ -795,7 +844,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 													end if
 												end tell
 												
-												if (isSonomaOrNewer) then -- See comments above about SECOND SecurityAgent auth prompt on macOS 14 Sonoma beta 1 through RC.
+												if (isSonomaOrNewer) then -- See comments above about SECOND SecurityAgent auth prompt on macOS 14 Sonoma.
 													set didAuthenticateStartupDisk to false
 													if (application securityAgentPath is running) then
 														tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
@@ -848,7 +897,7 @@ if (shouldSetStartupDisk and (chosenStartupDiskName is not equal to "")) then
 										end if
 									end tell
 									
-									if (isSonomaOrNewer) then -- The SECOND SecurityAgent prompt on macOS 14 Sonoma beta 1 through RC DOES NOT close on its own when System Settings is quit.
+									if (isSonomaOrNewer) then -- The SECOND SecurityAgent prompt on macOS 14 Sonoma DOES NOT close on its own when System Settings is quit.
 										if (application securityAgentPath is running) then
 											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
 												if ((number of windows) is 1) then

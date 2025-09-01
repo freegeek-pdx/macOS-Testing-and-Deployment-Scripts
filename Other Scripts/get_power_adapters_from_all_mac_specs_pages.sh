@@ -21,19 +21,19 @@
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
-# The https://support.apple.com/en-us/HT201700 page is also useful to identify power adapters, but it's not as specific and doesn't include Model IDs, so there's not much value in scraping it.
+# The https://support.apple.com/109509 page is also useful to identify power adapters, but it's not as specific and doesn't include Model IDs, so there's not much value in scraping it.
 
-declare -a all_mac_identification_pages=() # All Mac identification pages are listed on https://support.apple.com/HT213325 as well as in the "On the product or its packaging" section of https://support.apple.com/HT201581
-all_mac_identification_pages+=( 'HT201300' ) # MacBook Pro
-all_mac_identification_pages+=( 'HT201862' ) # MacBook Air
-all_mac_identification_pages+=( 'HT201608' ) # MacBook
-# all_mac_identification_pages+=( 'HT201634' ) # iMac
-# all_mac_identification_pages+=( 'HT201894' ) # Mac mini
-# all_mac_identification_pages+=( 'HT213073' ) # Mac Studio
-# all_mac_identification_pages+=( 'HT202888' ) # Mac Pro
+declare -a all_mac_identification_pages=() # All Mac identification pages are listed on https://support.apple.com/102604 as well as in the "Product or packaging" section of https://support.apple.com/102767
+all_mac_identification_pages+=( '108052' ) # MacBook Pro
+all_mac_identification_pages+=( '102869' ) # MacBook Air
+all_mac_identification_pages+=( '103257' ) # MacBook
+# all_mac_identification_pages+=( '108054' ) # iMac
+# all_mac_identification_pages+=( '102852' ) # Mac mini
+# all_mac_identification_pages+=( '102231' ) # Mac Studio
+# all_mac_identification_pages+=( '102887' ) # Mac Pro
 
 # NOTE: MagSafe 1 lists have older Model IDs that aren't included on the specs pages pre-included in them.
-every_85w_magsafe1_model='MacBookPro1,1+MacBookPro1,2+MacBookPro2,1+MacBookPro2,2+MacBookPro3,1+'
+every_85w_magsafe1_model='MacBookPro1,1+MacBookPro1,2+MacBookPro2,1+MacBookPro2,2+MacBookPro3,1+MacBookPro4,1+MacBookPro5,1+'
 every_60w_magsafe1_model='MacBook1,1+MacBook2,1+MacBook3,1+MacBook4,1+MacBook5,1+'
 every_45w_magsafe1_model='MacBookAir1,1+'
 every_85w_magsafe2_model=''
@@ -50,9 +50,11 @@ every_29w_usbc_model=''
 # charge capabilities so their descriptions are not as clear and clean to analyze in code as the past power adapter types
 # since the MagSafe 3 capability is listed on a separate line as just the cable and not the power adapter itself.
 # So, instead of trying, just manually check the outputs and come up with more concise descriptions and pre-add them to their respective lists instead.
-every_140w_magsafe3_model='MacBookPro18,1+MacBookPro18,2+Mac14,6+Mac14,10+'
+every_140w_magsafe3_model='MacBookPro18,1+MacBookPro18,2+Mac14,6+Mac14,10+Mac15,7+Mac15,9+Mac15,11+Mac16,7+Mac16,5+'
 every_67w_or_96w_magsafe3_model='MacBookPro18,3+MacBookPro18,4+Mac14,5+Mac14,9+'
-every_30w_or_35W_dp_or_67w_magsafe3_model='Mac14,2+'
+every_30w_or_35W_dp_or_70w_magsafe3_model='Mac14,2+Mac15,12+Mac16,12+'
+every_35W_dp_or_70w_magsafe3_model='Mac14,15+Mac15,13+Mac16,13+'
+every_70w_or_96w_magsafe3_model='Mac15,3+Mac15,6+Mac15,8+Mac15,10+Mac16,1+Mac16,6+Mac16,8+'
 
 every_unknown_model=''
 
@@ -144,19 +146,23 @@ for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
 						echo -e '\tMANUAL CONCISE DESCRIPTION: 140W USB-C/MagSafe 3'
 					elif [[ "+${every_67w_or_96w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
 						echo -e '\tMANUAL CONCISE DESCRIPTION: 67W or 96W USB-C/MagSafe 3'
-					elif [[ "+${every_30w_or_35W_dp_or_67w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
-						echo -e '\tMANUAL CONCISE DESCRIPTION: 30W or 35W Dual Port or 67W USB-C/MagSafe 3'
+					elif [[ "+${every_30w_or_35W_dp_or_70w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
+						echo -e '\tMANUAL CONCISE DESCRIPTION: 30W or 35W Dual Port or 70W USB-C/MagSafe 3'
+					elif [[ "+${every_35W_dp_or_70w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
+						echo -e '\tMANUAL CONCISE DESCRIPTION: 35W Dual Port or 70W USB-C/MagSafe 3'
+					elif [[ "+${every_70w_or_96w_magsafe3_model}" == *"+${this_model_identifier}+"* ]]; then
+						echo -e '\tMANUAL CONCISE DESCRIPTION: 70W or 96W USB-C/MagSafe 3'
 					else
 						echo -e '\tERROR: UNKNOWN Power Adater'
 						every_unknown_model+="${this_model_identifier}+"
 					fi
 					;;
 			esac
-		else
+		elif [[ "${this_model_id_or_specs_url}" == *','* ]]; then
 			this_model_identifier="${this_model_id_or_specs_url}"
-			echo -en "\n${this_model_identifier}"
+			echo -en "\n\n${this_model_identifier}"
 		fi
-	done < <(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')
+	done < <(echo "${this_mac_idenification_page_source}" | sed s'/<\/p><p/<\/p>\n<p/g' | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("</b>", "", $NF); gsub("</p>", "", $NF); print ""; print $NF } /Tech Specs/ { for (f = 1; f <= NF; f ++) { if (($f ~ /support.apple.com/) && !($f ~ /\/specs$/)) { print "https:" $f; break } else if (($f ~ /^\//) && !($f ~ /\./)) { print "https://support.apple.com" $f; break } } }')
 	# echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur
 done
 
@@ -216,9 +222,17 @@ echo -e '\n67W or 96W USB-C/MagSafe 3'
 every_67w_or_96w_magsafe3_model="$(echo "${every_67w_or_96w_magsafe3_model%+}" | tr '+' '\n' | sort -uV)"
 echo "\"${every_67w_or_96w_magsafe3_model//$'\n'/", "}\""
 
-echo -e '\n30W or 35W Dual Port or 67W USB-C/MagSafe 3'
-every_30w_or_35W_dp_or_67w_magsafe3_model="$(echo "${every_30w_or_35W_dp_or_67w_magsafe3_model%+}" | tr '+' '\n' | sort -uV)"
-echo "\"${every_30w_or_35W_dp_or_67w_magsafe3_model//$'\n'/", "}\""
+echo -e '\n30W or 35W Dual Port or 70W USB-C/MagSafe 3'
+every_30w_or_35W_dp_or_70w_magsafe3_model="$(echo "${every_30w_or_35W_dp_or_70w_magsafe3_model%+}" | tr '+' '\n' | sort -uV)"
+echo "\"${every_30w_or_35W_dp_or_70w_magsafe3_model//$'\n'/", "}\""
+
+echo -e '\n35W Dual Port or 70W USB-C/MagSafe 3'
+every_35W_dp_or_70w_magsafe3_model="$(echo "${every_35W_dp_or_70w_magsafe3_model%+}" | tr '+' '\n' | sort -uV)"
+echo "\"${every_35W_dp_or_70w_magsafe3_model//$'\n'/", "}\""
+
+echo -e '\n70W or 96W USB-C/MagSafe 3'
+every_70w_or_96w_magsafe3_model="$(echo "${every_70w_or_96w_magsafe3_model%+}" | tr '+' '\n' | sort -uV)"
+echo "\"${every_70w_or_96w_magsafe3_model//$'\n'/", "}\""
 
 echo -e '\nUNKNOWN Power Adapter (REQUIRES MANUAL EXAMINATION)'
 every_unknown_model="$(echo "${every_unknown_model%+}" | tr '+' '\n' | sort -uV)"
@@ -226,7 +240,7 @@ echo "\"${every_unknown_model//$'\n'/", "}\""
 
 echo ''
 
-# Example output from 2/1/23:
+# Example output from 5/15/25:
 
 # 85W MagSafe 1
 # "MacBookPro1,1", "MacBookPro1,2", "MacBookPro2,1", "MacBookPro2,2", "MacBookPro3,1", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro8,2", "MacBookPro8,3", "MacBookPro9,1"
@@ -265,13 +279,19 @@ echo ''
 # "MacBook8,1", "MacBook9,1"
 
 # 140W USB-C/MagSafe 3
-# "Mac14,6", "Mac14,10", "MacBookPro18,1", "MacBookPro18,2"
+# "Mac14,6", "Mac14,10", "Mac15,7", "Mac15,9", "Mac15,11", "Mac16,5", "Mac16,7", "MacBookPro18,1", "MacBookPro18,2"
 
 # 67W or 96W USB-C/MagSafe 3
 # "Mac14,5", "Mac14,9", "MacBookPro18,3", "MacBookPro18,4"
 
-# 30W or 35W Dual Port or 67W USB-C/MagSafe 3
-# "Mac14,2"
+# 30W or 35W Dual Port or 70W USB-C/MagSafe 3
+# "Mac14,2", "Mac15,12", "Mac16,12"
+
+# 35W Dual Port or 70W USB-C/MagSafe 3
+# "Mac14,15", "Mac15,13", "Mac16,13"
+
+# 70W or 96W USB-C/MagSafe 3
+# "Mac15,3", "Mac15,6", "Mac15,8", "Mac15,10", "Mac16,1", "Mac16,6", "Mac16,8"
 
 # UNKNOWN Power Adapter (REQUIRES MANUAL EXAMINATION)
 # ""

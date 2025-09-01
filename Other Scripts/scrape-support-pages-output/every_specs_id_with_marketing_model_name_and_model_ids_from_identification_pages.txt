@@ -1,0 +1,313 @@
+Mac Laptop;121552;MacBook Pro (14-inch, 2024):MacBook Pro (14-inch, M4, 2024):Mac16,1:
+Mac Laptop;121553;MacBook Pro (14-inch, 2024):MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):Mac16,6:Mac16,8:
+Mac Laptop;121554;MacBook Pro (16-inch, 2024):MacBook Pro (16-inch, 2024):Mac16,7:Mac16,5:
+Mac Laptop;117735;MacBook Pro (14-inch, Nov 2023):MacBook Pro (14-inch, M3, Nov 2023):Mac15,3:
+Mac Laptop;117736;MacBook Pro (14-inch, Nov 2023):MacBook Pro (14-inch, M3 Pro or M3 Max, Nov 2023):Mac15,6:Mac15,8:Mac15,10:
+Mac Laptop;117737;MacBook Pro (16-inch, Nov 2023):MacBook Pro (16-inch, Nov 2023):Mac15,7:Mac15,9:Mac15,11:
+Mac Laptop;111340;MacBook Pro (14-inch, 2023):MacBook Pro (14-inch, 2023):Mac14,5:Mac14,9:
+Mac Laptop;111838;MacBook Pro (16-inch, 2023):MacBook Pro (16-inch, 2023):Mac14,6:Mac14,10:
+Mac Laptop;111869;MacBook Pro (13-inch, M2, 2022):MacBook Pro (13-inch, M2, 2022):Mac14,7:
+Mac Laptop;111902;MacBook Pro (14-inch, 2021):MacBook Pro (14-inch, 2021):MacBookPro18,3:MacBookPro18,4:
+Mac Laptop;111901;MacBook Pro (16-inch, 2021):MacBook Pro (16-inch, 2021):MacBookPro18,1:MacBookPro18,2:
+Mac Laptop;111893;MacBook Pro (13-inch, M1, 2020):MacBook Pro (13-inch, M1, 2020):MacBookPro17,1:
+Mac Laptop;111981;MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):MacBookPro16,3:
+Mac Laptop;111339;MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):MacBookPro16,2:
+Mac Laptop;111932;MacBook Pro (16-inch, 2019):MacBook Pro (16-inch, 2019):MacBookPro16,1:MacBookPro16,4:
+Mac Laptop;111945;MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):MacBookPro15,4:
+Mac Laptop;111941;MacBook Pro (15-inch, 2019):MacBook Pro (15-inch, 2019):MacBookPro15,1:MacBookPro15,3:
+Mac Laptop;111997;MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):MacBookPro15,2:
+Mac Laptop;111949;MacBook Pro (15-inch, 2018):MacBook Pro (15-inch, 2018):MacBookPro15,1:
+Mac Laptop;111925;MacBook Pro (13-inch, 2018, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2018, Four Thunderbolt 3 ports):MacBookPro15,2:
+Mac Laptop;111947;MacBook Pro (15-inch, 2017):MacBook Pro (15-inch, 2017):MacBookPro14,3:
+Mac Laptop;111972;MacBook Pro (13-inch, 2017, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2017, Four Thunderbolt 3 ports):MacBookPro14,2:
+Mac Laptop;111951;MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):MacBookPro14,1:
+Mac Laptop;111975;MacBook Pro (15-inch, 2016):MacBook Pro (15-inch, 2016):MacBookPro13,3:
+Mac Laptop;112003;MacBook Pro (13-inch, 2016, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2016, Four Thunderbolt 3 ports):MacBookPro13,2:
+Mac Laptop;111999;MacBook Pro (13-inch, 2016, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2016, Two Thunderbolt 3 ports):MacBookPro13,1:
+Mac Laptop;111955;MacBook Pro (Retina, 15-inch, Mid 2015):MacBook Pro (Retina, 15-inch, Mid 2015):MacBookPro11,4:MacBookPro11,5:
+Mac Laptop;111959;MacBook Pro (Retina, 13-inch, Early 2015):MacBook Pro (Retina, 13-inch, Early 2015):MacBookPro12,1:
+Mac Laptop;111935;MacBook Pro (Retina, 15-inch, Mid 2014):MacBook Pro (Retina, 15-inch, Mid 2014):MacBookPro11,2:MacBookPro11,3:
+Mac Laptop;111942;MacBook Pro (Retina, 13-inch, Mid 2014):MacBook Pro (Retina, 13-inch, Mid 2014):MacBookPro11,1:
+Mac Laptop;111971;MacBook Pro (Retina, 15-inch, Late 2013):MacBook Pro (Retina, 15-inch, Late 2013):MacBookPro11,2:MacBookPro11,3:
+Mac Laptop;111946;MacBook Pro (Retina, 13-inch, Late 2013):MacBook Pro (Retina, 13-inch, Late 2013):MacBookPro11,1:
+Mac Laptop;118465;MacBook Pro (Retina, 15-inch, Early 2013):MacBook Pro (Retina, 15-inch, Early 2013):MacBookPro10,1:
+Mac Laptop;118466;MacBook Pro (Retina, 13-inch, Early 2013):MacBook Pro (Retina, 13-inch, Early 2013):MacBookPro10,2:
+Mac Laptop;118463;MacBook Pro (Retina, 13-inch, Late 2012):MacBook Pro (Retina, 13-inch, Late 2012):MacBookPro10,2:
+Mac Laptop;112576;MacBook Pro (Retina, 15-inch, Mid 2012):MacBook Pro (Retina, 15-inch, Mid 2012):MacBookPro10,1:
+Mac Laptop;112568;MacBook Pro (15-inch, Mid 2012):MacBook Pro (15-inch, Mid 2012):MacBookPro9,1:
+Mac Laptop;111958;MacBook Pro (13-inch, Mid 2012):MacBook Pro (13-inch, Mid 2012):MacBookPro9,2:
+Mac Laptop;112418;MacBook Pro (17-inch, Late 2011):MacBook Pro (17-inch, Late 2011):MacBookPro8,3:
+Mac Laptop;112586;MacBook Pro (15-inch, Late 2011):MacBook Pro (15-inch, Late 2011):MacBookPro8,2:
+Mac Laptop;111341;MacBook Pro (13-inch, Late 2011):MacBook Pro (13-inch, Late 2011):MacBookPro8,1:
+Mac Laptop;112598;MacBook Pro (17-inch, Early 2011):MacBook Pro (17-inch, Early 2011):MacBookPro8,3:
+Mac Laptop;112599;MacBook Pro (15-inch, Early 2011):MacBook Pro (15-inch, Early 2011):MacBookPro8,2:
+Mac Laptop;112600;MacBook Pro (13-inch, Early 2011):MacBook Pro (13-inch, Early 2011):MacBookPro8,1:
+Mac Laptop;112606;MacBook Pro (17-inch, Mid 2010):MacBook Pro (17-inch, Mid 2010):MacBookPro6,1:
+Mac Laptop;112605;MacBook Pro (15-inch, Mid 2010):MacBook Pro (15-inch, Mid 2010):MacBookPro6,2:
+Mac Laptop;112604;MacBook Pro (13-inch, Mid 2010):MacBook Pro (13-inch, Mid 2010):MacBookPro7,1:
+Mac Laptop;112473;MacBook Pro (17-inch, Mid 2009):MacBook Pro (17-inch, Mid 2009):MacBookPro5,2:
+Mac Laptop;112624;MacBook Pro (15-inch, Mid 2009):MacBook Pro (15-inch, Mid 2009) or (15-inch, 2.53 GHz, Mid 2009):MacBookPro5,3:
+Mac Laptop;112624;MacBook Pro (15-inch, 2.53GHz, Mid 2009):MacBook Pro (15-inch, Mid 2009) or (15-inch, 2.53 GHz, Mid 2009):MacBookPro5,3:
+Mac Laptop;112474;MacBook Pro (13-inch, Mid 2009):MacBook Pro (13-inch, Mid 2009):MacBookPro5,5:
+Mac Laptop;112526;MacBook Pro (17-inch, Early 2009):MacBook Pro (17-inch, Early 2009):MacBookPro5,2:
+Mac Laptop;122210;MacBook Air (15-inch, M4, 2025):MacBook Air (15-inch, M4, 2025):Mac16,13:
+Mac Laptop;122209;MacBook Air (13-inch, M4, 2025):MacBook Air (13-inch, M4, 2025):Mac16,12:
+Mac Laptop;118552;MacBook Air (15-inch, M3, 2024):MacBook Air (15-inch, M3, 2024):Mac15,13:
+Mac Laptop;118551;MacBook Air (13-inch, M3, 2024):MacBook Air (13-inch, M3, 2024):Mac15,12:
+Mac Laptop;111346;MacBook Air (15-inch, M2, 2023):MacBook Air (15-inch, M2, 2023):Mac14,15:
+Mac Laptop;111867;MacBook Air (M2, 2022):MacBook Air (M2, 2022):Mac14,2:
+Mac Laptop;111883;MacBook Air (M1, 2020):MacBook Air (M1, 2020):MacBookAir10,1:
+Mac Laptop;111991;MacBook Air (Retina, 13-inch, 2020):MacBook Air (Retina, 13-inch, 2020):MacBookAir9,1:
+Mac Laptop;111948;MacBook Air (Retina, 13-inch, 2019):MacBook Air (Retina, 13-inch, 2019):MacBookAir8,2:
+Mac Laptop;111933;MacBook Air (Retina, 13-inch, 2018):MacBook Air (Retina, 13-inch, 2018):MacBookAir8,1:
+Mac Laptop;111924;MacBook Air (13-inch, 2017):MacBook Air (13-inch, 2017):MacBookAir7,2:
+Mac Laptop;111956;MacBook Air (13-inch, Early 2015):MacBook Air (13-inch, Early 2015):MacBookAir7,2:
+Mac Laptop;112441;MacBook Air (11-inch, Early 2015):MacBook Air (11-inch, Early 2015):MacBookAir7,1:
+Mac Laptop;111944;MacBook Air (13-inch, Early 2014):MacBook Air (13-inch, Early 2014):MacBookAir6,2:
+Mac Laptop;112032;MacBook Air (11-inch, Early 2014):MacBook Air (11-inch, Early 2014):MacBookAir6,1:
+Mac Laptop;111938;MacBook Air (13-inch, Mid 2013):MacBook Air (13-inch, Mid 2013):MacBookAir6,2:
+Mac Laptop;112437;MacBook Air (11-inch, Mid 2013):MacBook Air (11-inch, Mid 2013):MacBookAir6,1:
+Mac Laptop;111966;MacBook Air (13-inch, Mid 2012):MacBook Air (13-inch, Mid 2012):MacBookAir5,2:
+Mac Laptop;112008;MacBook Air (11-inch, Mid 2012):MacBook Air (11-inch, Mid 2012):MacBookAir5,1:
+Mac Laptop;112038;MacBook Air (13-inch, Mid 2011):MacBook Air (13-inch, Mid 2011):MacBookAir4,2:
+Mac Laptop;112439;MacBook Air (11-inch, Mid 2011):MacBook Air (11-inch, Mid 2011):MacBookAir4,1:
+Mac Laptop;112585;MacBook Air (13-inch, Late 2010):MacBook Air (13-inch, Late 2010):MacBookAir3,2:
+Mac Laptop;112580;MacBook Air (11-inch, Late 2010):MacBook Air (11-inch, Late 2010):MacBookAir3,1:
+Mac Laptop;112660;MacBook Air (Mid 2009):MacBook Air (Mid 2009):MacBookAir2,1:
+Mac Laptop;111986;MacBook (Retina, 12-inch, 2017):MacBook (Retina, 12-inch, 2017):MacBook10,1:
+Mac Laptop;112033;MacBook (Retina, 12-inch, Early 2016):MacBook (Retina, 12-inch, Early 2016):MacBook9,1:
+Mac Laptop;112442;MacBook (Retina, 12-inch, Early 2015):MacBook (Retina, 12-inch, Early 2015):MacBook8,1:
+Mac Laptop;112581;MacBook (13-inch, Mid 2010):MacBook (13-inch, Mid 2010):MacBook7,1:
+Mac Laptop;112623;MacBook (13-inch, Late 2009):MacBook (13-inch, Late 2009):MacBook6,1:
+Mac Laptop;112459;MacBook (13-inch, Mid 2009):MacBook (13-inch, Mid 2009):MacBook5,2:
+Mac Laptop;111344;MacBook (13-inch, Early 2009):MacBook (13-inch, Early 2009):MacBook5,2:
+Mac Desktop;121557;iMac (24-inch, 2024, Four ports):iMac (24-inch, 2024, Four ports):Mac16,3:
+Mac Desktop;121556;iMac (24-inch, 2024, Two ports):iMac (24-inch, 2024, Two ports):Mac16,2:
+Mac Desktop;117734;iMac (24-inch, 2023, Four ports):iMac (24-inch, 2023, Four ports):Mac15,5:
+Mac Desktop;117733;iMac (24-inch, 2023, Two ports):iMac (24-inch, 2023, Two ports):Mac15,4:
+Mac Desktop;111895;iMac (24-inch, M1, 2021):iMac (24-inch, M1, 2021):iMac21,1:
+Mac Desktop;111895;iMac (24-inch, M1, 2021):iMac (24-inch, M1, 2021):iMac21,2:
+Mac Desktop;111913;iMac (Retina 5K, 27-inch, 2020):iMac (Retina 5K, 27-inch, 2020):iMac20,1:iMac20,2:
+Mac Desktop;111998;iMac (Retina 5K, 27-inch, 2019):iMac (Retina 5K, 27-inch, 2019):iMac19,1:
+Mac Desktop;111963;iMac (Retina 4K, 21.5-inch, 2019):iMac (Retina 4K, 21.5-inch, 2019):iMac19,2:
+Mac Desktop;111995;iMac Pro (2017):iMac Pro (2017):iMacPro1,1:
+Mac Desktop;111969;iMac (Retina 5K, 27-inch, 2017):iMac (Retina 5K, 27-inch, 2017):iMac18,3:
+Mac Desktop;112026;iMac (Retina 4K, 21.5-inch, 2017):iMac (Retina 4K, 21.5-inch, 2017):iMac18,2:
+Mac Desktop;111921;iMac (21.5-inch, 2017):iMac (21.5-inch, 2017):iMac18,1:
+Mac Desktop;112035;iMac (Retina 5K, 27-inch, Late 2015):iMac (Retina 5K, 27-inch, Late 2015):iMac17,1:
+Mac Desktop;112034;iMac (Retina 4K, 21.5-inch, Late 2015):iMac (Retina 4K, 21.5-inch, Late 2015):iMac16,2:
+Mac Desktop;112036;iMac (21.5-inch, Late 2015):iMac (21.5-inch, Late 2015):iMac16,1:
+Mac Desktop;112434;iMac (Retina 5K, 27-inch, Mid 2015):iMac (Retina 5K, 27-inch, Mid 2015):iMac15,1:
+Mac Desktop;112436;iMac (Retina 5K, 27-inch, Late 2014):iMac (Retina 5K, 27-inch, Late 2014):iMac15,1:
+Mac Desktop;112031;iMac (21.5-inch, Mid 2014):iMac (21.5-inch, Mid 2014):iMac14,4:
+Mac Desktop;111970;iMac (27-inch, Late 2013):iMac (27-inch, Late 2013):iMac14,2:
+Mac Desktop;111967;iMac (21.5-inch, Late 2013):iMac (21.5-inch, Late 2013):iMac14,1:
+Mac Desktop;112433;iMac (27-inch, Late 2012):iMac (27-inch, Late 2012):iMac13,2:
+Mac Desktop;112435;iMac (21.5-inch, Late 2012):iMac (21.5-inch, Late 2012):iMac13,1:
+Mac Desktop;112569;iMac (27-inch, Mid 2011):iMac (27-inch, Mid 2011):iMac12,2:
+Mac Desktop;111983;iMac (21.5-inch, Mid 2011):iMac (21.5-inch, Mid 2011):iMac12,1:
+Mac Desktop;112566;iMac (27-inch, Mid 2010):iMac (27-inch, Mid 2010):iMac11,3:
+Mac Desktop;112567;iMac (21.5-inch, Mid 2010):iMac (21.5-inch, Mid 2010):iMac11,2:
+Mac Desktop;112564;iMac (27-inch, Late 2009):iMac (27-inch, Late 2009):iMac10,1:
+Mac Desktop;112565;iMac (21.5-inch, Late 2009):iMac (21.5-inch, Late 2009):iMac10,1:
+Mac Desktop;112427;iMac (24-inch, Early 2009):iMac (Early 2009):iMac9,1:
+Mac Desktop;112427;iMac (20-inch, Early 2009):iMac (Early 2009):iMac9,1:
+Mac Desktop;121555;Mac mini (2024):Mac mini (2024):Mac16,11:Mac16,10:
+Mac Desktop;111837;Mac mini (2023):Mac mini (2023):Mac14,3:
+Mac Desktop;111837;Mac mini (2023):Mac mini (2023):Mac14,12:
+Mac Desktop;111894;Mac mini (M1, 2020):Mac mini (M1, 2020):Macmini9,1:
+Mac Desktop;111912;Mac mini (2018):Mac mini (2018):Macmini8,1:
+Mac Desktop;111931;Mac mini (Late 2014):Mac mini (Late 2014):Macmini7,1:
+Mac Desktop;111926;Mac mini (Late 2012):Mac mini (Late 2012):Macmini6,1:Macmini6,2:
+Mac Desktop;112007;Mac mini (Mid 2011):Mac mini (Mid 2011):Macmini5,1:Macmini5,2:
+Mac Desktop;112588;Mac mini (Mid 2010):Mac mini (Mid 2010):Macmini4,1:
+Mac Desktop;112482;Mac mini (Late 2009):Mac mini (Late 2009):Macmini3,1:
+Mac Desktop;111345;Mac mini (Early 2009):Mac mini (Early 2009):Macmini3,1:
+Mac Desktop;122211;Mac Studio (2025):Mac Studio (2025):Mac16,9:
+Mac Desktop;122211;Mac Studio (2025):Mac Studio (2025):Mac15,14:
+Mac Desktop;111835;Mac Studio (2023):Mac Studio (2023):Mac14,13:
+Mac Desktop;111835;Mac Studio (2023):Mac Studio (2023):Mac14,14:
+Mac Desktop;111900;Mac Studio (2022):Mac Studio (2022):Mac13,1:
+Mac Desktop;111900;Mac Studio (2022):Mac Studio (2022):Mac13,2:
+Mac Desktop;111343;Mac Pro (2023):Mac Pro (2023):Mac14,8:
+Mac Desktop;111343;Mac Pro (Rack, 2023):Mac Pro (2023):Mac14,8:
+Mac Desktop;118461;Mac Pro (2019):Mac Pro (2019):MacPro7,1:
+Mac Desktop;111907;Mac Pro (Rack, 2019):Mac Pro (Rack, 2019):MacPro7,1:
+Mac Desktop;112025;Mac Pro (Late 2013):Mac Pro (Late 2013):MacPro6,1:
+Mac Desktop;118464;Mac Pro (Mid 2012):Mac Pro (Mid 2012):MacPro5,1:
+Mac Desktop;118464;Mac Pro Server (Mid 2012):Mac Pro (Mid 2012):MacPro5,1:
+Mac Desktop;112578;Mac Pro (Mid 2010):Mac Pro (Mid 2010):MacPro5,1:
+Mac Desktop;112578;Mac Pro Server (Mid 2010):Mac Pro (Mid 2010):MacPro5,1:
+Mac Desktop;112590;Mac Pro (Early 2009):Mac Pro (Early 2009):MacPro4,1:
+iPhone;122208;iPhone 16e:iPhone 16e:A3212:A3408:A3410:A3409:
+iPhone;121032;iPhone 16 Pro Max:iPhone 16 Pro Max:A3084:A3295:A3297:A3296:
+iPhone;121031;iPhone 16 Pro:iPhone 16 Pro:A3083:A3292:A3294:A3293:
+iPhone;121030;iPhone 16 Plus:iPhone 16 Plus:A3082:A3289:A3291:A3290:
+iPhone;121029;iPhone 16:iPhone 16:A3081:A3286:A3288:A3287:
+iPhone;111828;iPhone 15 Pro Max:iPhone 15 Pro Max:A2849:A3105:A3108:A3106:
+iPhone;111829;iPhone 15 Pro:iPhone 15 Pro:A2848:A3101:A3104:A3102:
+iPhone;111830;iPhone 15 Plus:iPhone 15 Plus:A2847:A3093:A3096:A3094:
+iPhone;111831;iPhone 15:iPhone 15:A2846:A3089:A3092:A3090:
+iPhone;111846;iPhone 14 Pro Max:iPhone 14 Pro Max:A2651:A2893:A2896:A2895:A2894:
+iPhone;111849;iPhone 14 Pro:iPhone 14 Pro:A2650:A2889:A2892:A2891:A2890:
+iPhone;111854;iPhone 14 Plus:iPhone 14 Plus:A2632:A2885:A2888:A2887:A2886:
+iPhone;111850;iPhone 14:iPhone 14:A2649:A2881:A2884:A2883:A2882:
+iPhone;111866;iPhone SE (3rd generation):iPhone SE (3rd generation):A2595:A2782:A2784:A2785:A2783:
+iPhone;111870;iPhone 13 Pro Max:iPhone 13 Pro Max:A2484:A2641:A2644:A2645:A2643:
+iPhone;111871;iPhone 13 Pro:iPhone 13 Pro:A2483:A2636:A2639:A2640:A2638:
+iPhone;111872;iPhone 13:iPhone 13:A2482:A2631:A2634:A2635:A2633:
+iPhone;111873;iPhone 13 mini:iPhone 13 mini:A2481:A2626:A2629:A2630:A2628:
+iPhone;111874;iPhone 12 Pro Max:iPhone 12 Pro Max:A2342:A2410:A2412:A2411:
+iPhone;111875;iPhone 12 Pro:iPhone 12 Pro:A2341:A2406:A2408:A2407:
+iPhone;111876;iPhone 12:iPhone 12:A2172:A2402:A2404:A2403:
+iPhone;111877;iPhone 12 mini:iPhone 12 mini:A2176:A2398:A2400:A2399:
+iPhone;111882;iPhone SE (2nd generation):iPhone SE (2nd generation):A2275:A2298:A2296:
+iPhone;111879;iPhone 11 Pro:iPhone 11 Pro:A2160:A2217:A2215:
+iPhone;111878;iPhone 11 Pro Max:iPhone 11 Pro Max:A2161:A2220:A2218:
+iPhone;111865;iPhone 11:iPhone 11:A2111:A2223:A2221:
+iPhone;111881;iPhone XS:iPhone XS:A1920:A2097:A2098:A2099:A2100:
+iPhone;111880;iPhone XS Max:iPhone XS Max:A1921:A2101:A2102:A2103:A2104:
+iPhone;111868;iPhone XR:iPhone XR:A1984:A2105:A2106:A2107:A2108:
+iPhone;111864;iPhone X:iPhone X:A1865:A1901:A1902:
+iPhone;111976;iPhone 8:iPhone 8:A1863:A1905:A1906:
+iPhone;111950;iPhone 8 Plus:iPhone 8 Plus:A1864:A1897:A1898:
+iPhone;111943;iPhone 7:iPhone 7:A1660:A1778:A1779:
+iPhone;111953;iPhone 7 Plus:iPhone 7 Plus:A1661:A1784:A1785:
+iPhone;112005;iPhone SE (1st generation):iPhone SE:A1723:A1662:A1724:
+iPhone;111952;iPhone 6s:iPhone 6s:A1633:A1688:A1700:
+iPhone;111996;iPhone 6s Plus:iPhone 6s Plus:A1634:A1687:A1699:
+iPhone;111954;iPhone 6:iPhone 6:A1549:A1586:A1589:
+iPhone;111940;iPhone 6 Plus:iPhone 6 Plus:A1522:A1524:A1593:
+iPhone;111973;iPhone 5s:iPhone 5s:A1453:A1457:A1518:A1528::
+iPhone;111917;iPhone 5c:iPhone 5c:A1456:A1507:A1516:A1529:A1532:
+iPhone;112016;iPhone 5:iPhone 5:A1428:A1429:A1442:
+iPhone;112004;iPhone 4s:iPhone 4S:A1431:A1387:
+iPhone;112562;iPhone 4:iPhone 4:A1349:A1332:
+iPhone;112307;iPhone 3GS:iPhone 3GS:A1325:A1303:
+iPhone;112496;iPhone 3G:iPhone 3G:A1324:A1241:
+iPhone;112445;iPhone:iPhone:A1203:
+iPad;119891;iPad Pro 13-inch (M4) Wi-Fi:iPad Pro 13-inch (M4):A2925:
+iPad;119891;iPad Pro 13-inch (M4) Wi-Fi + Cellular:iPad Pro 13-inch (M4):A2926:
+iPad;119891;iPad Pro 13-inch (M4) Wi-Fi + Cellular (China):iPad Pro 13-inch (M4):A3007:
+iPad;119892;iPad Pro 11-inch (M4) Wi-Fi:iPad Pro 11-inch (M4):A2836:
+iPad;119892;iPad Pro 11-inch (M4) Wi-Fi + Cellular:iPad Pro 11-inch (M4):A2837:
+iPad;119892;iPad Pro 11-inch (M4) Wi-Fi + Cellular (China):iPad Pro 11-inch (M4):A3006:
+iPad;111841;iPad Pro 12.9-inch (6th generation):iPad Pro 12.9-inch (6th generation):A2436:
+iPad;111841;iPad Pro 12.9-inch (6th generation) Wi-Fi + Cellular:iPad Pro 12.9-inch (6th generation):A2437:
+iPad;111841;iPad Pro 12.9-inch (6th generation) Wi-Fi + Cellular with mmWave:iPad Pro 12.9-inch (6th generation):A2764:
+iPad;111841;iPad Pro 12.9-inch (6th generation) Wi-Fi + Cellular (China):iPad Pro 12.9-inch (6th generation):A2766:
+iPad;111842;iPad Pro 11-inch (4th generation):iPad Pro 11-inch (4th generation):A2759:
+iPad;111842;iPad Pro 11-inch (4th generation) Wi-Fi + Cellular:iPad Pro 11-inch (4th generation):A2761:
+iPad;111842;iPad Pro 11-inch (4th generation) Wi-Fi + Cellular with mmWave:iPad Pro 11-inch (4th generation):A2435:
+iPad;111842;iPad Pro 11-inch (4th generation) Wi-Fi + Cellular (China):iPad Pro 11-inch (4th generation):A2762:
+iPad;111896;iPad Pro 12.9-inch (5th generation):iPad Pro, 12.9-inch (5th generation):A2378:
+iPad;111896;iPad Pro 12.9-inch (5th generation) Wi-Fi + Cellular:iPad Pro, 12.9-inch (5th generation):A2461:
+iPad;111896;iPad Pro 12.9-inch (5th generation) Wi-Fi + Cellular with mmWave:iPad Pro, 12.9-inch (5th generation):A2379:
+iPad;111896;iPad Pro 12.9-inch (5th generation) Wi-Fi + Cellular (China):iPad Pro, 12.9-inch (5th generation):A2462:
+iPad;111897;iPad Pro 11-inch (3rd generation):iPad Pro, 11-inch (3rd generation):A2377:
+iPad;111897;iPad Pro 11-inch (3rd generation) Wi-Fi + Cellular:iPad Pro, 11-inch (3rd generation):A2459:
+iPad;111897;iPad Pro 11-inch (3rd generation) Wi-Fi + Cellular with mmWave:iPad Pro, 11-inch (3rd generation):A2301:
+iPad;111897;iPad Pro 11-inch (3rd generation) Wi-Fi + Cellular (China):iPad Pro, 11-inch (3rd generation):A2460:
+iPad;111977;iPad Pro 12.9-inch (4th generation):iPad Pro 12.9-inch (4th generation):A2229:
+iPad;111977;iPad Pro 12.9-inch (4th generation) Wi-Fi + Cellular:iPad Pro 12.9-inch (4th generation):A2069:A2232:
+iPad;111977;iPad Pro 12.9-inch (4th generation) Wi-Fi + Cellular (China):iPad Pro 12.9-inch (4th generation):A2233:
+iPad;118452;iPad Pro 11-inch (2nd generation):iPad Pro 11-inch (2nd generation):A2228:
+iPad;118452;iPad Pro 11-inch (2nd generation) Wi-Fi + Cellular:iPad Pro 11-inch (2nd generation):A2068:A2230:
+iPad;118452;iPad Pro 11-inch (2nd generation) Wi-Fi + Cellular (China):iPad Pro 11-inch (2nd generation):A2231:
+iPad;111979;iPad Pro 12.9-inch (3rd generation):iPad Pro 12.9-inch (3rd generation):A1876:
+iPad;111979;iPad Pro 12.9-inch (3rd generation) Wi-Fi + Cellular:iPad Pro 12.9-inch (3rd generation):A2014:A1895:
+iPad;111979;iPad Pro 12.9-inch (3rd generation) Wi-Fi + Cellular (China):iPad Pro 12.9-inch (3rd generation):A1983:
+iPad;111974;iPad Pro 11-inch:iPad Pro 11-inch (1st generation):A1980:
+iPad;111974;iPad Pro 11-inch Wi-Fi + Cellular:iPad Pro 11-inch (1st generation):A2013:A1934:
+iPad;111974;iPad Pro 11-inch Wi-Fi + Cellular (China):iPad Pro 11-inch (1st generation):A1979:
+iPad;111964;iPad Pro 12.9-inch (2nd generation):iPad Pro (12.9-inch) (2nd generation):A1670:
+iPad;111964;iPad Pro 12.9-inch (2nd generation) Wi-Fi + Cellular:iPad Pro (12.9-inch) (2nd generation):A1671:
+iPad;111964;iPad Pro 12.9-inch (2nd generation) Wi-Fi + Cellular (China):iPad Pro (12.9-inch) (2nd generation):A1821:
+iPad;111927;iPad Pro (10.5-inch):iPad Pro (10.5-inch):A1701:
+iPad;111927;iPad Pro (10.5-inch) Wi-Fi + Cellular:iPad Pro (10.5-inch):A1709:
+iPad;111927;iPad Pro (10.5-inch) Wi-Fi + Cellular (China):iPad Pro (10.5-inch):A1852:
+iPad;111965;iPad Pro (9.7-inch):iPad Pro (9.7-inch):A1673:
+iPad;111965;iPad Pro (9.7-inch) Wi-Fi + Cellular:iPad Pro (9.7-inch):A1674:A1675:
+iPad;112024;iPad Pro (12.9-inch):iPad Pro (12.9-inch):A1584:
+iPad;112024;iPad Pro (12.9-inch) Wi-Fi + Cellular:iPad Pro (12.9-inch):A1652:
+iPad;122242;iPad Air 13-inch (M3) Wi-Fi:iPad Air 13-inch (M3):A3268:
+iPad;122242;iPad Air 13-inch (M3) Wi-Fi + Cellular:iPad Air 13-inch (M3):A3269:
+iPad;122242;iPad Air 13-inch (M3) Wi-Fi + Cellular (China):iPad Air 13-inch (M3):A3271:
+iPad;122241;iPad Air 11-inch (M3) Wi-Fi:iPad Air 11-inch (M3):A3266:
+iPad;122241;iPad Air 11-inch (M3) Wi-Fi + Cellular:iPad Air 11-inch (M3):A3267:
+iPad;122241;iPad Air 11-inch (M3) Wi-Fi + Cellular (China):iPad Air 11-inch (M3):A3270:
+iPad;119893;iPad Air 13-inch (M2) Wi-Fi:iPad Air 13-inch (M2):A2898:
+iPad;119893;iPad Air 13-inch (M2) Wi-Fi + Cellular:iPad Air 13-inch (M2):A2899:
+iPad;119893;iPad Air 13-inch (M2) Wi-Fi + Cellular (China):iPad Air 13-inch (M2):A2900:
+iPad;119894;iPad Air 11-inch (M2) Wi-Fi:iPad Air 11-inch (M2):A2902:
+iPad;119894;iPad Air 11-inch (M2) Wi-Fi + Cellular:iPad Air 11-inch (M2):A2903:
+iPad;119894;iPad Air 11-inch (M2) Wi-Fi + Cellular (China):iPad Air 11-inch (M2):A2904:
+iPad;111887;iPad Air (5th generation):iPad Air (5th generation):A2588:
+iPad;111887;iPad Air (5th generation) Wi-Fi + Cellular:iPad Air (5th generation):A2589:A2591:
+iPad;111905;iPad Air (4th generation):iPad Air (4th generation):A2316:
+iPad;111905;iPad Air (4th generation) Wi-Fi + Cellular:iPad Air (4th generation):A2324:A2325:A2072:
+iPad;111939;iPad Air (3rd generation):iPad Air (3rd generation):A2152:
+iPad;111939;iPad Air (3rd generation) Wi-Fi + Cellular:iPad Air (3rd generation):A2123:A2153:
+iPad;111939;iPad Air (3rd generation) Wi-Fi + Cellular (China):iPad Air (3rd generation):A2154:
+iPad;112017;iPad Air 2:iPad Air 2:A1566:
+iPad;112017;iPad Air 2 Wi-Fi + Cellular:iPad Air 2:A1567:
+iPad;112020;iPad Air Wi-Fi:iPad Air:A1474:
+iPad;112020;iPad Air Wi-Fi + Cellular:iPad Air:A1475:
+iPad;112020;iPad Air Wi-Fi + Cellular (TD-LTE):iPad Air:A1476:
+iPad;121456;iPad mini (A17 Pro):iPad mini (A17 Pro):A2993:
+iPad;121456;iPad mini (A17 Pro) Wi-Fi + Cellular:iPad mini (A17 Pro):A2995:
+iPad;121456;iPad mini (A17 Pro) (China):iPad mini (A17 Pro):A2996:
+iPad;111886;iPad mini (6th generation):iPad mini (6th generation):A2567:
+iPad;111886;iPad mini (6th generation) Wi-Fi + Cellular:iPad mini (6th generation):A2568:
+iPad;111886;iPad mini (6th generation) Wi-Fi + Cellular (China):iPad mini (6th generation):A2569:
+iPad;111904;iPad mini (5th generation):iPad mini (5th generation):A2133:
+iPad;111904;iPad mini (5th generation) Wi-Fi + Cellular:iPad mini (5th generation):A2124:A2126:
+iPad;111904;iPad mini (5th generation) Wi-Fi + Cellular (China):iPad mini (5th generation):A2125:
+iPad;112002;iPad mini 4:iPad mini 4:A1538:
+iPad;112002;iPad mini 4 Wi-Fi + Cellular:iPad mini 4:A1550:
+iPad;112018;iPad mini 3:iPad mini 3:A1599:
+iPad;112018;iPad mini 3 Wi-Fi + Cellular:iPad mini 3:A1600:
+iPad;112019;iPad mini 2 Wi-Fi:iPad mini 2 with Retina display:A1489:
+iPad;112019;iPad mini 2 Wi-Fi + Cellular:iPad mini 2 with Retina display:A1490:
+iPad;112019;iPad mini 2 Wi-Fi + Cellular (TD-LTE):iPad mini 2 with Retina display:A1491:
+iPad;111978;iPad mini Wi-Fi:iPad mini:A1432:
+iPad;111978;iPad mini Wi-Fi + Cellular:iPad mini:A1454:
+iPad;111978;iPad mini Wi-Fi + Cellular (MM):iPad mini:A1455:
+iPad;122240;iPad (A16):iPad (A16):A3354:
+iPad;122240;iPad (A16) Wi-Fi + Cellular:iPad (A16):A3355:
+iPad;122240;iPad (A16) Wi-Fi + Cellular (China):iPad (A16):A3356:
+iPad;111840;iPad (10th generation):iPad (10th generation):A2696:
+iPad;111840;iPad (10th generation) Wi-Fi + Cellular:iPad (10th generation):A2757:
+iPad;111840;iPad (10th generation) Wi-Fi + Cellular (China):iPad (10th generation):A2777:
+iPad;111840;iPad (10th generation) Wi-Fi + Cellular (China):iPad (10th generation):A3162:
+iPad;111898;iPad (9th generation):iPad (9th generation):A2602:
+iPad;111898;iPad (9th generation) Wi-Fi + Cellular:iPad (9th generation):A2604:
+iPad;111898;iPad (9th generation) Wi-Fi + Cellular (North America):iPad (9th generation):A2603:
+iPad;111898;iPad (9th generation) Wi-Fi + Cellular (China):iPad (9th generation):A2605:
+iPad;118451;iPad (8th generation):iPad (8th generation):A2270:
+iPad;118451;iPad (8th generation) Wi-Fi + Cellular:iPad (8th generation):A2428:A2429:A2430:
+iPad;111911;iPad (7th generation) Wi-Fi:iPad (7th generation):A2197:
+iPad;111911;iPad (7th generation) Wi-Fi + Cellular:iPad (7th generation):A2200:A2198:
+iPad;111957;iPad (6th generation) Wi-Fi:iPad (6th generation):A1893:
+iPad;111957;iPad (6th generation) Wi-Fi + Cellular:iPad (6th generation):A1954:
+iPad;111960;iPad (5th generation) Wi-Fi:iPad (5th generation):A1822:
+iPad;111960;iPad (5th generation) Wi-Fi + Cellular:iPad (5th generation):A1823:
+iPad;111993;iPad (4th generation) Wi-Fi:iPad (4th generation):A1458:
+iPad;111993;iPad (4th generation) Wi-Fi + Cellular:iPad (4th generation):A1459:
+iPad;111993;iPad (4th generation) Wi-Fi + Cellular (MM):iPad (4th generation):A1460:
+iPad;111992;iPad (3rd generation) Wi-Fi:iPad (3rd generation):A1416:
+iPad;111992;iPad (3rd generation) Wi-Fi + Cellular:iPad (3rd generation):A1430:
+iPad;111992;iPad (3rd generation) Wi-Fi + Cellular (VZ):iPad (3rd generation):A1403:
+iPad;111990;iPad 2 (Wi-Fi):iPad 2:A1395:
+iPad;111990;iPad 2 (GSM):iPad 2:A1396:
+iPad;111990;iPad 2 (CDMA):iPad 2:A1397:
+iPad;112438;iPad (Wi-Fi):iPad:A1219:
+iPad;112438;iPad (Wi-Fi + 3G):iPad:A1337:
+Apple TV;111839;Apple TV 4K (3rd generation) Wi-Fi + Ethernet:Apple TV 4K (3rd generation):A2843:
+Apple TV;111839;Apple TV 4K (3rd generation) Wi-Fi:Apple TV 4K (3rd generation):A2737:
+Apple TV;111922;Apple TV 4K (2nd generation):Apple TV 4K (2nd generation):A2169:
+Apple TV;111929;Apple TV 4K (1st generation):Apple TV 4K (1st generation):A1842:
+Apple TV;111928;Apple TV HD:Apple TV HD:A1625:
+Apple TV;112429;Apple TV (3rd generation):Apple TV (3rd generation):A1427:A1469:
+Apple TV;112428;Apple TV (2nd generation):Apple TV (2nd generation):A1378:
+Apple TV;112555;Apple TV (1st generation):Apple TV (1st generation):A1218:

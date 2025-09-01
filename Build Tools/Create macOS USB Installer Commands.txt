@@ -2,23 +2,23 @@
 # THE FOLLOWING COMMANDS ARE INTENDED TO BE COPIED-AND-PASTED INTO TERMINAL WHEN NEEDED.
 # BUT, THIS *IS NOT NEEDED ANYMORE* SINCE "update-mac-drives.sh" CAN BE USED INSTEAD.
 
-# CREATE Sonoma INSTALLER USB (15.2 GB REQUIRED):
-sudo '/Volumes/Install macOS Sonoma beta/Install macOS Sonoma beta.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallSonoma --nointeraction
+# CREATE Sequoia INSTALLER USB (17.9 GB REQUIRED):
+sudo '/Volumes/Install macOS Sequoia/Install macOS Sequoia.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallSequoia --nointeraction
 
-# CREATE Ventura INSTALLER USB (14.8 GB REQUIRED):
+# CREATE Sonoma INSTALLER USB (15.9 GB REQUIRED):
+sudo '/Volumes/Install macOS Sonoma/Install macOS Sonoma.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallSonoma --nointeraction
+
+# CREATE Ventura INSTALLER USB (14.5 GB REQUIRED):
 sudo '/Volumes/Install macOS Ventura/Install macOS Ventura.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallVentura --nointeraction
 
 # CREATE Monterey INSTALLER USB (14.7 GB REQUIRED):
 sudo '/Volumes/Install macOS Monterey/Install macOS Monterey.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallMonterey --nointeraction
 
-# CREATE Big Sur INSTALLER USB (14 GB REQUIRED):
+# CREATE Big Sur INSTALLER USB (13.6 GB REQUIRED):
 sudo '/Volumes/Install macOS Big Sur/Install macOS Big Sur.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallBigSur --nointeraction
 
-# CREATE Catalina INSTALLER USB (9 GB REQUIRED):
+# CREATE Catalina INSTALLER USB (8.4 GB REQUIRED):
 sudo '/Volumes/Install macOS Catalina/Install macOS Catalina.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallCatalina --nointeraction
-
-# CREATE High Sierra INSTALLER USB (6 GB REQUIRED):
-sudo '/Volumes/Install macOS High Sierra/Install macOS High Sierra.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallHighSierra --nointeraction
 
 
 
@@ -26,6 +26,9 @@ sudo '/Volumes/Install macOS High Sierra/Install macOS High Sierra.app/Contents/
 
 # CREATE Mojave INSTALLER USB (7 GB REQUIRED):
 sudo '/Volumes/Install macOS Mojave/Install macOS Mojave.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallMojave --nointeraction
+
+# CREATE High Sierra INSTALLER USB (6 GB REQUIRED):
+sudo '/Volumes/Install macOS High Sierra/Install macOS High Sierra.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallHighSierra --nointeraction
 
 # CREATE Sierra INSTALLER USB (6 GB REQUIRED)
 sudo '/Applications/Install macOS Sierra.app/Contents/Resources/createinstallmedia' --applicationpath '/Applications/Install macOS Sierra.app' --volume /Volumes/InstallSierra --nointeraction

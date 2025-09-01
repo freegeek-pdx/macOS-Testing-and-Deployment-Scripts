@@ -22,16 +22,64 @@ PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH f
 PROJECT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)/.."
 readonly PROJECT_DIR
 
-if ! WIFI_PASSWORD="$(PlistBuddy -c 'Print :wifi_password' "${PROJECT_DIR}/../Build Tools/Free Geek Passwords.plist")" || [[ -z "${WIFI_PASSWORD}" ]]; then
+if ! WIFI_PASSWORD="$(PlistBuddy -c 'Print :wifi_password' "${PROJECT_DIR}/../Build Tools/Free Geek Private Strings.plist")" || [[ -z "${WIFI_PASSWORD}" ]]; then
 	echo 'FAILED TO GET WI-FI PASSWORD'
 	exit 1
 fi
 readonly WIFI_PASSWORD
 
+
+human_readable_duration_from_seconds() { # Based On: https://stackoverflow.com/a/39452629
+	total_seconds="$1"
+	if [[ ! "${total_seconds}" =~ ^[0123456789]+$ ]]; then
+		echo 'INVALID Seconds'
+		return 1
+	fi
+
+	duration_output=''
+
+	display_days="$(( total_seconds / 86400 ))"
+	if (( display_days > 0 )); then
+		duration_output="${display_days} Day$( (( display_days != 1 )) && echo 's' )"
+	fi
+
+	display_hours="$(( (total_seconds % 86400) / 3600 ))"
+	if (( display_hours > 0 )); then
+		if [[ -n "${duration_output}" ]]; then
+			duration_output+=', '
+		fi
+		duration_output+="${display_hours} Hour$( (( display_hours != 1 )) && echo 's' )"
+	fi
+
+	display_minutes="$(( (total_seconds % 3600) / 60 ))"
+	if (( display_minutes > 0 )); then
+		if [[ -n "${duration_output}" ]]; then
+			duration_output+=', '
+		fi
+		duration_output+="${display_minutes} Minute$( (( display_minutes != 1 )) && echo 's' )"
+	fi
+
+	display_seconds="$(( total_seconds % 60 ))"
+	if (( display_seconds > 0 )) || [[ -z "${duration_output}" ]]; then
+		if [[ -n "${duration_output}" ]]; then
+			duration_output+=', '
+		fi
+		duration_output+="${display_seconds} Second$( (( display_seconds != 1 )) && echo 's' )"
+	fi
+
+	echo "${duration_output}"
+}
+
+
+overall_start_timestamp="$(date '+%s')"
+connected_fgMIB_count=0
+
 if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" ]]; then
 	for this_fgMIB_volume in '/Volumes/fgMIB'*; do
 		if [[ -d "${this_fgMIB_volume}" ]]; then
+			(( connected_fgMIB_count ++ ))
 			echo "STARTING ${this_fgMIB_volume}"
+			this_fgMIB_start_timestamp="$(date '+%s')"
 
 			# There is no point comparing "fg-install-os" files (like we do with other files) since they will never match
 			# because the source contains the password placeholder and the target contains the obfuscated password.
@@ -57,7 +105,7 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 				fi
 
 				echo 'COPYING customization-resources/fg-prepare-os.pkg...'
-				ditto "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg"
+				ditto "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg" || exit
 			else
 				echo "EXACT COPY EXISTS: customization-resources/fg-prepare-os.pkg"
 			fi
@@ -65,37 +113,45 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 			for this_install_packages_script_file_or_folder in "${PROJECT_DIR}/Install Packages Script/"*; do
 				this_install_packages_script_file_or_folder_name="${this_install_packages_script_file_or_folder##*/}"
 				
-				if [[ -f "${this_install_packages_script_file_or_folder}" ]]; then
-					if ! cmp -s "${this_install_packages_script_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"; then
-						rm -f "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"
-						echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}..."
-						ditto "${this_install_packages_script_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"
-					else
-						echo "EXACT COPY EXISTS: customization-resources/${this_install_packages_script_file_or_folder_name}"
-					fi
-				elif [[ -d "${this_install_packages_script_file_or_folder}" ]]; then
-					if [[ ! -d "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}" ]]; then
-						mkdir -p "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"
-					fi
-
-					for this_install_packages_script_subfolder_file_or_folder in "${this_install_packages_script_file_or_folder}/"*; do
-						this_install_packages_script_subfolder_file_or_folder_name="${this_install_packages_script_subfolder_file_or_folder##*/}"
-
-						if [[ -f "${this_install_packages_script_subfolder_file_or_folder}" ]]; then
-							if ! cmp -s "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"; then
-								rm -f "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
-								echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}..."
-								ditto "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
-							else
-								echo "EXACT COPY EXISTS: customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
-							fi
-						elif [[ -d "${this_install_packages_script_subfolder_file_or_folder}" ]]; then
-							# TODO: Check if exact copy exists instead of always re-copying whole dir (which will be an app). THIS IS NO LONGER CURRENTLY IMPORTANT SINCE NO LONGER INCLUDING APPS IN HERE (INCLUDING ZIP INSTEAD).
-							rm -rf "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
-							echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}..."
-							ditto "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+				if [[ "${this_install_packages_script_file_or_folder_name}" == 'OLD-'* ]]; then
+					echo "IGNORING OLD FILE OR FOLDER: customization-resources/${this_install_packages_script_file_or_folder_name}"
+				else
+					if [[ -f "${this_install_packages_script_file_or_folder}" ]]; then
+						if ! cmp -s "${this_install_packages_script_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"; then
+							rm -f "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"
+							echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}..."
+							ditto "${this_install_packages_script_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}" || exit
+						else
+							echo "EXACT COPY EXISTS: customization-resources/${this_install_packages_script_file_or_folder_name}"
 						fi
-					done
+					elif [[ -d "${this_install_packages_script_file_or_folder}" ]]; then
+						if [[ ! -d "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}" ]]; then
+							mkdir -p "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}"
+						fi
+
+						for this_install_packages_script_subfolder_file_or_folder in "${this_install_packages_script_file_or_folder}/"*; do
+							this_install_packages_script_subfolder_file_or_folder_name="${this_install_packages_script_subfolder_file_or_folder##*/}"
+
+							if [[ "${this_install_packages_script_subfolder_file_or_folder_name}" == 'OLD-'* ]]; then
+								echo "IGNORING OLD FILE OR FOLDER: customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+							else
+								if [[ -f "${this_install_packages_script_subfolder_file_or_folder}" ]]; then
+									if ! cmp -s "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"; then
+										rm -f "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+										echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}..."
+										ditto "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}" || exit
+									else
+										echo "EXACT COPY EXISTS: customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+									fi
+								elif [[ -d "${this_install_packages_script_subfolder_file_or_folder}" ]]; then
+									# TODO: Check if exact copy exists instead of always re-copying whole dir (which will be an app). THIS IS NO LONGER CURRENTLY IMPORTANT SINCE NO LONGER INCLUDING APPS IN HERE (INCLUDING ZIP INSTEAD).
+									rm -rf "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}"
+									echo "COPYING customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}..."
+									ditto "${this_install_packages_script_subfolder_file_or_folder}" "${this_fgMIB_volume}/customization-resources/${this_install_packages_script_file_or_folder_name}/${this_install_packages_script_subfolder_file_or_folder_name}" || exit
+								fi
+							fi
+						done
+					fi
 				fi
 			done
 			
@@ -114,7 +170,7 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 							if ! cmp -s "${this_extra_bins_versioned_file}" "${this_fgMIB_volume}/extra-bins/${this_extra_bins_folder_name}/${this_extra_bins_versioned_file_name}"; then
 								rm -f "${this_fgMIB_volume}/extra-bins/${this_extra_bins_folder_name}/${this_extra_bins_versioned_file_name}"
 								echo "COPYING extra-bins/${this_extra_bins_folder_name}/${this_extra_bins_versioned_file_name}..."
-								ditto "${this_extra_bins_versioned_file}" "${this_fgMIB_volume}/extra-bins/${this_extra_bins_folder_name}/${this_extra_bins_versioned_file_name}"
+								ditto "${this_extra_bins_versioned_file}" "${this_fgMIB_volume}/extra-bins/${this_extra_bins_folder_name}/${this_extra_bins_versioned_file_name}" || exit
 							else
 								echo "EXACT COPY EXISTS: extra-bins/${this_extra_bins_folder_name}/${this_extra_bins_versioned_file_name}"
 							fi
@@ -123,7 +179,7 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 				fi
 			done
 			
-			echo "DONE WITH ${this_fgMIB_volume} - UNMOUNTING..."
+			echo "DONE WITH ${this_fgMIB_volume} ($(human_readable_duration_from_seconds "$(( $(date '+%s') - this_fgMIB_start_timestamp ))")) - UNMOUNTING..."
 			diskutil unmountDisk "${this_fgMIB_volume}"
 		else
 			echo "ERROR - fgMIB VOLUME NOT FOUND"
@@ -132,3 +188,5 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 else
 	echo -e "ERROR - CRITICAL FILES NOT FOUND IN PROJECT_DIR:\n${PROJECT_DIR}"
 fi
+
+echo -e "\nFinished Updating fgMIB on ${connected_fgMIB_count} Mac Drives in $(human_readable_duration_from_seconds "$(( $(date '+%s') - overall_start_timestamp ))")"

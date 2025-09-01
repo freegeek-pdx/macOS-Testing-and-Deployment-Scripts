@@ -1,7 +1,7 @@
 /*
 * By: Pico Mitchell
 * For: MacLand @ Free Geek
-* Last Updated: September 8th, 2022
+* Last Updated: June 17th, 2024
 *
 * MIT License
 *
@@ -20,14 +20,21 @@
 */
 
 body {
-	background-image: none !important;
-	background-color: white;
+	background-color: white !important;
 	overflow: hidden;
 	display: none;
 }
 
+ins, iframe, img, .google-auto-placed { /* Hide All Ads */
+	display: none !important;
+}
+
+.kbmain {
+	max-width: 100% !important;
+}
+
 #logo {
-	margin: 10px 0px 6px 0px;
+	margin-top: 15px;
 	text-align: center;
 }
 
@@ -46,9 +53,9 @@ body {
 	font-family: Arial, sans-serif;
 	resize: none;
 	display: block;
-	margin: 0px auto 11px auto;
+	margin: 0px auto;
 	padding: 5px;
-	width: 877px;
+	width: 885px;
 	height: 123px;
 }
 
@@ -59,12 +66,17 @@ body {
 }
 
 #hidden_text_before {
-    width: 1px;
-    height: 1px;
-    border: 0px;
+	width: 1px;
+	height: 1px;
+	border: 0px;
 }
 
-#soundArea, input[name="reset"], #key44, #key145, #key19, #key45, #key36, #key33, #key46, #key35, #key34, #key144, #key111, #key106, #key109b, #key103, #key104, #key105, #key107b, #key100, #key101, #key102, #key97, #key98, #key99, #key13b, #key96, #key110, #key224, #key224b, #key92, #key17b, .label, #notes {
+.kbblock {
+	margin: 0px !important;
+	padding: 0px !important;
+}
+
+.kbblock:nth-of-type(1), .kbblock:nth-of-type(3), #soundArea, input[name="reset"], #select_layout, #key44, #key145, #key19, #key45, #key36, #key33, #key46, #key35, #key34, #key144, #key111, #key106, #key109b, #key103, #key104, #key105, #key107b, #key100, #key101, #key102, #key97, #key98, #key99, #key13b, #key96, #key110, #key224, #key224b, #key92, #key17b, .label, #notes {
 	display: none;
 }
 
@@ -74,7 +86,7 @@ body {
 }
 
 table {
-	margin: 0px auto;
+	margin: 0px auto !important;
 }
 
 td {
@@ -82,10 +94,14 @@ td {
 	padding: 0px !important;
 }
 
+td.key_small {
+	vertical-align: top !important;
+}
+
 .key_block td, .key_row div { /* All Keys */
-    font-size: 16px;
+	font-size: 16px;
 	font-family: Arial, sans-serif !important;
-    border-radius: 6px;
+	border-radius: 6px;
 	padding: 6px 8px !important;
 	min-width: 22px;
 	text-align: center;
@@ -97,13 +113,13 @@ td {
 }
 
 .key_pressed, .key_pressed_m {
-    border-color: green !important;
-    background-color: #2CB32C !important;
-    color: white;
+	border-color: green !important;
+	background-color: #2CB32C !important;
+	color: white;
 }
 
 .key_small div { /* Function Keys */
-    font-size: 12px;
+	font-size: 12px;
 	min-width: 29px;
 }
 
@@ -132,7 +148,7 @@ td {
 }
 
 table.key_block { /* Arrow Keys */
-	margin: 0px -4px -4px 0px;
+	margin: 0px -6px -4px 8px !important
 }
 
 .key_block td { /* Arrow Keys */
@@ -145,10 +161,10 @@ table.key_block { /* Arrow Keys */
 	padding: 8px !important;
 }
 
-@media (-webkit-min-device-pixel-ratio: 2),  (min-resolution: 192dpi) {
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
 	#testarea {
 		padding: 10px;
-		width: 867px;
+		width: 875px;
 		height: 105px;
 	}
 
@@ -158,5 +174,11 @@ table.key_block { /* Arrow Keys */
 
 	#key38, #key40 { /* Up Arrow, Down Arrow */
 		font-size: 12.5px;
+	}
+}
+
+@media screen and (min-width: 1200px) {
+	.key_block tr td, .key_row div {
+		font-size: inherit !important; /* Need to UNDO the "font-size: larger" setting for larger window widths. */
 	}
 }

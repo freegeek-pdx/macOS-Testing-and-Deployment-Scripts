@@ -16,9 +16,9 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.7.7-3
+-- Version: 2024.11.11-1
 
--- App Icon is “Counterclockwise Arrows” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
+-- App Icon is “Counterclockwise Arrows” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 -- Build Flag: LSUIElement
@@ -200,7 +200,7 @@ if (appVersion is not equal to "UNKNOWN") then
 
 You must be connected to the internet to be able to check for updates.
 
-Make sure you're connected to either the “Free Geek” or “FG Reuse” Wi-Fi network or plugged in with an Ethernet cable.
+Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
 
 If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
 

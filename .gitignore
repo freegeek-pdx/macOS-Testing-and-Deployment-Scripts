@@ -12,7 +12,10 @@
 *.tiff
 *.pdf
 *.svg
+*.icon
+*.car
 *.pxm
+*.pxd
 *.iconsproj
 *.driveDxLicense
 *.preferences
@@ -21,8 +24,11 @@
 OLD-*
 UNUSED-*
 
+# Ignore if name ends with in any location:
+*-OUTPUT.txt
+
 # Ignore in "Build Tools":
-Free\ Geek\ Passwords.plist
+Free\ Geek\ Private Strings.plist
 
 # Ignore in "fgMIB Resources":
 extra-bins/
@@ -32,3 +38,6 @@ Tools/
 DriveDx/
 Remote\ Management\ Debugging/
 ZIPs\ for\ Auto-Update/
+
+# Ignore in "Other Stuff":
+ARCHIVE/

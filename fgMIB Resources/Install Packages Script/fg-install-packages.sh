@@ -22,14 +22,14 @@
 
 # NOTICE: This script will only be installed and run via LaunchDaemon when customizing an existing clean install, such as on Apple Silicon Macs.
 
-readonly SCRIPT_VERSION='2023.6.16-1'
+readonly SCRIPT_VERSION='2023.11.9-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
 SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
 
-DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc.
+DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 18 = 10.14, 19 = 10.15, 20 = 11.0, 21 = 12.0, 22 = 13.0, 23 = 14.0, etc.
 readonly DARWIN_MAJOR_VERSION
 
 launch_daemon_path='/Library/LaunchDaemons/org.freegeek.fg-install-packages.plist'
@@ -46,7 +46,7 @@ launch_login_progress_app() {
 
 		login_progress_launch_agent_path='/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
 
-		# NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
+		# NOTE: The following LaunchAgent is setup to run a signed script which launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
 		# BUT, this is just done for consistency with other code since this particular script will never run when a user is logged in to even be able to see that list in macOS 13 Ventura.
 		# On macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
 		PlistBuddy \

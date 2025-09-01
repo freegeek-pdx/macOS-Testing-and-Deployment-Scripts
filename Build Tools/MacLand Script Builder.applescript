@@ -95,28 +95,52 @@ repeat
 	tell application id "com.apple.finder"
 		set parentFolder to (container of (path to me))
 		
-		set fgPasswordsPlistPath to ((POSIX path of (parentFolder as alias)) & "Free Geek Passwords.plist")
+		set fgPrivateStringsPlistPath to ((POSIX path of (parentFolder as alias)) & "Free Geek Private Strings.plist")
 		
 		set adminPassword to ""
 		try
-			set adminPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :admin_password' " & (quoted form of fgPasswordsPlistPath)) as text)
+			set adminPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :admin_password' " & (quoted form of fgPrivateStringsPlistPath)) as text)
 		end try
 		
 		set previousAdminPassword to ""
 		try
-			set previousAdminPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :previous_admin_password' " & (quoted form of fgPasswordsPlistPath)) as text)
+			set previousAdminPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :previous_admin_password' " & (quoted form of fgPrivateStringsPlistPath)) as text)
 		end try
 		
 		set wiFiPassword to ""
 		try
-			set wiFiPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :wifi_password' " & (quoted form of fgPasswordsPlistPath)) as text)
+			set wiFiPassword to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :wifi_password' " & (quoted form of fgPrivateStringsPlistPath)) as text)
+		end try
+		
+		set checkRemoteManagedMacsLogURL to ""
+		try
+			set checkRemoteManagedMacsLogURL to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :check_remote_managed_macs_log_url' " & (quoted form of fgPrivateStringsPlistPath)) as text)
+		end try
+		
+		set logRemoteManagedMacURL to ""
+		try
+			set logRemoteManagedMacURL to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :log_remote_managed_mac_url' " & (quoted form of fgPrivateStringsPlistPath)) as text)
+		end try
+		
+		set markPreviouslyRemoteManagedMacAsRemovedURL to ""
+		try
+			set markPreviouslyRemoteManagedMacAsRemovedURL to (do shell script ("/usr/libexec/PlistBuddy -c 'Print :mark_previously_remote_managed_mac_as_removed_url' " & (quoted form of fgPrivateStringsPlistPath)) as text)
 		end try
 		
 		if (adminPassword is equal to "") then
-			set (end of buildResultsOutput) to "⚠️		FAILED TO RETRIEVE ADMINISTRATOR PASSWORD"
+			set (end of buildResultsOutput) to "⚠️		FAILED TO RETRIEVE adminPassword"
 			set (end of buildResultsOutput) to ""
 		else if (wiFiPassword is equal to "") then
-			set (end of buildResultsOutput) to "⚠️		FAILED TO RETRIEVE WI-FI PASSWORD"
+			set (end of buildResultsOutput) to "⚠️		FAILED TO RETRIEVE wiFiPassword"
+			set (end of buildResultsOutput) to ""
+		else if (checkRemoteManagedMacsLogURL is equal to "") then
+			set (end of buildResultsOutput) to "⚠️		FAILED TO RETRIEVE checkRemoteManagedMacsLogURL"
+			set (end of buildResultsOutput) to ""
+		else if (logRemoteManagedMacURL is equal to "") then
+			set (end of buildResultsOutput) to "⚠️		FAILED TO RETRIEVE logRemoteManagedMacURL"
+			set (end of buildResultsOutput) to ""
+		else if (markPreviouslyRemoteManagedMacAsRemovedURL is equal to "") then
+			set (end of buildResultsOutput) to "⚠️		FAILED TO RETRIEVE markPreviouslyRemoteManagedMacAsRemovedURL"
 			set (end of buildResultsOutput) to ""
 		else if ((name of parentFolder) is equal to "Build Tools") then
 			set macLandFolder to (container of parentFolder)
@@ -168,7 +192,7 @@ repeat
 						
 						try
 							((thisScriptAppPath as POSIX file) as alias)
-							set (end of buildResultsOutput) to "⏭		" & (name of thisScriptTypeFolder) & " > " & thisScriptName & " ALREADY BUILT"
+							set (end of buildResultsOutput) to "⏭️		" & (name of thisScriptTypeFolder) & " > " & thisScriptName & " ALREADY BUILT"
 						on error
 							try
 								set thisScriptSourcePath to (thisScriptFolderPath & "Source/" & thisScriptName & ".applescript")
@@ -180,12 +204,15 @@ repeat
 								
 								set obfuscatedAdminPasswordPlaceholder to "\"[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED ADMIN PASSWORD]\""
 								set obfuscatedWiFiPasswordPlaceholder to "\"[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]\""
+								set obfuscatedCheckRemoteManagedMacsLogURLPlaceholder to "\"[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED CHECK REMOTE MANAGED MACS LOG URL]\""
+								set obfuscatedLogRemoteManagedMacURLPlaceholder to "\"[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED LOG REMOTE MANAGED MAC URL]\""
+								set obfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURLPlaceholder to "\"[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED MARK PREVIOUSLY REMOTE MANAGED MAC AS REMOVED URL]\""
 								
 								set addBuildRunOnlyArg to ""
-								if (thisScriptSource contains "-- Build Flag: Run-Only" or (thisScriptSource contains obfuscatedAdminPasswordPlaceholder) or (thisScriptSource contains obfuscatedWiFiPasswordPlaceholder)) then
+								if (thisScriptSource contains "-- Build Flag: Run-Only" or (thisScriptSource contains obfuscatedAdminPasswordPlaceholder) or (thisScriptSource contains obfuscatedWiFiPasswordPlaceholder) or (thisScriptSource contains obfuscatedCheckRemoteManagedMacsLogURLPlaceholder) or (thisScriptSource contains obfuscatedLogRemoteManagedMacURLPlaceholder) or (thisScriptSource contains obfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURLPlaceholder)) then
 									set addBuildRunOnlyArg to " -x"
 									
-									if ((thisScriptSource contains obfuscatedAdminPasswordPlaceholder) or (thisScriptSource contains obfuscatedWiFiPasswordPlaceholder)) then
+									if ((thisScriptSource contains obfuscatedAdminPasswordPlaceholder) or (thisScriptSource contains obfuscatedWiFiPasswordPlaceholder) or (thisScriptSource contains obfuscatedCheckRemoteManagedMacsLogURLPlaceholder) or (thisScriptSource contains obfuscatedLogRemoteManagedMacURLPlaceholder) or (thisScriptSource contains obfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURLPlaceholder)) then
 										set obfuscateCharactersShiftCount to (random number from 100000 to 999999)
 										
 										if (thisScriptSource contains obfuscatedAdminPasswordPlaceholder) then
@@ -254,6 +281,36 @@ end try")
 											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedWiFiPasswordPlaceholder as text)
 										end if
 										
+										if (thisScriptSource contains obfuscatedCheckRemoteManagedMacsLogURLPlaceholder) then
+											tell me to set obfuscatedCheckRemoteManagedMacsLogURL to shiftString(checkRemoteManagedMacsLogURL)
+											
+											set AppleScript's text item delimiters to obfuscatedCheckRemoteManagedMacsLogURLPlaceholder
+											set thisScriptSourcePartsSplitAtObfuscatedCheckRemoteManagedMacsLogURLPlaceholder to (every text item of thisScriptSource)
+											
+											set AppleScript's text item delimiters to "x(\"" & obfuscatedCheckRemoteManagedMacsLogURL & "\")"
+											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedCheckRemoteManagedMacsLogURLPlaceholder as text)
+										end if
+										
+										if (thisScriptSource contains obfuscatedLogRemoteManagedMacURLPlaceholder) then
+											tell me to set obfuscatedLogRemoteManagedMacURL to shiftString(logRemoteManagedMacURL)
+											
+											set AppleScript's text item delimiters to obfuscatedLogRemoteManagedMacURLPlaceholder
+											set thisScriptSourcePartsSplitAtObfuscatedLogRemoteManagedMacURLPlaceholder to (every text item of thisScriptSource)
+											
+											set AppleScript's text item delimiters to "x(\"" & obfuscatedLogRemoteManagedMacURL & "\")"
+											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedLogRemoteManagedMacURLPlaceholder as text)
+										end if
+										
+										if (thisScriptSource contains obfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURLPlaceholder) then
+											tell me to set obfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURL to shiftString(markPreviouslyRemoteManagedMacAsRemovedURL)
+											
+											set AppleScript's text item delimiters to obfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURLPlaceholder
+											set thisScriptSourcePartsSplitAtObfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURLPlaceholder to (every text item of thisScriptSource)
+											
+											set AppleScript's text item delimiters to "x(\"" & obfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURL & "\")"
+											set thisScriptSource to (thisScriptSourcePartsSplitAtObfuscatedMarkPreviouslyRemoteManagedMacAsRemovedURLPlaceholder as text)
+										end if
+										
 										set thisScriptSource to thisScriptSource & "
 
 on x(s)
@@ -320,7 +377,12 @@ mv " & (quoted form of (thisScriptAppPath & "/Contents/Resources/applet.rsrc")) 
 
 rm -f " & (quoted form of (thisScriptAppPath & "/Contents/Resources/applet.icns")) & "
 ditto " & (quoted form of (thisScriptFolderPath & "Source/" & thisScriptName & " Icon/applet.icns")) & " " & (quoted form of (thisScriptAppPath & "/Contents/Resources/" & thisScriptName & ".icns")) & "
-plutil -replace CFBundleIconFile -string " & (quoted form of thisScriptName) & " " & (quoted form of thisScriptAppInfoPlistPath))
+plutil -replace CFBundleIconFile -string " & (quoted form of thisScriptName) & " " & (quoted form of thisScriptAppInfoPlistPath) & "
+if [[ -f " & (quoted form of (thisScriptFolderPath & "Source/" & thisScriptName & " Icon/Assets.car")) & " ]]; then
+	ditto " & (quoted form of (thisScriptFolderPath & "Source/" & thisScriptName & " Icon/Assets.car")) & " " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Assets.car")) & "
+	plutil -replace CFBundleIconName -string " & (quoted form of thisScriptName) & " " & (quoted form of thisScriptAppInfoPlistPath) & "
+fi
+")
 										
 										set thisScriptAppIconTwemojiAttribution to ""
 										if (thisScriptSource contains "App Icon is “") then

@@ -1,0 +1,1861 @@
+<?php
+
+//
+// MIT License
+//
+// Copyright (c) 2025 Free Geek
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
+// to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
+
+header('Content-Type: text/plain');
+header('Access-Control-Allow-Origin: *');
+
+// Do not cache: https://www.arclab.com/en/kb/php/prevent-web-browser-caching-for-php-files.html
+header_remove('ETag');
+header_remove('Pragma');
+header_remove('Cache-Control');
+header_remove('Last-Modified');
+header_remove('Expires');
+header('Expires: Thu, 1 Jan 1970 00:00:00 GMT');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
+
+$serial = '';
+$model_id = '';
+$a_number = '';
+
+$json_body = file_get_contents('php://input');
+if ($json_body) {
+	$json_body = trim($json_body);
+	if (str_starts_with($json_body, '{')) {
+		$json_body_dict = json_decode($json_body, true);
+		if (is_array($json_body_dict) && !array_is_list($json_body_dict)) {
+			$_REQUEST = array_merge($json_body_dict, $_REQUEST);
+		}
+	}
+}
+
+foreach (['serial_number', 'serial', 'sn', 's', 'model_id', 'id', 'a'] as $this_input_value_key) {
+	if (array_key_exists($this_input_value_key, $_REQUEST)) {
+		$this_input_value = preg_replace('/\s+/', '', $_REQUEST[$this_input_value_key]);
+
+		if ($this_input_value) {
+			if (!$model_id && str_contains($this_input_value, ',')) {
+				$model_id = str_replace(
+					['mac', 'book', 'pro', 'air', 'phone', 'pad', 'pod', 'apple', 'tv', 'watch', 'audio', 'accessory', 'reality', 'device', 'power', 'rack', 'xserve'],
+					['Mac', 'Book', 'Pro', 'Air', 'Phone', 'Pad', 'Pod', 'Apple', 'TV', 'Watch', 'Audio', 'Accessory', 'Reality', 'Device', 'Power', 'Rack', 'Xserve'],
+					strtolower($this_input_value)
+				);
+			} else if (!$a_number && preg_match('/^[AaMm][0-9]{4}$/', $this_input_value)) {
+				$a_number = strtoupper($this_input_value);
+			} else if (!$serial) {
+				$serial = strtoupper($this_input_value);
+			}
+		}
+	}
+}
+
+$serial_length = strlen($serial);
+if (($serial_length == 13) && str_starts_with($serial, 'S')) {
+	// From https://support.apple.com/102858
+	// Barcode scans of Apple hardware product boxes might display a leading letter "S" in front of the product's serial number; however, the leading letter "S" is not a part of the serial number.
+	// BUT, this is not the case for old 11 character serials scanned from the barcode on the computer itself, AND some valid 11 character serials start with an "S".
+	// SO, INITIALLY can only safely trim off a leading "S" from 12 character serials that are submitted with 13 characters starting with an "S".
+	// If it IS NOT a valid 11 character serial that is found in the local Config Codes, then the "S" will be trimmed off before checking the Apple URL API.
+
+	$serial = substr($serial, 1);
+	$serial_length --;
+}
+
+if (($serial_length == 10) || ($serial_length == 12)) {
+	// From https://support.apple.com/102858
+	// Apple registration numbers and Apple hardware product serial numbers use the numbers 0 (zero) and 1 (one) instead of the letters "O" or "I".
+	// BUT, I have found this to not be true for older 11 character serials, so only replace O's and I's on newer 10 and 12 character serials.
+
+	$serial = str_replace(['O', 'I'], ['0', '1'], $serial);
+}
+
+$serial_display = 'Serial "' . $serial . '"';
+
+$config_code = '';
+if (($serial_length == 3) || ($serial_length == 4) || ($serial_length == 11) || ($serial_length == 12)) {
+	// The Configuration Code part of the Serial Number which indicates the model is the last 4 characters for 12 character serials and the last 3 characters for 11 character serials from vintage devices: https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/
+	if ($serial_length >= 11) {
+		$config_code = substr($serial, 8);
+	} else {
+		$config_code = $serial;
+		$serial_display = 'Serial Config Code "' . $config_code . '"';
+	}
+}
+
+$is_valid_serial = false;
+$is_valid_config_code = false;
+
+$error = '';
+
+$model_name = '';
+$possible_model_names = [];
+$product_type = '';
+$model_ids = [];
+
+$specs_url_base = 'https://support.apple.com/';
+$specs_url = '';
+$specs_url_id = '';
+
+$docs_url_base = $specs_url_base . 'docs/';
+$docs_url = '';
+$docs_id = '';
+
+$image_url_base = 'https://cdsassets.apple.com/content/services/pub/image?productid=';
+$image_url = '';
+
+$data_source = '';
+$apple_model_cache_folder_path = '/home/' . get_current_user() . '/apple-model-cache/';
+$serials_cache_folder_path = $apple_model_cache_folder_path . '/serials/';
+$docs_ids_cache_folder_path = $apple_model_cache_folder_path . '/docs-ids/';
+
+$every_marketing_model_name_and_docs_url_with_grouped_config_codes = every_marketing_model_name_and_docs_url_with_grouped_config_codes();
+$every_model_id_with_marketing_model_name_and_specs_id = every_model_id_with_marketing_model_name_and_specs_id();
+
+if (($config_code || ($serial_length == 10)) && preg_match('/^[A-Z0-9]+$/', $serial)) {
+	if ($config_code) {
+		foreach ($every_marketing_model_name_and_docs_url_with_grouped_config_codes as $this_marketing_model_name_and_docs_url_with_grouped_config_codes) {
+			$these_config_codes = explode(':', $this_marketing_model_name_and_docs_url_with_grouped_config_codes);
+			$docs_infos_and_model_name_part = array_shift($these_config_codes); // Shift off the first element which will be the Docs info and Model Name separated by ";".
+			array_pop($these_config_codes); // Always remove the last element which will just be and empty string since every line ends with ":".
+
+			if (in_array($config_code, $these_config_codes)) {
+				$docs_infos_and_model_name_parts = explode(';', $docs_infos_and_model_name_part);
+				if (count($docs_infos_and_model_name_parts) == 4) {
+					$model_name = $docs_infos_and_model_name_parts[3];
+					$product_type = $docs_infos_and_model_name_parts[0];
+
+					if (!str_ends_with($docs_infos_and_model_name_parts[1], '/unknown')) {
+						$docs_url = $docs_url_base . $docs_infos_and_model_name_parts[1];
+						$image_url = $image_url_base . strtoupper(end(explode('/', $docs_infos_and_model_name_parts[1])));
+					}
+
+					if ($docs_infos_and_model_name_parts[2] != 'unknown') {
+						$specs_url_id = $docs_infos_and_model_name_parts[2];
+						$specs_url = $specs_url_base . $specs_url_id;
+					}
+
+					if ($serial_length > 4) $is_valid_serial = true;
+					$is_valid_config_code = true;
+
+					$data_source = 'Local';
+				}
+
+				break;
+			}
+		}
+	}
+
+	if ($data_source != 'Local') {
+		if ($serial_length == 4) {
+			$serial = 'XXXXXXXX' . $config_code; // For 4 character config codes, passing all X's works for the first portion of the 12 character serial which isn't relevant to the model.
+		} else if ($serial_length == 3) {
+			$serial = 'RM101000' . $config_code;
+			// For 3 character config codes, passing all X's DOES NOT work for the first portion of the serial which isn't relevant to the model and some valid format must be used,
+			// so append the config code to a remanufactured/refurb serial (starting with "RM") made in year 1, week 01, and a unique ID of 000 which would never exist but allows the API call to work properly.
+			// More info about this old 11 character serial format: https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/
+		} else if (($serial_length == 11) && str_starts_with($serial, 'S')) {
+			// As mentioned in the comments at the top, if an 11 character serial that starts with a "S" IS NOT a valid,
+			// it may be a valid 10 character serial that was scanned from a product box and needs the leading "S" trimmed off before checking the Apple URL API.
+			// Also, O's and I's would not have been replaced above because it would have initially been assumed this was an old 11 character serial that may contain O's and I's.
+
+			$serial = str_replace(['O', 'I'], ['0', '1'], substr($serial, 1));
+			$serial_length --;
+			$serial_display = 'Serial "' . $serial . '"';
+			$config_code = '';
+		}
+
+		// Starting with the 2021 MacBook Pro models, randomized 10 character Serial Numbers are now used which do not have any model specific characters like the Configuration Code used above.
+		// So those serial numbers need to load the Marketing Model Name over the internet using the following URL API.
+
+		// NOTE: Going to "https://support.apple.com/specs/[SERIAL NUMBER]" USED TO forward to a Mac's Specs page.
+		// But, on March 20th, 2024, Apple released a new "Manuals, Specs, and Downloads" page at "https://support.apple.com/docs" (https://www.macrumors.com/2024/03/20/apple-manuals-specs-downloads-website/).
+		// And the previous "https://support.apple.com/specs" now forwards to this new "docs" page, and the previous "https://support.apple.com/specs/[SERIAL NUMBER]" functionality *NO LONGER WORKS* with the new "docs" page.
+		// But, the first part of Apple olds code which can retrieve the Marketing Model Name and Docs IDs from a serial using this URL API *STILL WORKS*, but the 2nd part of Apples old code to get the Specs URL *NO LONGER WORKS*, so that must be done manually.
+		// For more information about this "Specs Search" URL API, see: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_specs_url_from_serial.sh
+		// IMPORTANT: On May 15th, 2025, "https://km.support.apple.com/kb/index?page=categorydata" started returning 403 Forbidden! But other active "page" values that are still used on other parts of their site still work, so I think this was intentionally taken down.
+
+		$this_cached_serial_file_path = $serials_cache_folder_path . ($config_code ?: $serial) . '.json';
+
+		$model_dict = null;
+
+		if (file_exists($this_cached_serial_file_path)) {
+			$model_dict = json_decode(file_get_contents($this_cached_serial_file_path), true);
+		}
+
+		if ($model_dict && is_array($model_dict) && !array_is_list($model_dict) && array_key_exists('id', $model_dict) && $model_dict['id'] && ($model_dict['id'] != 'null')) {
+			$data_source = 'Cache';
+		} else if (false) { // DISABLE DYNAMIC SERIAL LOOKUP (See IMPORTANT Comment Above)
+			$model_dict = json_decode(file_get_contents('https://km.support.apple.com/kb/index?page=categorydata&serialnumber=' . urlencode($serial), false, stream_context_create([
+				'http' => ['timeout' => 10] // I have seen this URL API timeout after 5 seconds when called multiple times rapidly (likely because of rate limiting), so give it a 10 second timeout which seems to always work.
+			])), true);
+
+			$data_source = 'Apple';
+		}
+
+		if ($model_dict && is_array($model_dict) && !array_is_list($model_dict) && array_key_exists('id', $model_dict)) {
+			if ($model_dict['id'] && ($model_dict['id'] != 'null')) {
+				if ($data_source == 'Apple') {
+					try {
+						if (!is_dir($serials_cache_folder_path)) mkdir($serials_cache_folder_path, 0755, true);
+
+						$this_serial_cache_to_write = fopen($this_cached_serial_file_path, 'w');
+						fwrite($this_serial_cache_to_write, json_encode($model_dict, JSON_PRETTY_PRINT));
+						fclose($this_serial_cache_to_write);
+					} catch (Exception $cache_serial_exception) {
+						// Ignore Exception
+					}
+				}
+
+				if (array_key_exists('name', $model_dict) && $model_dict['name']) {
+					$model_name = trim(preg_replace(['/[[:cntrl:]]/', '/\s+/'], ' ', $model_dict['name']));
+				}
+
+				$docs_id = $model_dict['id'];
+
+				$this_cached_docs_id_file_path = $docs_ids_cache_folder_path . $docs_id . '.json';
+				if (file_exists($this_cached_docs_id_file_path)) {
+					$cached_dict = json_decode(file_get_contents($this_cached_docs_id_file_path), true);
+
+					if ($cached_dict && is_array($cached_dict) && !array_is_list($cached_dict) && array_key_exists('model', $cached_dict) &&
+						(($model_name == $cached_dict['model']) || !$model_name)) {
+
+						$model_name = $cached_dict['model'];
+						$product_type = $cached_dict['product_type'];
+						$docs_url = $cached_dict['docs_url'];
+						$image_url = $cached_dict['image_url'];
+						$specs_url = $cached_dict['specs_url'];
+						$specs_url_id = end(explode('/', $specs_url));
+
+						if ($serial_length > 4) $is_valid_serial = true;
+						if ($config_code) $is_valid_config_code = true;
+
+						$data_source .= ' + Cache';
+					}
+				}
+
+				if (!str_ends_with($data_source, ' + Cache')) {
+					$data_source .= ' + Apple';
+
+					$docs_pf_id = '';
+					$docs_pl_id = '';
+					$docs_pp_id = '';
+					foreach ([$model_dict['greatgrandparent'], $model_dict['grandparent'], $model_dict['parent']] as $this_docs_ancestor_id) {
+						// Some products could have multiple PF IDs, such as Displays (such as Config Code "P2RH") could have a Grandparent ID of "PF8" (for all accessories) and Parent ID of "PF5" (just for displays).
+						// So, the order of this loop is very important to overwrite each variable with the lowest tier PF ID.
+
+						if (str_starts_with($this_docs_ancestor_id, 'PF')) {
+							$docs_pf_id = $this_docs_ancestor_id;
+						} else if (str_starts_with($this_docs_ancestor_id, 'PL')) {
+							$docs_pl_id = $this_docs_ancestor_id;
+						} else if (str_starts_with($this_docs_ancestor_id, 'PP')) {
+							$docs_pp_id = $this_docs_ancestor_id;
+						}
+					}
+
+					if ($docs_pf_id) {
+						$docs_category = 'unknown';
+						$docs_url_id = $docs_id;
+
+						if (($docs_pf_id == 'PF1') || ($docs_pf_id == 'PF2') || ($docs_pf_id == 'PF6') || ($docs_pf_id == 'PF11')) {
+							$docs_category = 'mac';
+							$product_type = 'Mac';
+
+							if ($docs_pf_id == 'PF1') {
+								$product_type .= ' Desktop';
+							} else if ($docs_pf_id == 'PF2') {
+								$product_type .= ' Laptop';
+							} else if ($docs_pf_id == 'PF6') {
+								$product_type = 'macOS';
+							} else {
+								$product_type .= ' Server'; // NOTE: There are no docs pages for server products such as Xserve (such as Config Code "HDE") as well as old Power Mac Server and Mac Pro Server models.
+							}
+						} else if ($docs_pf_id == 'PF3') {
+							$docs_category = 'ipod';
+							$product_type = 'iPod';
+						} else if ($docs_pf_id == 'PF5') {
+							$docs_category = 'displays';
+							$product_type = 'Display';
+						} else if ($docs_pf_id == 'PF7') {
+							$docs_category = 'accessories';
+							$product_type = 'AirPort';
+						} else if ($docs_pf_id == 'PF8') {
+							$docs_category = 'accessories';
+
+							if ($docs_pl_id == 'PL177') {
+								$product_type = 'AirTag';
+							} else {
+								$product_type = 'Accessory';
+							}
+						} else if ($docs_pf_id == 'PF9') {
+							$docs_category = 'iphone';
+							$product_type = 'iPhone';
+
+							if ($docs_pl_id == 'PL134') {
+								if ($docs_pp_id == 'PP70') {
+									$docs_category = 'airpods';
+									$product_type = 'AirPods';
+								} else {
+									$product_type .= ' Accessory';
+								}
+							}
+						} else if ($docs_pf_id == 'PF10') {
+							$docs_category = 'apple-tv';
+							$product_type = 'Apple TV';
+						} else if (($docs_pf_id == 'PF12') || ($docs_pf_id == 'PF13') || ($docs_pf_id == 'PF14') || ($docs_pf_id == 'PF16')) {
+							if (str_contains($model_name, 'Mac OS X')) {
+								$docs_category = 'mac';
+								$product_type = 'macOS';
+							} else {
+								$docs_category = 'software';
+								$product_type = 'Software';
+							}
+						} else if ($docs_pf_id == 'PF22') {
+							$docs_category = 'ipad';
+							$product_type = 'iPad';
+
+							if ($docs_pl_id == 'PL221') {
+								$product_type .= ' Accessory';
+
+								if ($docs_id == '300111') {
+									$docs_url_id = 'pp125'; // Can see on "https://support.apple.com/docs/ipad" that the Docs ID for "PF22;PL221;3001111;300111;Apple Pencil (2nd generation):JKM9:" is actually "pp125" even though there is no PP ID in the info from the Specs API.
+								}
+							}
+						} else if ($docs_pf_id == 'PF27') {
+							$docs_category = 'accessories'; // NOTE: There are no docs pages for Beats products, except for the 2024 Beats Pill which is listed under accessories.
+							$product_type = 'Beats';
+						} else if ($docs_pf_id == 'PF28') {
+							$docs_category = 'watch';
+							$product_type = 'Apple Watch';
+						} else if ($docs_pf_id == 'PF34') {
+							$docs_category = 'homepod';
+							$product_type = 'HomePod';
+						} else if ($docs_pf_id == 'PF36') {
+							$docs_category = 'vision';
+							$product_type = 'Apple Vision';
+						}
+
+						if ($docs_category != 'unknown') {
+							$found_valid_docs_url = false;
+
+							foreach ([$docs_url_id, strtolower($docs_pl_id)] as $this_possible_docs_url_id) {
+								if ($this_possible_docs_url_id) {
+									// Some Software and iPhone/iPad/iPod Accessories may use PL ID, so check and use if Docs ID doesn't have a valid Docs page.
+									// Also, some Apple Watch Docs IDs don't have Tech Specs links, but there may be Tech Specs associated with the PL ID for all the variants of a whole generation (as they are listed on "https://support.apple.com/docs/watch").
+
+									// https://stackoverflow.com/a/13718745
+									libxml_use_internal_errors(false);
+									$this_docs_page_dom = new DomDocument;
+									$this_docs_page_dom->loadHTMLFile('https://support.apple.com/en-us/docs/' . urlencode($docs_category) . '/' . urlencode($this_possible_docs_url_id));
+									$this_docs_page_dom_xpath = new DomXPath($this_docs_page_dom);
+									$this_docs_page_url = $this_docs_page_dom_xpath->query('//meta[@property="og:url"]/@content')[0]->nodeValue;
+
+									if (str_ends_with($this_docs_page_url, '/' . $this_possible_docs_url_id)) { // If the Docs URL is not valid, it will be redirected to the category URL and this "meta" tag value will not be for the originally requested URL.
+										$specs_url_id = end(explode('/', $this_docs_page_dom_xpath->query('//a[text()="Tech Specs"]/@href')[0]->nodeValue));
+
+										if (!$found_valid_docs_url) {
+											$found_valid_docs_url = true;
+
+											if ($docs_url_id != $this_possible_docs_url_id) { // Do not change Docs URL if already found a valid one without Tech Specs (since subsequent ones may be less specific and still not have Tech Specs), but kept checking for Tech Specs in PL ID.
+												$docs_url_id = $this_possible_docs_url_id;
+											}
+										}
+
+										if ($specs_url_id) {
+											if ($docs_url_id != $this_possible_docs_url_id) { // But if a Docs URL was found Tech Specs, always use it as the Docs ID.
+												$docs_url_id = $this_possible_docs_url_id;
+											}
+
+											$specs_url = $specs_url_base . $specs_url_id;
+
+											break;
+										}
+									}
+								}
+							}
+
+							$docs_url = $docs_url_base . $docs_category . '/' . $docs_url_id;
+							$image_url = $image_url_base . strtoupper($docs_url_id);
+						}
+					}
+				}
+			} else {
+				$error = 'INVALID ' . $serial_display;
+			}
+		} else {
+			$error = 'FAILED to Retrieve Model for ' . $serial_display;
+		}
+	}
+
+	if ($specs_url_id) {
+		foreach ($every_model_id_with_marketing_model_name_and_specs_id as $this_marketing_model_name_with_model_ids_and_specs_id) {
+			$this_product_type_and_specs_id = explode(';', $this_marketing_model_name_with_model_ids_and_specs_id);
+			if (count($this_product_type_and_specs_id) == 3) {
+				$this_marketing_model_name_and_model_ids = array_pop($this_product_type_and_specs_id);
+
+				if ($specs_url_id) {
+					if ($specs_url_id == $this_product_type_and_specs_id[1]) {
+						$these_model_ids = explode(':', $this_marketing_model_name_and_model_ids);
+						if (count($these_model_ids) >= 3) {
+							$this_model_id = array_shift($these_model_ids);
+							$this_model_name = array_shift($these_model_ids);
+							array_pop($these_model_ids); // Always remove the last element which will just be and empty string since every line ends with ":".
+							array_unshift($these_model_ids, $this_model_id); // Add DeviceXX,Y Model ID back onto the Model IDs list including the A Number Model IDs.
+
+							$model_ids = array_values(array_unique($these_model_ids));
+						}
+
+						break;
+					}
+				}
+			}
+		}
+	}
+} else if ($serial_length > 0) {
+	$error = 'INVALID ' . $serial_display;
+}
+
+if ($model_id || $a_number) {
+	foreach ([$model_id, $a_number] as $this_model_id_or_a_number) {
+		$possible_specs_urls = [];
+		$possible_docs_urls = [];
+
+		foreach ($every_model_id_with_marketing_model_name_and_specs_id as $this_marketing_model_name_with_model_ids_and_specs_id) {
+			$this_product_type_and_specs_id = explode(';', $this_marketing_model_name_with_model_ids_and_specs_id);
+			if (count($this_product_type_and_specs_id) == 3) {
+				$this_marketing_model_name_and_model_ids = array_pop($this_product_type_and_specs_id);
+				$these_model_ids = explode(':', $this_marketing_model_name_and_model_ids);
+				if (count($these_model_ids) >= 3) {
+					$this_model_id = array_shift($these_model_ids);
+					$this_model_name = array_shift($these_model_ids);
+					array_pop($these_model_ids); // Always remove the last element which will just be and empty string since every line ends with ":".
+					array_unshift($these_model_ids, $this_model_id); // Add DeviceXX,Y Model ID back onto the Model IDs list including the A Number Model IDs.
+
+					if (in_array($this_model_id_or_a_number, $these_model_ids)) {
+						$product_type = $this_product_type_and_specs_id[0]; // Even with multiple matches, the Product Type will be the same.
+
+						$model_ids = array_merge($model_ids, $these_model_ids);
+
+						$possible_model_names[] = $this_model_name; // NOTE: The model name from only a Model ID may not be as accurate as from a Serial since Model IDs are sometimes used for multiple generations or could cover multiple variants which may have separate more specific names.
+
+						$this_specs_url_id = $this_product_type_and_specs_id[1];
+						if ($this_specs_url_id != 'unknown') $possible_specs_urls[] = $specs_url_base . $this_specs_url_id;
+
+						// If this model is pre-randomized 10 character serials and the Specs URL ID is UNIQUE we can get the Docs URL for it at well.
+						foreach ($every_marketing_model_name_and_docs_url_with_grouped_config_codes as $this_marketing_model_name_and_docs_url_with_grouped_config_codes) {
+							$this_product_type_docs_url_and_specs_id = explode(';', $this_marketing_model_name_and_docs_url_with_grouped_config_codes);
+							$this_marketing_model_name_and_config_codes = array_pop($this_product_type_docs_url_and_specs_id);
+							// TODO: Should I check and compare the Marketing Model Names, or include the possible Config Codes in the output?
+							if ($this_specs_url_id == $this_product_type_docs_url_and_specs_id[2]) {
+								$possible_docs_urls[] = $docs_url_base . $this_product_type_docs_url_and_specs_id[1];
+							}
+						}
+
+						$data_source = 'Local';
+					}
+				}
+			}
+		}
+
+		$possible_model_names = array_values(array_unique($possible_model_names));
+		if ($possible_model_names) {
+			$model_name = implode(' or ', $possible_model_names);
+
+			$model_ids = array_values(array_unique($model_ids));
+			sort($model_ids);
+
+			$possible_specs_urls = array_unique($possible_specs_urls);
+			if (count($possible_specs_urls) == 1) {
+				$specs_url = $possible_specs_urls[0];
+			}
+
+			$possible_docs_urls = array_unique($possible_docs_urls);
+			if (count($possible_docs_urls) == 1) {
+				$docs_url = $possible_docs_urls[0];
+				$image_url = $image_url_base . strtoupper(end(explode('/', $docs_url)));
+			}
+
+			break;
+		}
+	}
+} else if (!$error) {
+	$error = 'No Serial or Model ID Specified';
+}
+
+$output_dict = [];
+
+if ($model_name) {
+	$output_dict['model'] = $model_name;
+	if (count($possible_model_names) > 1) $output_dict['possible_models'] = $possible_model_names;
+	if ($product_type) $output_dict['product_type'] = $product_type;
+	if ($model_ids) $output_dict['model_ids'] = $model_ids;
+	if ($docs_url) $output_dict['docs_url'] = $docs_url;
+	if ($image_url) $output_dict['image_url'] = $image_url;
+	if ($specs_url) $output_dict['specs_url'] = $specs_url;
+
+	if (!str_ends_with($data_source, ' + Cache') && $docs_id && ($docs_url || $specs_url)) {
+		try {
+			if (!is_dir($docs_ids_cache_folder_path)) mkdir($docs_ids_cache_folder_path, 0755, true);
+
+			$this_docs_id_cache_to_write = fopen($docs_ids_cache_folder_path . $docs_id . '.json', 'w');
+			fwrite($this_docs_id_cache_to_write, json_encode($output_dict, JSON_PRETTY_PRINT));
+			fclose($this_docs_id_cache_to_write);
+		} catch (Exception $cache_docs_id_exception) {
+			// Ignore Exception
+		}
+	}
+} else {
+	$output_dict['error'] = ($error ?: 'UNKNOWN Model for ' . ($serial ? $serial_display : 'ID "' . $model_id . '"'));
+}
+
+if (array_key_exists('redirect', $_REQUEST)) {
+	$redirect_to = (strtolower(preg_replace('/\s+/', '', $_REQUEST['redirect'])) ?: 'specs');
+	$redirect_url = ($docs_url ?: $docs_url_base);
+
+	if ($redirect_to == 'image') {
+		$redirect_url = ($image_url ?: $image_url_base);
+	} else if (($redirect_to == 'specs') && $specs_url) {
+		$redirect_url = $specs_url;
+	}
+
+	header('Location: ' . $redirect_url);
+	exit();
+}
+
+if ($is_valid_serial) {
+	$output_dict['serial'] = $serial;
+}
+
+if ($is_valid_config_code) {
+	$output_dict['config_code'] = $config_code;
+}
+
+if ($data_source && array_key_exists('include_data_source', $_REQUEST)) {
+	$output_dict['data_source'] = $data_source;
+}
+
+$output_format = (strtolower(preg_replace('/\s+/', '', $_REQUEST['format'])) ?: 'json');
+
+if ($output_format == 'text') {
+	foreach ($output_dict as $this_key => $this_value) {
+		echo $this_key . ': ' . ((gettype($this_value) == 'boolean') ? ($this_value ? 'true' : 'false') : (is_array($this_value) ? implode(', ', $this_value) : $this_value)) . "\n";
+	}
+} else if (($output_format == 'plist') && file_exists(__DIR__ . '/includes/CFPropertyList/CFPropertyList.php')) {
+	$subclasses_to_load_after = [];
+	foreach (glob(__DIR__ . '/includes/CFPropertyList/*.php') as $this_file_path) {
+		if (str_contains(file_get_contents($this_file_path), ' extends ')) {
+			$subclasses_to_load_after[] = $this_file_path;
+		} else {
+			require_once($this_file_path);
+		}
+	}
+	foreach ($subclasses_to_load_after as $this_file_path) {
+		require_once($this_file_path);
+	}
+
+	$output_plist = new CFPropertyList\CFPropertyList();
+	$output_plist->add((new CFPropertyList\CFTypeDetector())->toCFType($output_dict));
+	echo $output_plist->toXML(true);
+} else if (($output_format == 'yaml') && function_exists('yaml_emit')) {
+	echo yaml_emit($output_dict);
+} else if ($output_format == 'php') {
+	echo serialize($output_dict);
+} else {
+	echo json_encode($output_dict, JSON_PRETTY_PRINT);
+}
+
+function every_marketing_model_name_and_docs_url_with_grouped_config_codes() {
+	// The following list is generated from: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_every_config_code_with_marketing_model_name_from_apple_api.sh
+	// List last updated 5/14/25
+	return [
+		'Accessory;accessories/160;unknown;QuickTake 100/100+:5KA:77X:',
+		'Accessory;accessories/112773;unknown;DVI to ADC Adapter:MCX:',
+		'Accessory;accessories/119765;unknown;iSight:MZL:Q4U:R57:RAW:SGJ:SGK:',
+		'Accessory;accessories/130968;unknown;Non-serialized Products:IWP:OWP:',
+		'Accessory;accessories/unknown;unknown;QuickTake 200:9FQ:',
+		'AirPods;airpods/300040;111855;AirPods (1st generation):H8TT:',
+		'AirPods;airpods/300121;111856;AirPods (2nd generation):LX2Y:',
+		'AirPods;airpods/300122;111856;AirPods (2nd generation) with Wireless Charging Case:JMMT:',
+		'AirPods;airpods/300145;111861;AirPods Pro (1st generation) with Wireless Charging Case:0C6L:0T88:LKKT:',
+		'AirPods;airpods/300273;111858;AirPods Max:01TV:P3W9:P3WC:P3WF:P3WG:',
+		'AirPods;airpods/300453;111863;AirPods (3rd generation):05TT:',
+		'AirPods;airpods/300454;111859;AirPods Pro (1st generation) with MagSafe Charging Case:1059:1NRC:',
+		'AirPods;airpods/300882;111851;AirPods Pro (2nd generation) with MagSafe Charging Case (Lightning):18RG:267H:',
+		'AirPods;airpods/300896;111863;AirPods (3rd generation) with Lightning Charging:202T:',
+		'AirPort;accessories/8022;112290;AirPort Base Station (original):H93:H94:',
+		'AirPort;accessories/8023;unknown;AirPort Card:G3G:G43:G45:LH8:LP6:LP8:P2Q:QAC:',
+		'AirPort;accessories/111495;112245;AirPort Base Station (Dual Ethernet):H95:M2C:M2D:M2E:M2F:M2G:M31:M32:M3Z:M40:',
+		'AirPort;accessories/117241;112525;AirPort Extreme Base Station:NVX:NVY:NVZ:NW1:NW2:NW3:NW4:P0A:P2U:P5A:P5B:P5D:P5F:P5G:P5H:PDC:PKF:PKG:Q4N:Q4P:Q4V:Q4W:Q4X:Q4Z:Q53:Q55:T0G:TTF:TTG:TTH:TTJ:TTK:TTL:TTM:TTN:TTU:TTV:TTX:TTY:TTZ:TU0:TU1:',
+		'AirPort;accessories/117253;unknown;AirPort Extreme Card:N6S:N6W:N6X:N6Y:P2N:P2P:P2R:P2S:P2T:P71:P72:P73:PT9:Q3M:Q3N:Q3P:R16:R17:R18:S4N:S4P:S4Q:U0R:U0S:U0T:',
+		'AirPort;accessories/124285;112509;AirPort Extreme Base Station POE/UL2043:Q8X:QMW:QMX:QMZ:QN0:QN8:',
+		'AirPort;accessories/124986;112484;AirPort Express Base Station:QV0:R4N:R4P:R4Q:R4R:R4S:R4T:R4U:RD1:T0B:T0C:T0D:T0E:T0F:U4S:U4T:U4U:U4V:U4W:U4X:',
+		'AirPort;accessories/131340;112479;AirPort Extreme 802.11n (1st Generation):VYS:VYT:VYU:VYV:VYX:VZC:',
+		'AirPort;accessories/131620;112446;AirPort Extreme 802.11n (2nd Generation):2FB:YCP:YEV:YEW:YEX:YEY:',
+		'AirPort;accessories/131841;112505;AirPort Time Capsule 802.11n (1st Generation):32D:32E:32F:32G:32H:32K:32L:32M:32N:32P:YZQ:YZR:YZS:YZT:YZU:YZV:YZW:YZX:YZY:YZZ:ZTM:ZTN:',
+		'AirPort;accessories/131955;112477;AirPort Express 802.11n (1st Generation):0HW:0HX:0HY:0HZ:2U6:2U7:2UF:2UG:2UH:3NN:6YM:ZP8:',
+		'AirPort;accessories/132374;112460;AirPort Extreme 802.11n (3rd Generation):31S:31T:31U:31V:31W:',
+		'AirPort;accessories/132380;112572;AirPort Time Capsule 802.11n (2nd Generation):2UJ:2UK:2UL:2UM:2UN:2UP:2UR:2US:2UT:2UU:6GQ:6GR:6GS:6GT:6GU:',
+		'AirPort;accessories/132713;112575;AirPort Extreme 802.11n (4th Generation):ACC:AQA:AQB:AQC:AQD:DNND:DNNF:DNNG:DNNH:DNNJ:',
+		'AirPort;accessories/132719;112563;AirPort Time Capsule 802.11n (3rd Generation):ACD:ACG:AQE:AQF:AQG:AQH:AQN:AQP:AQQ:AQT:',
+		'AirPort;accessories/133323;112571;AirPort Time Capsule 802.11n (4th Generation):DM73:DM74:',
+		'AirPort;accessories/133324;112440;AirPort Extreme 802.11n (5th Generation):DM72:',
+		'AirPort;accessories/133637;112421;AirPort Express 802.11n (2nd Generation):DV2R:',
+		'AirPort;accessories/134028;112420;AirPort Time Capsule 802.11ac:F9H5:F9H6:',
+		'AirPort;accessories/134029;112419;AirPort Extreme 802.11ac:FJ1R:',
+		'AirTag;accessories/300356;111847;AirTag:1NCJ:25W5:2DD2:2FK6:P0GV:',
+		'AirTag;accessories/300357;111847;AirTag Hermès:PX9C:',
+		'Apple TV;apple-tv/131333;112555;Apple TV (1st generation):WH7:XVC:XVD:XVE:XVF:XVG:YR4:YSS:YST:YSU:YSV:YSW:',
+		'Apple TV;apple-tv/133077;112428;Apple TV (2nd generation):DDR5:DHJH:DHJK:DHJM:',
+		'Apple TV;apple-tv/133607;112429;Apple TV (3rd generation):DRHN:',
+		'Apple TV;apple-tv/133607;112429;Apple TV (3rd generation):FF54:',
+		'Apple TV;apple-tv/300013;111928;Apple TV HD:0FNL:G9RM:GXH8:H1DV:H1DW:JG2X:',
+		'Apple TV;apple-tv/300016;unknown;Siri Remote:GQQT:GXD0:GXD2:GXD3:GXD4:GXHN:GY0W:',
+		'Apple TV;apple-tv/300353;111922;Apple TV 4K (2nd generation):0WHW:NTG8:NTG9:',
+		'Apple TV;apple-tv/504270;111929;Apple TV 4K (1st generation):0N6J:HNM4:J1WF:',
+		'Apple Watch;watch/135277;112010;Apple Watch 38mm Aluminum (1st gen):G99D:G99F:GR79:GR7C:',
+		'Apple Watch;watch/135278;112009;Apple Watch 38mm Stainless Steel (1st gen):G9HM:G9HN:',
+		'Apple Watch;watch/135279;112011;Apple Watch 38mm Gold (1st gen):G9HP:G9HQ:GCLT:GH6W:',
+		'Apple Watch;watch/135280;112010;Apple Watch 42mm Aluminum (1st gen):G9J5:G9J6:GR7M:GR7N:',
+		'Apple Watch;watch/135281;112009;Apple Watch 42mm Stainless Steel (1st gen):G9J8:G9JC:',
+		'Apple Watch;watch/135282;112011;Apple Watch 42mm Gold (1st gen):G9JD:G9JF:GCLR:GRT3:',
+		'Apple Watch;watch/300005;112009;Apple Watch 38mm Hermès (1st gen):GR7R:',
+		'Apple Watch;watch/300006;112009;Apple Watch 42mm Hermès (1st gen):GR81:',
+		'Apple Watch;watch/300024;111985;Apple Watch Series 1 38mm (2nd gen):HF12:HF1C:HF1D:HJLF:',
+		'Apple Watch;watch/300025;112022;Apple Watch Series 2 Aluminum 38mm (2nd gen):HDX5:HDX7:HDX9:HF6H:HF6J:HF6K:HJLL:HJLR:',
+		'Apple Watch;watch/300026;112022;Apple Watch Series 2 Hermès 38mm (2nd gen):HDYM:HF74:',
+		'Apple Watch;watch/300027;112022;Apple Watch Series 2 Edition 38mm (2nd gen):HDXP:HF6N:',
+		'Apple Watch;watch/300028;112022;Apple Watch Series 2 Stainless Steel 38mm (2nd gen):HDXD:HDXL:HF6L:HF6M:',
+		'Apple Watch;watch/300029;112022;Apple Watch Series 2 Nike + 38mm (2nd gen):HF1L:HF70:HHYK:HJLC:',
+		'Apple Watch;watch/300030;111985;Apple Watch Series 1 42mm (2nd gen):HF1G:HF1H:HF1J:HJLG:',
+		'Apple Watch;watch/300031;112022;Apple Watch Series 2 Aluminum 42mm (2nd gen):HDXV:HDXX:HDY0:HF6Q:HF6R:HF6T:HJLJ:HJLT:',
+		'Apple Watch;watch/300032;112022;Apple Watch Series 2 Stainless Steel 42mm (2nd gen):HDY3:HDY9:HF6V:HF6W:',
+		'Apple Watch;watch/300033;112022;Apple Watch Series 2 Hermès 42mm (2nd gen):HDYF:HF75:',
+		'Apple Watch;watch/300034;112022;Apple Watch Series 2 Edition 42mm (2nd gen):HDY2:HF6X:',
+		'Apple Watch;watch/300035;112022;Apple Watch Series 2 Nike + 42mm (2nd gen):HF1N:HF72:HHYL:HJLD:',
+		'Apple Watch;watch/300061;111891;Apple Watch Series 3 GPS Aluminum 42mm (3rd gen):J5X3:J5X4:J5X5:',
+		'Apple Watch;watch/300062;111891;Apple Watch Series 3 Cellular Aluminum 38mm (3rd gen):J6DT:J6DV:J6DW:J6GR:J6GT:J6GV:J6M9:J6MC:J6MD:',
+		'Apple Watch;watch/300063;111891;Apple Watch Series 3 GPS Nike+ 38mm (3rd gen):J5X2:J8MR:',
+		'Apple Watch;watch/300064;111891;Apple Watch Series 3 Cellular Nike+ 42mm (3rd gen):J6GN:J6GP:J6J5:J6J6:J6N0:J6N1:',
+		'Apple Watch;watch/300065;111891;Apple Watch Series 3 Stainless Steel 38mm (3rd gen):J6DY:J6F1:J6H5:J6H6:J6MF:J6MG:',
+		'Apple Watch;watch/300066;111891;Apple Watch Series 3 Stainless Steel 42mm (3rd gen):J6GH:J6GJ:J6J0:J6J1:J6MT:J6MV:',
+		'Apple Watch;watch/300067;111891;Apple Watch Series 3 Hermès 38mm (3rd gen):J6FL:J6HF:J6MN:',
+		'Apple Watch;watch/300068;111891;Apple Watch Series 3 Hermès 42mm (3rd gen):J6GQ:J6J7:J6NF:',
+		'Apple Watch;watch/300069;111891;Apple Watch Series 3 Edition 38mm (3rd gen):J6FD:J6FH:J6H8:J6H9:J6MJ:J6MK:',
+		'Apple Watch;watch/300070;111891;Apple Watch Series 3 Edition 42mm (3rd gen):J6GL:J6GM:J6J3:J6J4:J6MX:J6MY:',
+		'Apple Watch;watch/300098;111984;Apple Watch Series 4 GPS Nike+ 44mm (4th gen):KDHC:KDHD:',
+		'Apple Watch;watch/300099;111984;Apple Watch Series 4 GPS Nike+ 40mm (4th gen):KDH8:KDH9:',
+		'Apple Watch;watch/300100;111984;Apple Watch Series 4 Cellular Nike+ 40mm (4th gen):KDTX:KDTY:KDV3:KDV4:',
+		'Apple Watch;watch/300101;111984;Apple Watch Series 4 Hermès 40mm (4th gen):KDV7:KDV9:',
+		'Apple Watch;watch/300102;111984;Apple Watch Series 4 Cellular Nike+ 44mm (4th gen):KDV0:KDV1:KDV5:KDV6:',
+		'Apple Watch;watch/300103;111984;Apple Watch Series 4 Hermès 44mm (4th gen):KDV8:KDVC:',
+		'Apple Watch;watch/300104;111984;Apple Watch Series 4 Stainless Steel 40mm (4th gen):KDT4:KDT5:KDT6:KDTL:KDTM:KDTN:',
+		'Apple Watch;watch/300105;111984;Apple Watch Series 4 Stainless Steel 44mm (4th gen):KDTC:KDTD:KDTG:KDTT:KDTV:KDTW:',
+		'Apple Watch;watch/300125;118453;Apple Watch Series 5 Stainless Steel 40mm:MLCP:MLCR:MLCT:MLD5:MLD6:MLD7:',
+		'Apple Watch;watch/300126;118453;Apple Watch Series 5 GPS Nike 40mm:MLTL:MLTM:',
+		'Apple Watch;watch/300127;118453;Apple Watch Series 5 Cellular Nike 40mm:MLCY:MLD0:MLDD:MLDF:',
+		'Apple Watch;watch/300128;118453;Apple Watch Series 5 GPS Nike 44mm:MLTR:MLTT:',
+		'Apple Watch;watch/300129;118453;Apple Watch Series 5 Hermès 40mm:MLD1:MLDG:MRNV:MRNW:',
+		'Apple Watch;watch/300130;118453;Apple Watch Series 5 Edition Titanium 40mm:MLCV:MLCW:MLD8:MLD9:',
+		'Apple Watch;watch/300131;118453;Apple Watch Series 5 Stainless Steel 44mm:MLDL:MLDM:MLDN:MLF1:MLF2:MLF3:',
+		'Apple Watch;watch/300132;118453;Apple Watch Series 5 Cellular Nike 44mm:MLDT:MLDV:MLF7:MLF8:',
+		'Apple Watch;watch/300133;118453;Apple Watch Series 5 Edition Ceramic 40mm:MLCX:MLDC:',
+		'Apple Watch;watch/300134;118453;Apple Watch Series 5 Hermès 44mm:MLDW:MLF9:MRNX:MRNY:',
+		'Apple Watch;watch/300135;118453;Apple Watch Series 5 Edition Titanium 44mm:MLDP:MLDQ:MLF4:MLF5:',
+		'Apple Watch;watch/300136;118453;Apple Watch Series 5 Edition Ceramic 44mm:MLDR:MLF6:',
+		'Apple Watch;watch/504272;111891;Apple Watch Series 3 Cellular Nike+ 38mm (3rd gen):J6FJ:J6FK:J6HC:J6HD:J6ML:J6MM:',
+		'Apple Watch;watch/504280;111891;Apple Watch Series 3 Cellular Aluminum 42mm (3rd gen):J6GD:J6GF:J6GG:J6HW:J6HX:J6HY:J6MP:J6MQ:J6MR:J6NQ:J6NR:J6NT:J6NV:J6NW:J6NY:J6P0:',
+		'Apple Watch;watch/504288;111891;Apple Watch Series 3 GPS Aluminum 38mm (3rd gen):J5WY:J5X0:J5X1:',
+		'Apple Watch;watch/504292;111891;Apple Watch Series 3 GPS Nike+ 42mm (3rd gen):J5X6:J8MT:',
+		'Apple Watch;watch/505593;111984;Apple Watch Series 4 GPS Aluminum 44mm (4th gen):KD99:KDH0:KDH1:',
+		'Apple Watch;watch/505596;111984;Apple Watch Series 4 GPS Aluminum 40mm (4th gen):KDH2:KDH3:KDH4:',
+		'Apple Watch;watch/505657;111984;Apple Watch Series 4 Cellular Aluminum 40mm (4th gen):KDT1:KDT2:KDT3:KDTH:KDTJ:KDTK:',
+		'Apple Watch;watch/505676;111984;Apple Watch Series 4 Cellular Aluminum 44mm (4th gen):KDT7:KDT8:KDT9:KDTP:KDTQ:KDTR:',
+		'Apple Watch;watch/507724;118453;Apple Watch Series 5 GPS Aluminum 40mm:MLTH:MLTJ:MLTK:',
+		'Apple Watch;watch/507730;118453;Apple Watch Series 5 GPS Aluminum 44mm:MLTN:MLTP:MLTQ:',
+		'Apple Watch;watch/507736;118453;Apple Watch Series 5 Cellular Aluminum 40mm:MLCL:MLCM:MLCN:MLD2:MLD3:MLD4:',
+		'Apple Watch;watch/507763;118453;Apple Watch Series 5 Cellular Aluminum 44mm:MLDH:MLDJ:MLDK:MLDX:MLDY:MLF0:',
+		'Apple Watch;watch/pl290;111862;Apple Watch Nike SE GPS 40mm (1st gen):Q1N0:Q1N1:',
+		'Apple Watch;watch/pl290;111862;Apple Watch Nike SE GPS 44mm (1st gen):Q1MY:Q1N2:',
+		'Apple Watch;watch/pl290;111862;Apple Watch Nike SE GPS + Cellular 40mm (1st gen):Q1ND:Q1NF:Q1NJ:Q1NK:',
+		'Apple Watch;watch/pl290;111862;Apple Watch Nike SE GPS + Cellular 44mm (1st gen):Q1N9:Q1NC:Q1NG:Q1NH:',
+		'Apple Watch;watch/pl290;111862;Apple Watch SE GPS Aluminum 40mm (1st gen):Q07R:Q07T:Q07V:',
+		'Apple Watch;watch/pl290;111862;Apple Watch SE GPS Aluminum 44mm (1st gen):Q07W:Q07X:Q07Y:',
+		'Apple Watch;watch/pl290;111862;Apple Watch SE GPS + Cellular Aluminum 40mm (1st gen):Q122:Q123:Q124:Q125:Q126:Q127:',
+		'Apple Watch;watch/pl290;111862;Apple Watch SE GPS + Cellular Aluminum 44mm (1st gen):Q128:Q129:Q12C:Q12D:Q12F:Q12G:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Edition Series 6 GPS + Cellular Titanium 40mm:Q20K:Q20L:Q20P:Q20Q:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Edition Series 6 GPS + Cellular Titanium 44mm:Q20H:Q20J:Q20M:Q20N:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Hermès Series 6 GPS + Cellular 40mm:Q42W:Q42X:Q431:Q432:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Hermès Series 6 GPS + Cellular 44mm:Q42T:Q42V:Q42Y:Q430:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Nike Series 6 GPS 40mm:Q1RR:Q1RW:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Nike Series 6 GPS 44mm:Q1RT:Q1RV:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Nike Series 6 GPS + Cellular 40mm:Q1YN:Q1YP:Q1YT:Q1YV:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Nike Series 6 GPS + Cellular 44mm:Q1YL:Q1YM:Q1YQ:Q1YR:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Series 6 GPS Aluminum 40mm:10GP:Q1RD:Q1RG:Q1RL:Q1RM:Q1RQ:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Series 6 GPS Aluminum 44mm:10GN:Q1RF:Q1RH:Q1RJ:Q1RN:Q1RP:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Series 6 GPS + Cellular Aluminum 40mm:10GT:10GV:Q1XL:Q1XM:Q1XN:Q1XP:Q1XW:Q1XX:Q1XY:Q1Y0:Q20R:Q20T:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Series 6 GPS + Cellular Aluminum 44mm:10GQ:10GR:Q1XJ:Q1XK:Q1XQ:Q1XR:Q1XT:Q1XV:Q1Y1:Q1Y2:Q1Y3:Q1YC:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Series 6 GPS + Cellular Stainless Steel 40mm:Q203:Q204:Q207:Q209:Q20F:Q20G:',
+		'Apple Watch;watch/pl291;111918;Apple Watch Series 6 GPS + Cellular Stainless Steel 44mm:Q201:Q202:Q205:Q206:Q20C:Q20D:',
+		'Beats;accessories/134756;unknown;Heartbeats (2nd generation):G71T:G71V:G7LL:G7LM:',
+		'Beats;accessories/134761;unknown;iBeats:G7L1:G7L2:G7L3:G7L4:G7MQ:',
+		'Beats;accessories/134767;unknown;Powerbeats (1st generation):G7LQ:G7LR:G7LT:',
+		'Beats;accessories/134782;unknown;Tour (1st generation):G71D:G71F:G7ML:G7MM:',
+		'Beats;accessories/134787;unknown;Tour (2nd generation):G71W:G735:G73N:G763:G78L:G78M:G78N:G78P:GCP3:',
+		'Beats;accessories/134796;unknown;urBeats (2nd generation):G724:G72F:G72M:G731:G73P:G756:G757:G758:G759:G75C:G76C:G76D:G76F:G76H:G770:GCP4:GFJM:GFJN:GFJP:GHPC:GHPD:GHPF:GHPG:GHPH:GHPJ:GHPK:GHPL:GHPM:GHPN:GWL8:HK32:',
+		'Beats;accessories/134812;unknown;Powerbeats2 Wireless:G774:G775:G776:G779:G77M:GCNK:GL5M:GL5N:GL5P:GL5Q:GLC4:GLC5:GLC6:GTVN:GVKC:H4NC:HC5R:',
+		'Beats;accessories/134818;unknown;Mixr:G71K:G71M:G71N:G73G:G73H:G73J:G73K:G73L:G75D:G761:G768:G76T:G77Y:G780:G781:G782:G783:G784:G7LN:G7LP:',
+		'Beats;accessories/134839;unknown;Solo HD:G715:G716:G717:G71C:G72G:G72H:G72K:G72L:G730:G74L:G74R:G74T:G74V:G74W:G74Y:G750:G751:G75J:G75M:G766:G76J:G76K:G76V:G7D3:G7DW:G7KT:G7KV:G7LY:G7M1:G7M3:GC8P:GC8Q:',
+		'Beats;accessories/134872;unknown;Solo 2:G747:G748:G749:G74M:G777:G778:G8Q1:G8Q2:G8Q3:G8Q4:G8Q5:G9LG:G9LH:GCNW:GQF7:GQF8:GQF9:GR18:',
+		'Beats;accessories/134880;unknown;Wireless (1.5):G713:G714:G73M:G75F:G75G:G76G:G7MN:G7MP:',
+		'Beats;accessories/134889;unknown;Executive:G71Y:G746:G7F0:G7F6:',
+		'Beats;accessories/134894;unknown;Pro:G71P:G71Q:G71R:G729:G74J:G75K:G7K7:G7LV:G7LW:GCNL:GCNM:GCNN:GCNP:GCNQ:GCNR:GCNT:',
+		'Beats;accessories/134904;unknown;Studio (1st generation):G718:G719:G71G:G71H:G71J:G71L:G720:G72Q:G72R:G72T:G72V:G72W:G72Y:G733:G73Q:G74Q:G7CN:G7CP:G7CQ:G7CR:G7CT:G7CV:G7CY:G7D0:G7D1:G7D2:G7D4:G7D5:G7D6:G7D7:G7D8:G7D9:G7DC:G7DD:G7DF:G7DG:G7DH:G7DJ:G7DK:G7DL:G7DM:G7DN:G7DP:G7DV:G7DY:G7F7:G7F9:G7FC:G7FD:G7FG:G7FH:G7FJ:G7FK:G7FL:G7FM:G7FN:G7FP:G7FQ:G7FR:G7FT:G7L0:G7M5:G7M6:G7M7:G7M8:G7M9:G7MD:G7MG:G7MH:G7MJ:',
+		'Beats;accessories/134975;unknown;Studio (2nd generation):G72D:G72J:G732:G74N:G755:G75L:G75Y:G760:G762:G76L:G76M:G76N:G77C:G77D:G77F:G77G:G77H:G77T:G77W:G7K3:GHV0:',
+		'Beats;accessories/134995;unknown;Studio Wireless:G73R:G73T:G73V:G75T:G764:G765:G79M:G79N:G8PR:GCN6:GCP0:GCP2:GMYQ:GMYR:GMYT:GMYV:GMYW:GMYY:GPKK:GPKL:GR6H:GWLC:H4LL:H4LM:H4LP:H4LQ:H4LR:H4LV:H4LY:H4M0:H4M2:H4M5:HKJH:HKJJ:HMHT:HV90:',
+		'Beats;accessories/135002;unknown;Beatbox:G712:G7LJ:',
+		'Beats;accessories/135005;unknown;Beatbox Portable (1st generation):G721:G722:G7LG:G7LH:',
+		'Beats;accessories/135010;unknown;Beatbox Portable (2nd generation):G72N:G72P:',
+		'Beats;accessories/135013;unknown;Beatbox Portable (3rd generation):G723:',
+		'Beats;accessories/135015;unknown;Pill 1.0:G725:G726:G727:G734:G736:G74C:G74D:G74F:G74G:G74H:G754:G7DQ:G7DR:G7F1:G7F2:G7F3:G7F4:G7F5:G7F8:G7FF:',
+		'Beats;accessories/135036;unknown;Pill 2.0:G737:G738:G739:G752:G753:G75H:G76P:G76Q:G76R:G77N:G78W:G79C:G79P:G7K6:G8PQ:G9LJ:GCNF:',
+		'Beats;accessories/135048;unknown;Pill XL:G73C:G73D:G73F:G786:G787:',
+		'Beats;accessories/135052;unknown;urBeats (1st generation):GC8M:GC8N:',
+		'Beats;accessories/135055;unknown;Wireless (1st generation):GC22:GC8R:',
+		'Beats;accessories/135058;unknown;Diddybeats:G7K8:G7K9:G7KC:G7KD:G7KF:',
+		'Beats;accessories/135064;unknown;Heartbeats (1st generation):G7L5:G7L7:G7L8:',
+		'Beats;accessories/135068;unknown;Solo (1st generation):G7KQ:G7KR:G7LD:',
+		'Beats;accessories/135086;unknown;Beats X, Matte Gold or Silver:JC2H:JC2K:',
+		'Beats;accessories/135205;unknown;Solo2 Wireless:G8PM:G8PN:G8PP:G8PT:GH82:GH83:GH84:GLC7:GLC8:GLC9:GTVM:GVKD:GWL6:GWL7:H4M7:H4M8:H4M9:H4MD:H4MF:H4MG:H4MH:H4MJ:H4ML:H4MM:H4MN:H4MR:',
+		'Beats;accessories/300004;unknown;Tour 2.5:GJMF:GJMG:GL6N:GL6P:GL6Q:',
+		'Beats;accessories/300036;unknown;EP:GQDK:GQDV:GQDX:GQDY:GQF0:',
+		'Beats;accessories/300037;unknown;Powerbeats3 Wireless:GQ65:GQ66:HDQX:HDR2:HDR3:HMHV:HTYY:HV01:HV8Y:HX9P:HX9R:HY8Y:J2K6:',
+		'Beats;accessories/300038;unknown;Solo3 Wireless:H8VD:H8VF:H8VG:H8VH:H8VJ:HK2Q:HK2R:HMC6:HTYP:HTYR:HX9T:HX9W:HYJ0:',
+		'Beats;accessories/300059;unknown;urBeats3:J2VW:J2VX:J2VY:J2W0:',
+		'Beats;accessories/300060;unknown;urBeats3, Lightning:J529:J92M:J92P:',
+		'Beats;accessories/300089;unknown;Powerbeats3 Wireless, Decade Collection:JPGK:',
+		'Beats;accessories/300090;unknown;urBeats3, Decade Collection:K0JC:',
+		'Beats;accessories/300091;unknown;urBeats3, Lightning, Decade Collection:K25V:',
+		'Beats;accessories/300092;unknown;Solo3 Wireless, Pop Collection:JVGH:JVGJ:JVGK:JVGL:',
+		'Beats;accessories/300093;unknown;Powerbeats3 Wireless, Pop Collection:JKDJ:JKDK:JKDL:JKDM:',
+		'Beats;accessories/300107;unknown;Studio3 Wireless, DJ Khaled:L433:',
+		'Beats;accessories/300108;unknown;Solo3 Wireless, Mickeys 90th - USA:KK53:',
+		'Beats;accessories/300116;unknown;Solo3 Wireless, Chinese New Year - Blade Gray:LC73:',
+		'Beats;accessories/300146;unknown;Solo Pro:JMMC:JMMD:JMMF:JMMG:JMMJ:JMMK:',
+		'Beats;accessories/300172;unknown;Powerbeats (4th generation):MK72:MK73:MK74:',
+		'Beats;accessories/300243;unknown;Beats Flex:1JDC:1K2N:1QD6:Q1HJ:Q1HK:Q1HL:Q1HM:',
+		'Beats;accessories/300269;unknown;Powerbeats (4th generation), AMBUSH Glow:PXVL:',
+		'Beats;accessories/300271;unknown;Studio3 Wireless, FaZe:005C:0PH7:',
+		'Beats;accessories/300272;unknown;Solo Pro, Wasted Youth:Q6TL:',
+		'Beats;accessories/300399;unknown;Beats Studio Buds:0RP2:0RP3:0RP4:1NXF:1NXG:1NXH:',
+		'Beats;accessories/300863;unknown;Studio Buds:1K2Q:1K2R:1K2V:1VW6:1VW7:',
+		'Beats;accessories/300960;unknown;Studio Pro Wireless:266W:266X:266Y:2670:2DCG:2DGR:2DGT:2DGV:2FCC:2FCD:',
+		'Beats;accessories/500323;unknown;Pill+:1609:1K2H:GN1V:GN1Y:GN20:HC84:HX8R:HX8X:J21K:Q69D:',
+		'Beats;accessories/502254;unknown;Beats X:H18V:H18W:H18X:HDQV:J21L:N9PF:',
+		'Beats;accessories/504097;unknown;Solo3 Wireless, Matte Gold or Silver:J927:JC3X:JC40:',
+		'Beats;accessories/504111;unknown;Studio3 Wireless:0VHN:13RX:1CX4:1H80:1K2X:J0CW:J0CX:J1FY:J1G0:J5W0:J5W1:MPTL:MPTM:',
+		'Beats;accessories/504534;unknown;Solo3 Wireless, Electric Red:JMWG:',
+		'Beats;accessories/505015;unknown;Studio3 Wireless, Decade Collection:JPGJ:L431:',
+		'Beats;accessories/505018;unknown;Beats X, Decade Collection:JPGN:',
+		'Beats;accessories/505020;unknown;Solo3 Wireless, Decade Collection:JPGP:',
+		'Beats;accessories/505834;unknown;urBeats3, Lightning, Blue:L417:L418:L419:L41C:',
+		'Beats;accessories/505841;unknown;Solo3 Wireless, Satin Gold or Silver:27HJ:27HK:2CD6:2DP2:KY5Y:KY60:LTWM:LTWN:LTWP:LTWQ:',
+		'Beats;accessories/505941;unknown;Studio3 Wireless, Skyline Collection:KCD5:KCD6:KCD7:KCD8:',
+		'Beats;accessories/507078;unknown;Powerbeats Pro:08X0:0VPG:1CX3:1K2P:1K32:LN3J:LN3L:LN3N:LN3P:PNJH:PNJJ:PNJK:PNJL:PXLL:',
+		'Display;displays/2466;unknown;AppleVision 850AV Display:93T:93U:',
+		'Display;displays/6756;112292;Apple Studio Display 17 inch CRT:CVS:CVT:GZC:H5G:',
+		'Display;displays/6769;112289;Apple Studio Display 21 inch CRT:CT5:CT6:D6C:D6X:F8U:H0E:H5E:H5F:HOE:',
+		'Display;displays/8167;112295;Apple Cinema Display:G5W:',
+		'Display;displays/8398;112458;Apple Cinema Display ADC:JU8:',
+		'Display;displays/8400;112524;Apple Studio Display 17 inch ADC:HBY:JAJ:JAK:JAL:JAM:JAN:JZF:K3U:',
+		'Display;displays/8401;112470;Apple Studio Display 15 inch ADC:JPC:',
+		'Display;displays/109732;112517;Apple Studio Display 17 inch LCD:KPW:LB1:LB2:P6L:',
+		'Display;displays/109732;112517;Apple Studio Display (17-inch LCD):NNF:',
+		'Display;displays/112473;112463;Apple Cinema HD Disp 23:LFA:',
+		'Display;displays/117639;112508;Apple Cinema Display (20-inch):NAF:',
+		'Display;displays/125346;112528;Apple Cinema Display (20-inch DVI):PKK:',
+		'Display;displays/125347;112528;Apple Cinema Display (23-inch DVI):PKL:',
+		'Display;displays/125348;112528;Apple Cinema Display (30-inch DVI):PKM:',
+		'Display;displays/130759;112528;Apple Cinema Display (20-inch DVI Late 2005):UFZ:',
+		'Display;displays/130765;112528;Apple Cinema Display (23-inch DVI Late 2005):UG0:',
+		'Display;displays/132160;112472;LED Cinema Display (24-inch, Late 2008):0K0:',
+		'Display;displays/132965;112620;LED Cinema Display (27-inch):6JL:',
+		'Display;displays/133350;112597;Apple Thunderbolt Display (27-inch):DJGR:F2GC:',
+		'Display;displays/508209;111892;Pro Display XDR:MHMT:MHMX:MHN1:MHN4:ML9V:ML9W:P2RH:',
+		'Display;displays/unknown;unknown;AppleVision 850 Display:949:',
+		'HomePod;homepod/300078;111994;HomePod (1st generation):HQK8:J265:',
+		'HomePod;homepod/300245;111914;HomePod mini:0DM0:0DM2:PQ1H:PQ1J:',
+		'iPad Accessory;ipad/300014;111920;Apple Pencil:GWJ2:GWTJ:',
+		'iPad Accessory;ipad/300015;unknown;Smart Keyboard:GWTL:H8CY:H8D0:H8D1:H8D2:H8D3:H8D4:H8D5:H8D6:HD21:HD22:HD23:HD24:HD25:HD26:HD27:HD28:HD29:HD2C:HD2F:HF41:HF42:HF43:HF9V:HFCN:HFCP:HFCQ:HFCR:HFCT:HFCV:HFCW:HG57:HJJF:J86T:JLY4:JLY6:JLY8:JYL0:JYL1:JYL2:JYL3:JYL4:JYL5:JYL6:JYL7:JYL8:JYL9:JYLC:JYLD:JYLF:JYLG:JYLH:JYLJ:JYLK:JYLL:JYLM:JYLN:JYLP:JYLQ:JYLR:JYLT:JYLV:JYLW:JYLX:JYLY:JYM0:JYM1:JYM2:JYM3:JYM4:JYM5:JYM6:JYM7:JYM8:JYM9:JYMC:K0Q9:',
+		'iPad Accessory;ipad/300173;111910;Magic Keyboard for iPad Pro 11-inch (2nd generation):0M2L:18JR:1L15:N611:P2TF:P2TG:P2TH:P2TJ:P2TK:P2TL:P2TM:P2TN:P2TP:P2TQ:P2TR:P2TT:P2TV:P2TW:P2TX:P2TY:P2V0:P2V1:P2V2:P2V3:P2V4:P2V5:P2V7:P2V8:P2V9:P2VC:P2VD:P2VF:P2VG:P2VH:P2VJ:P2VK:P2VM:P2VP:P2VQ:P2VV:P2VW:P2VX:P2VY:',
+		'iPad Accessory;ipad/300174;111936;Magic Keyboard for iPad Pro 12.9-inch (4th Generation):0M2J:N5TR:N5YJ:N5YK:N5YL:N5YM:N5YN:N5YP:N5YQ:N5YR:N5YT:N5YV:N5YW:N5YX:N5YY:N600:N601:N602:N603:N604:N605:N606:N607:N608:N60C:N60D:N60F:N60G:N60H:N60J:N60K:N60L:N60M:N60N:N60P:N60R:N60T:N60W:N60X:N60Y:N610:',
+		'iPad Accessory;ipad/pl221;unknown;Smart Keyboard Folio for iPad Pro 11-inch:0M2G:1L30:K16T:K6CW:K6CX:K6CY:K6D0:K6D1:K6D2:K6D3:K6D4:K6D5:K6D6:K6D7:K6D8:K6D9:K6DC:K6DD:K6DF:K6DG:K6DH:K6DJ:K6DK:K6DL:K6DM:K6DN:K6DP:K6DQ:K6DR:K6DT:K6DV:K6DW:K6DX:K6DY:K6F0:K6F1:K6F3:K6F4:K6F5:K6F6:K6F7:K6F8:LLT4:LLT6:MJ66:MLLX:MLM0:MLM2:MLM4:MLM6:MLM8:MLMC:MLMF:MLMH:MLMK:MLMM:MLMP:MLMR:MLMV:MLMX:MLN0:MLN2:MLN4:MLN6:MLN8:MLNC:MLNF:MLNK:MLNM:MLNP:MLNR:MLNV:MLNX:MLP0:MLP2:MLP4:MLP6:MLP8:MLPF:MLPH:MLPM:MLPP:MLPR:MLPV:',
+		'iPad Accessory;ipad/pl221;unknown;Smart Keyboard Folio for iPad Pro 12.9-inch (3rd generation):0M2C:1L2Y:K16R:KCRH:KCRJ:KCRK:KCRM:KCRP:KCRQ:KCRR:KCRT:KCRW:KCRX:KCRY:KCT0:KCT1:KCT2:KCT3:KCT4:KCT5:KCT6:KCT7:KCT8:KCT9:KCTC:KCTD:KCTF:KCTG:KCTH:KCTJ:KCTK:KCTL:KCTM:KCTN:KCTP:KCTQ:KCTT:KCTV:KCTW:KCTX:KCTY:KCV0:LLT5:LLT7:MJ65:MLLW:MLLY:MLM1:MLM3:MLM5:MLM7:MLM9:MLMD:MLMG:MLMJ:MLML:MLMN:MLMQ:MLMT:MLMW:MLMY:MLN1:MLN3:MLN5:MLN7:MLN9:MLND:MLNJ:MLNL:MLNN:MLNQ:MLNT:MLNW:MLNY:MLP1:MLP3:MLP5:MLP7:MLPD:MLPG:MLPL:MLPN:MLPQ:MLPT:',
+		'iPad Accessory;ipad/pl221;unknown;Smart Keyboard for 10.5-inch iPad Pro - US English:0M2K:HPG0:HPG1:HPG2:HPG3:HPG4:HPG5:HPG6:HPG7:HPG8:HPG9:HPGC:HPGD:HPGF:HPGG:HPGH:HPGJ:HPGK:HPGL:HPGM:HPGN:HPGP:HPGQ:HPGT:HPGW:HPGX:HPGY:HPH0:HPH1:HPH2:HPH3:J094:J1DY:J1F0:J1F1:J1F2:J1F3:J2K1:JXK1:JY64:JY65:JY66:JY67:JY68:JY69:JY6C:JY6D:JY6F:JY6G:JY6H:JY6J:JY6K:JY6L:JY6M:JY6N:JY6P:JY6Q:JY6R:JY6T:JY6V:JY6W:JY6X:JY6Y:JY70:JY71:JY72:JY73:JY74:JY75:JY76:JY77:JY78:JY79:JY7C:JY7D:JY7F:JY7G:JY7H:K0FC:N0TF:N0TG:N0TH:N0TJ:N0TK:N0TL:N0TM:N0TN:N0TP:N0TQ:N0TR:N0TT:N0TV:N0TW:N0TX:N0TY:N0V0:N0V1:N0V2:N0V3:N0V4:N0V6:N0V7:N0V8:N0V9:N0VC:N0VD:N0VG:N0VH:N0VJ:N0VK:N0VL:N0VM:N0VN:N0VP:N0VQ:N0VR:N0VT:N0VV:N18V:P01M:P01N:P01P:P01Q:P01R:P01T:P01V:P01W:',
+		'iPad Accessory;ipad/pp125;111889;Apple Pencil (2nd generation):JKM9:',
+		'iPad;ipad/132814;112438;iPad:Z38:Z39:Z3A:',
+		'iPad;ipad/132844;112438;iPad Wi-Fi + 3G:A90:ETU:ETV:K48M:',
+		'iPad;ipad/133215;111990;iPad 2:DFHW:DFHY:DFJ0:DKPH:DKPJ:DKPK:',
+		'iPad;ipad/133216;111990;iPad 2 Wi-Fi + 3G:DFJ1:DFJ2:DFJ3:DKNV:DKNW:DKNY:',
+		'iPad;ipad/133217;111990;iPad 2 Wi-Fi + 3G (Verizon):DJHF:DJHG:DJHH:DKPL:DKPM:DKPN:',
+		'iPad;ipad/133608;111992;iPad (3rd generation):DJ8R:DJ8T:DJ8V:DVD1:DVD2:DVD3:',
+		'iPad;ipad/133609;111992;iPad (3rd Generation) Wi-Fi + Cellular (Verizon):DNQR:DNQT:DNQV:DVGC:DVGD:DVGF:',
+		'iPad;ipad/133610;111992;iPad (3rd generation) Wi-Fi + Cellular:DVGG:DVGH:DVGJ:DVGK:DVGL:DVGM:',
+		'iPad;ipad/133846;111993;iPad (4th generation):F182:F183:F184:F185:F186:F187:FCYF:FCYG:',
+		'iPad;ipad/133847;111993;iPad (4th generation) Wi-Fi + Cellular:F188:F189:F18C:F18D:F18F:F18G:FCYC:FCYD:',
+		'iPad;ipad/133848;111993;iPad (4th generation) Wi-Fi + Cellular (MM):F18P:F18W:F18Y:F190:F191:F192:FCY8:FCY9:',
+		'iPad;ipad/133849;111978;iPad mini:F193:F194:F195:F196:F197:F198:F637:F638:',
+		'iPad;ipad/133850;111978;iPad mini Wi-Fi + Cellular:F199:F19C:F19D:F19F:F19G:F19H:',
+		'iPad;ipad/133851;111978;iPad mini Wi-Fi + Cellular (MM):F19J:F19K:F19L:F19M:F19N:F19P:',
+		'iPad;ipad/134321;112020;iPad Air WiFi + Cellular:F4YD:F4YF:F4YG:F4YH:F4YJ:F4YK:FKYC:FKYH:',
+		'iPad;ipad/134322;112020;iPad Air:FK10:FK11:FK12:FK13:FK14:FK15:FK16:FK17:',
+		'iPad;ipad/134323;112019;iPad mini 2:FCM5:FCM6:FCM7:FCM8:FCM9:FCMC:FH12:FH13:FQRR:FQRT:FQRY:FQT0:FRWG:FRWH:FRWJ:FRWL:FRWP:FRWQ:FRWR:FRWT:FRWV:FRWW:FRWY:FRY0:FRY1:',
+		'iPad;ipad/134324;112019;iPad mini 2 WiFi + Cellular:FLMJ:FLMK:FLML:FLMM:FLMN:FLMP:FLMQ:FLMR:FN7Q:FRY9:FRYF:FRYG:FRYH:FRYN:',
+		'iPad;ipad/134338;111978;iPad mini Wi-Fi:FP84:',
+		'iPad;ipad/135088;112017;iPad Air 2:G5VJ:G5VT:G5VV:G5VW:G5VY:G5W0:G5W1:G5W2:G5W3:HG5D:HG5F:HG5G:',
+		'iPad;ipad/135089;112017;iPad Air 2 Wi-Fi + Cellular:G5WQ:G5WR:G5WT:G5YL:G5YM:G5YN:G5YP:G5YQ:G5YR:HG6R:HG6T:HG6V:',
+		'iPad;ipad/135090;112018;iPad mini 3:G5V1:G5V2:G5V3:G5V4:G5V5:G5V6:G5V7:G5V8:G5V9:',
+		'iPad;ipad/135091;112018;iPad mini 3 Wi-Fi + Cellular:G5W8:G5Y1:G5Y2:G5Y3:G5Y4:G5Y5:G5YH:G5YJ:G5YK:',
+		'iPad;ipad/135092;112018;iPad mini 3 Wi-Fi Cellular (China Mainland):G5TG:G5TH:G5TJ:G5TK:G5TL:G5TM:G5TN:G5TP:G5TQ:',
+		'iPad;ipad/300200;118451;iPad (8th generation):Q1GC:Q1GD:Q1GF:Q1GG:Q1GH:Q1GJ:',
+		'iPad;ipad/300201;118451;iPad (8th generation) Wi-Fi + Cellular:Q1KM:Q1KN:Q1KP:Q1KQ:Q1KR:Q1KT:Q1KV:Q1KW:Q1KX:Q1KY:Q1L0:Q1L1:Q1L2:Q1L3:Q1L4:Q1L5:Q1L6:Q1L7:',
+		'iPad;ipad/300202;111905;iPad Air (4th generation):Q16M:Q16N:Q16P:Q16Q:Q16R:Q16T:Q16V:Q16W:Q16X:Q16Y:',
+		'iPad;ipad/300203;111905;iPad Air (4th generation) Wi-Fi + Cellular:Q190:Q191:Q192:Q193:Q194:Q195:Q196:Q197:Q198:Q199:Q19C:Q19D:Q19F:Q19G:Q19H:Q19J:Q19K:Q19L:Q19M:Q19N:Q19P:Q19Q:Q19R:Q19T:Q19V:Q19W:Q19X:Q19Y:Q1C0:Q1C1:',
+		'iPad;ipad/300346;111897;iPad Pro, 11-inch (3rd generation):0FGW:0FGX:0FGY:0FH0:0FH1:0FH2:0FH3:0FH4:0FH5:0FH6:',
+		'iPad;ipad/300347;111897;iPad Pro, 11-inch (3rd generation) Cellular sub6/mmW:0FJX:0FJY:0FK0:0FK1:0FK2:0FK3:0FK4:0FK6:0FK7:0FK8:',
+		'iPad;ipad/300348;111897;iPad Pro, 11-inch (3rd generation) Cellular sub6:0FHL:0FHM:0FHN:0FHP:0FHQ:0FHR:0FHT:0FHV:0FHW:0FHX:0FHY:0FJ0:0FJ1:0FJ2:0FJ3:0FJ4:0FJ5:0FJ6:0FJ7:0FJ8:',
+		'iPad;ipad/300349;111896;iPad Pro, 12.9-inch (5th generation):0FM2:0FM3:0FM4:0FM5:0FM6:0FM7:0FM8:0FM9:0FMC:0FMD:',
+		'iPad;ipad/300350;111896;iPad Pro, 12.9-inch (5th generation) Cellular sub6/mmW:0FMH:0FMJ:0FMK:0FMM:0FMN:0FMP:0FMQ:0FMR:0FMT:0FMV:',
+		'iPad;ipad/300351;111896;iPad Pro, 12.9-inch (5th generation) Cellular sub6:0FFX:0FFY:0FG0:0FG1:0FG2:0FG3:0FG4:0FG6:0FG7:0FG8:0FG9:0FGC:0FGD:0FGF:0FGG:0FGH:0FGJ:0FGK:0FGL:0FGM:',
+		'iPad;ipad/500106;112002;iPad mini 4:GHK9:GHKC:GHKD:GHKF:GHKG:GHKH:GHKJ:GHKK:GHKL:HGJ1:HGJ2:HGJ3:',
+		'iPad;ipad/500116;112002;iPad mini 4 Wi-Fi + Cellular:GHMG:GHMH:GHMJ:GHMK:GHML:GHMM:GHMN:GHMP:GHMQ:HGC3:HGC4:HGC5:',
+		'iPad;ipad/500278;112024;iPad Pro 12.9-inch (1st generation) Wi-Fi:GMLD:GMLF:GMLG:GMLL:GMLM:GMLN:GMLT:GMLV:GMLW:',
+		'iPad;ipad/500285;112024;iPad Pro 12.9-inch (1st generation) Wi-Fi + Cellular:GMW3:GMW4:GMW5:GMW6:GMW7:GMW8:',
+		'iPad;ipad/501360;111965;iPad Pro (9.7-inch):H1M9:H1MC:H1MD:H1MJ:H1MK:H1ML:H1MM:H1MN:H1MP:H1MR:H1MV:H1MW:',
+		'iPad;ipad/501377;111965;iPad Pro (9.7-inch, Wi-Fi + Cellular):GXPX:GXPY:GXQ0:GXQ4:GXQ5:GXQ6:GXQ7:GXQ8:GXQ9:H23F:H23X:H23Y:H240:H245:H246:H247:H248:H249:H24C:H24D:H24F:H256:H258:H259:',
+		'iPad;ipad/503187;111960;iPad (5th generation):HLF9:HLFC:HLFD:HLFF:HP9X:HP9Y:',
+		'iPad;ipad/503198;111960;iPad (5th generation) Wi-Fi + Cellular:HLJJ:HLJK:HLJL:HLJM:HP61:HP62:',
+		'iPad;ipad/503605;111964;iPad Pro (12.9-inch) (2nd generation) Wi-Fi:HND6:HND7:HND8:HPJ4:HPJ5:HPJ6:J262:J263:J264:',
+		'iPad;ipad/503620;111964;iPad Pro (12.9-inch) (2nd generation) Wi-Fi + Cellular:HP34:HP35:HP36:HP3L:HP3M:HP3P:HPQG:HPQH:HPQJ:HPR8:HPR9:HPRF:J294:J295:J296:J299:J29C:J29D:',
+		'iPad;ipad/503642;111927;iPad Pro (10.5-inch) Wi-Fi:HP50:HP51:HP52:HP53:HP83:HP84:HP85:HP86:J28K:J28L:J28M:J28N:',
+		'iPad;ipad/503659;111927;iPad Pro (10.5-inch) Wi-Fi + Cellular:HPDV:HPDW:HPDX:HPDY:HPF8:HPF9:HPFC:HPFD:HPT4:HPT5:HPT6:HPT7:HPT8:HPT9:HPTC:HPTD:J2D1:J2D2:J2D3:J2D4:J2H6:J2H7:J2H8:J2HF:',
+		'iPad;ipad/504852;111957;iPad (6th generation):JF8J:JF8K:JF8M:JF8N:JMVR:JMVT:',
+		'iPad;ipad/504856;111957;iPad (6th generation) Wi-Fi + Cellular:JF88:JF89:JF8D:JF8G:JMXJ:JMXK:',
+		'iPad;ipad/506047;111979;iPad Pro 12.9-inch (3rd generation) Wi-Fi:K7M9:K7MC:K7RG:K7RH:K822:K823:K824:K825:',
+		'iPad;ipad/506058;111979;iPad Pro 12.9-inch (3rd generation) Wi-Fi + Cellular:KC43:KC47:KC48:KC4L:KC4Q:KC4V:KC4W:KC50:KC51:KC58:KC5F:KC5G:KC5J:KC5N:KC5P:KC5Q:KC5V:KC5W:KC6N:KC6R:KC6T:KC6V:KC6Y:KC70:',
+		'iPad;ipad/506083;111974;iPad Pro 11-inch Wi-Fi:KD6J:KD6K:KD6L:KD6M:KD6N:KD6P:KD6Q:KD6R:',
+		'iPad;ipad/506094;111974;iPad Pro 11-inch Wi-Fi + Cellular:KD7V:KD7Y:KD80:KD81:KD84:KD85:KD86:KD89:KD8C:KD8D:KD8H:KD8J:KD8K:KD8N:KD8P:KD8Q:KD8V:KD8W:KD8X:KD91:KD92:KD93:KD96:KD97:',
+		'iPad;ipad/506704;111904;iPad mini (5th generation):LM93:LM94:LM95:LM99:LM9C:LM9D:',
+		'iPad;ipad/506714;111904;iPad mini (5th generation) Wi-Fi + Cellular:LMT7:LMT8:LMT9:LMTG:LMTH:LMTJ:LMTW:LMTX:LMTY:LMV3:LMV4:LMV6:LMV7:LMV8:LMV9:LMVJ:LMVK:LMVL:',
+		'iPad;ipad/506739;111939;iPad Air (3rd generation):LMPD:LMPF:LMPG:LMPL:LMPM:LMPN:',
+		'iPad;ipad/506749;111939;iPad Air (3rd generation) Wi-Fi + Cellular:LMVV:LMVW:LMVX:LMVY:LMW0:LMW1:LMWG:LMWH:LMWJ:LMWN:LMWP:LMWQ:LMWR:LMWT:LMWV:LMX0:LMX1:LMX2:',
+		'iPad;ipad/507974;111911;iPad (7th generation):MF3M:MF3N:MF3P:MF3Q:MF3R:MF3V:',
+		'iPad;ipad/507984;111911;iPad (7th generation) Wi-Fi + Cellular:MDFT:MDFV:MDFW:MDFX:MDFY:MDG0:MDG1:MDG2:MDG3:MDG4:MDG5:MDG6:MDG7:MDG8:MDG9:MDGC:MDGD:MDGF:',
+		'iPad;ipad/509181;118452;iPad Pro 11-inch (2nd generation) Wi-Fi:NRC9:NRCC:NRCD:NRCF:NRCG:NRCH:PTRF:PTRK:',
+		'iPad;ipad/509192;111977;iPad Pro 12.9-inch (4th Generation) Wi-Fi:NR71:NR72:NR73:NR74:NR75:NR76:PV03:PV04:',
+		'iPad;ipad/509203;118452;iPad Pro 11-inch (2nd generation) Wi-Fi + Cellular:NTH0:NTH1:NTH2:NTH3:NTH4:NTH5:NTH8:NTH9:NTHC:NTHD:NTHF:NTHG:NTHM:NTHN:NTHP:NTHQ:NTHR:NTHT:PV13:PV14:PV15:PV16:PV17:PV18:',
+		'iPad;ipad/509228;111977;iPad Pro 12.9-inch (4th Generation) Wi-Fi + Cellular:NTGR:NTGT:NTGV:NTGW:NTHH:NTHJ:NTHX:NTHY:NTJ0:NTJ1:NTJ2:NTJ3:NTJ6:NTJ7:NTJ8:NTJ9:NTJC:NTJD:PV1P:PV1Q:PV1R:PV1T:PV1V:PV1W:',
+		'iPhone Accessory;iphone/300147;unknown;iPhone 11 Smart Battery Case:N3Y9:N3YC:',
+		'iPhone Accessory;iphone/300148;unknown;iPhone 11 Pro Smart Battery Case:N3YD:N3YF:N3YG:',
+		'iPhone Accessory;iphone/300149;unknown;iPhone 11 Pro Max Smart Battery Case:N3YH:N3YJ:N3YK:',
+		'iPhone Accessory;iphone/300414;111857;MagSafe Battery Pack:0NLJ:',
+		'iPhone Accessory;iphone/pl134;unknown;Bluetooth Headset:XAP:',
+		'iPhone Accessory;iphone/pl134;unknown;iPhone 6s Smart Battery Case:G5T6:G5T7:G5T8:G5T9:GR8J:GR8K:GR8L:GR8M:GR8N:GR8P:GR8Q:GR8R:',
+		'iPhone Accessory;iphone/pl134;unknown;iPhone 7 Smart Battery Case:HJ7X:HJ7Y:HJ80:',
+		'iPhone Accessory;iphone/pl134;unknown;iPhone XR Smart Battery Case:LN55:LN56:',
+		'iPhone Accessory;iphone/pl134;unknown;iPhone XS Max Smart Battery Case:L5YV:L5YX:LN59:',
+		'iPhone Accessory;iphone/pl134;unknown;iPhone XS Smart Battery Case:L5YT:L5YW:LN57:',
+		'iPhone Accessory;iphone/pl134;unknown;MagSafe Charger:06M2:06M3:06M5:06M6:06M7:0QNP:',
+		'iPhone Accessory;iphone/pl134;unknown;MagSafe Duo Charger:0DLY:0R53:0R56:0R57:0R58:0T6X:',
+		'iPhone;iphone/131510;112445;iPhone (original):0KH:VR0:WH8:',
+		'iPhone;iphone/132035;112496;iPhone 3G (China Mainland):8L0:',
+		'iPhone;iphone/132035;112496;iPhone 3G:1R4:Y7H:Y7K:',
+		'iPhone;iphone/132537;112307;iPhone 3GS:3NP:3NQ:3NR:3NS:',
+		'iPhone;iphone/132740;112307;iPhone 3GS (China Mainland):8M7:8M8:8M9:8MB:',
+		'iPhone;iphone/132927;112562;iPhone 4:A4S:A4T:DZZ:E00:',
+		'iPhone;iphone/132932;112307;iPhone 3GS (8GB):EDG:',
+		'iPhone;iphone/133177;112562;iPhone 4 (CDMA):DDP7:DDP8:DDP9:DDPC:',
+		'iPhone;iphone/133466;112562;iPhone 4 CDMA (8GB):DP0V:DPNG:',
+		'iPhone;iphone/133476;112004;iPhone 4S:DT9V:DT9Y:DTC0:DTC1:DTD0:DTD1:DTD2:DTD3:DTD5:DTD6:DTD7:DTD8:DTDC:DTDD:DTDF:DTDG:DTDK:DTDL:DTDM:DTDN:DTDR:DTDT:DTDV:DTDW:DTF9:DTFC:DTFD:DTFF:DTFG:DTFH:',
+		'iPhone;iphone/133477;112562;iPhone 4 (8GB):DP0N:DPMW:',
+		'iPhone;iphone/133778;112016;iPhone 5:DTTN:DTTP:DTTQ:DTTR:F38W:F38Y:FH19:FH1C:FH1D:FH1F:FH1G:FH1H:',
+		'iPhone;iphone/133779;112016;iPhone 5 (GSM, CDMA):DTWD:DTWF:DTWG:DTWH:F39C:F39D:F8GH:F8GJ:F8GK:F8GL:F8GM:F8GN:F8H2:F8H4:F8H5:F8H6:F8H7:F8H8:',
+		'iPhone;iphone/134093;112004;iPhone 4s (8GB):FML3:FML4:FML5:FML6:FML7:FML8:FML9:FMLC:FMLD:FMLF:',
+		'iPhone;iphone/134094;111917;iPhone 5c:FFHG:FFHH:FFHJ:FFHK:FFHL:FFHM:FFHN:FFHP:FFHQ:FFHR:FM1N:FM1P:FM1Q:FM1R:FM1T:FM1V:FM1W:FM1Y:FM20:FM21:FNDD:FNDF:FNDG:FNDH:FNDJ:FNDK:FNDL:FNDM:FNDN:FNDP:FNLQ:FNLR:FNLT:FNLV:FNLW:FNLY:FNM0:FNM1:FNM2:FNM3:',
+		'iPhone;iphone/134095;111917;iPhone 5c:FFT5:FFT6:FFT7:FFTM:FFTN:FL01:FL02:FL03:FL04:FL05:FLFL:FLFM:FLFN:FLFP:FLFT:FLFV:FLFW:FLFY:FLG0:FLG2:FQ0Y:FQ10:FQ11:FQ12:FQ13:FQ14:FQ15:FQ16:FQ17:FQ18:FR8F:FR8G:FR8H:FR8J:FR8M:FR8N:FR8P:FR8Q:FR8R:FR8T:FR8V:FR8W:FR8Y:FR90:FR91:FR92:FR93:FR94:FR95:FR96:',
+		'iPhone;iphone/134096;111973;iPhone 5s:FF9R:FF9V:FF9Y:FFDN:FFDP:FFDQ:FFDR:FFFJ:FFFK:FFFL:FFFM:FFFN:FFFP:FFFQ:FFFR:FFFT:FFFV:FFFW:FNJJ:FNJK:FNJL:FNJM:FNJN:FNJP:FNJQ:FNJR:FNJT:FNNK:FNNL:FNNM:FNNN:FNNP:FNNQ:FNNR:FNNT:FNNV:',
+		'iPhone;iphone/134097;111973;iPhone 5s:FFG8:FFG9:FFGC:FFGD:FFGF:FFGG:FFGH:FFGJ:FFGK:FP6H:FP6J:FP6K:FP6L:FP6M:FP6N:FP6P:FP6Q:FP6R:FR97:FR98:FR99:FR9C:FR9D:FR9F:FR9G:FR9H:FR9J:FR9K:FR9L:FR9M:FR9N:FR9P:FR9Q:FR9R:FR9T:FR9V:FRC4:FRC5:FRC6:FRC7:FRC8:FRC9:FRCC:FRCD:FRCF:',
+		'iPhone;iphone/134505;111917;iPhone 5c (8GB):FYW8:FYW9:FYWC:FYWD:FYWF:FYWM:FYWN:FYWP:FYWQ:FYWR:FYY1:FYY2:FYY3:FYY4:FYY5:FYYD:FYYF:FYYG:FYYH:FYYJ:G07P:G07Q:G07R:G07T:G07V:',
+		'iPhone;iphone/134710;111940;iPhone 6 Plus:G5QF:G5QG:G5QH:G5QJ:G5QK:G5QL:G5QM:G5QN:G5QP:G5QQ:G5QR:G5QT:G5QV:G5QW:G5QY:G5R0:G5R1:G5R2:',
+		'iPhone;iphone/134711;111954;iPhone 6:G5MC:G5MD:G5MF:G5MG:G5MH:G5MJ:G5MK:G5ML:G5MM:G5MN:G5MP:G5MQ:G5MR:G5MT:G5MV:G5MW:G5MY:G5N0:HXR5:HXR6:HYFK:HYFL:',
+		'iPhone;iphone/300239;111877;iPhone 12 mini:0GPP:0GPQ:0GPR:0GPT:0GPV:0GPW:0GPX:0GPY:0GQ0:0GQ1:0GQ2:0GQ3:0GQ4:0GQ5:0GQ6:0GQ7:0GQ8:0GQ9:0GQC:0GQD:0GQF:0GQG:0GQH:0GQJ:0GQK:0GQL:0GQM:0GQN:0GQP:0GQQ:0GQR:0GQT:0GQV:0GQW:0GQX:0GQY:0GR0:0GR1:0GR2:0GR3:0GR4:0GR5:0GR6:0GR7:0GR8:0GR9:0GRD:0GRF:0GRG:0GRH:0GRJ:0GRL:0GRM:0GRN:0GRP:0GRQ:0GRR:0GRT:0GRV:0GRW:',
+		'iPhone;iphone/300240;111874;iPhone 12 Pro Max:0D3Y:0D40:0D41:0D42:0D43:0D44:0D45:0D46:0D47:0D48:0D49:0D4C:0D4D:0D4F:0D4G:0D4H:0D4J:0D4K:0D4N:0D4P:0D4Q:0D4R:0D4T:0D4W:0D4Y:0D50:0D51:0D52:0D53:0D54:0D55:0D56:0D57:0D58:0D59:0D5C:0D5D:0D5F:0D5G:0D5H:0D5J:0D5K:0D5L:0D5M:0D5N:0D5P:0D5Q:0D5R:',
+		'iPhone;iphone/300241;111876;iPhone 12:0DXP:0DXQ:0DXR:0DXT:0DXV:0DXW:0DXX:0DXY:0DY0:0DY1:0DY2:0DY3:0DY4:0DY5:0DY6:0DYF:0DYG:0DYH:0DYJ:0DYK:0DYL:0DYM:0DYN:0DYP:0DYQ:0DYR:0DYV:0DYW:0DYX:0DYY:0F00:0F01:0F02:0F03:0F04:0F06:0F07:0F09:0F0D:0F0F:0F0G:0F0H:0F0J:0F0L:0F0M:0F0N:0F0Q:0F0R:0F0V:0F0W:0F0X:0F0Y:0F10:0F11:0F12:0F13:0F14:0F16:0F17:0F18:',
+		'iPhone;iphone/300242;111875;iPhone 12 Pro:0D80:0D81:0D82:0D83:0D84:0D85:0D86:0D87:0D88:0D89:0D8D:0D8F:0D8G:0D8H:0D8J:0D8L:0D8M:0D8N:0D8P:0D8Q:0D8R:0D8T:0D8V:0D8W:0D8X:0D8Y:0D90:0D91:0D92:0D93:0D94:0D95:0D96:0D97:0D98:0D99:0D9C:0D9D:0D9F:0D9G:0D9H:0D9J:0D9K:0D9L:0D9M:0D9N:0D9P:0D9Q:',
+		'iPhone;iphone/500016;111952;iPhone 6s:GRXQ:GRXR:GRXT:GRXV:GRXW:GRXX:GRXY:GRY0:GRY1:GRY2:GRY3:GRY4:GRY5:GRY6:GRY7:GRY8:GRY9:GRYC:GRYD:GRYF:GRYG:GRYH:GRYJ:GRYK:HFLM:HFLN:HFLP:HFLQ:HFLR:HFLT:HFLV:HFLW:',
+		'iPhone;iphone/500040;111996;iPhone 6s Plus:GRWD:GRWF:GRWH:GRWJ:GRWL:GRWM:GRWP:GRWQ:GRWT:GRWV:GRWX:GRWY:GRX1:GRX2:GRX4:GRX5:GRX7:GRX8:GRXC:GRXD:GRXG:GRXH:GRXK:GRXL:HFLX:HFLY:HFM0:HFM1:HFM2:HFM3:HFM4:HFM5:',
+		'iPhone;iphone/501343;112005;iPhone SE (1st generation):H2XG:H2XH:H2XJ:H2XK:H2XL:H2XM:H2XN:H2XP:H2XQ:H2XR:H2XT:H2XV:H2XW:H2XX:H2Y7:H2Y8:HTVK:HTVL:HTVM:HTVN:HTVQ:HTVR:HTVT:HTVV:HTVW:HTVX:HTW0:HTW1:HTW2:HTW3:HTW4:HTW5:',
+		'iPhone;iphone/502272;111943;iPhone 7:HG6W:HG6X:HG6Y:HG70:HG71:HG72:HG73:HG74:HG75:HG76:HG77:HG78:HG79:HG7D:HG7F:HG7G:HG7H:HG7J:HG7K:HG7L:HG7M:HG7N:HG7P:HG7Q:HG7R:HG7T:HG7V:HG7W:HG7X:HG7Y:HG80:HG81:HG82:HG83:HG84:HG85:HG86:HG87:HG88:HG89:HG8C:HG8D:HPXN:HPXP:HPXQ:HPXR:HPXT:HPXV:HPXW:HPXX:HPY0:HPY1:HPY2:HPY3:HPY4:HPY5:HX96:HX97:HX98:HX99:HX9C:HX9D:J1D9:J1DC:J5KM:J5KN:J5KP:',
+		'iPhone;iphone/502287;111953;iPhone 7 Plus:HFXW:HFXX:HFXY:HFY0:HFY1:HFY2:HFY3:HFY4:HFY5:HFY6:HFY7:HFY8:HFY9:HFYC:HFYD:HFYF:HFYG:HFYH:HFYJ:HFYK:HFYL:HFYM:HFYN:HFYP:HFYQ:HFYT:HFYV:HFYW:HFYX:HFYY:HG00:HG01:HG02:HG03:HG04:HG05:HG06:HG07:HG08:HG09:HG0C:HG0F:HPY6:HPY7:HPY8:HPY9:HPYC:HPYF:HPYG:HPYH:HPYJ:HPYK:HPYL:HPYM:HPYN:HPYP:HX9F:HX9G:HX9H:HX9J:HX9K:HX9L:J1DD:J1DF:J5KQ:J5KR:J5KT:',
+		'iPhone;iphone/504266;111976;iPhone 8:JC67:JC68:JC69:JC6C:JC6D:JC6F:JC6G:JC6H:JC6J:JC6K:JC6L:JC6M:JC6N:JC6P:JC6Q:JC6R:JC6T:JC6V:JWF5:JWF6:JWF7:JWF8:JWF9:JWFC:N1MW:N1MX:N1MY:N1N0:N1N1:N1N2:N1N4:N1N5:N1N6:',
+		'iPhone;iphone/504267;111950;iPhone 8 Plus:JCLM:JCLN:JCLP:JCLQ:JCLR:JCLT:JCLV:JCLW:JCLX:JCLY:JCM0:JCM1:JCM2:JCM3:JCM4:JCM5:JCM6:JCM7:JWLK:JWLL:JWLM:JWLN:JWLP:JWLQ:N1YP:N1YQ:N1YR:N1YT:N1YV:N1YW:N1YX:N1YY:N200:',
+		'iPhone;iphone/504268;111864;iPhone X:JCL6:JCL7:JCL8:JCL9:JCLC:JCLD:JCLF:JCLG:JCLH:JCLJ:JCLK:JCLL:',
+		'iPhone;iphone/505602;111868;iPhone XR:KXK1:KXK2:KXK3:KXK4:KXK5:KXK6:KXK7:KXK8:KXK9:KXKC:KXKD:KXKF:KXKG:KXKH:KXKJ:KXKK:KXKL:KXKM:KXKN:KXKP:KXKQ:KXKR:KXKT:KXKV:KXKW:KXKX:KXKY:KXL0:KXL1:KXL2:KXL3:KXL4:KXL5:KXL6:KXL7:KXL8:KXL9:KXLC:KXLD:KXLF:KXLG:KXLH:KXLJ:KXLK:KXLL:KXLM:KXLN:KXLP:KXLQ:KXLR:KXLT:KXLV:KXLW:KXLX:KXLY:KXM0:KXM1:KXM2:KXM3:KXM4:KXM5:KXM6:KXM7:KXM8:KXM9:KXMC:KXMD:KXMF:KXMG:KXMH:KXMJ:KXMK:',
+		'iPhone;iphone/505716;111880;iPhone XS Max:KPH1:KPH2:KPH3:KPH4:KPH5:KPH6:KPH7:KPH8:KPH9:KPHC:KPHD:KPHF:KPHG:KPHH:KPHJ:KPHK:KPHL:KPHM:KPHN:KPHP:KPHQ:KPHR:KPHT:KPHV:KPHW:KPHX:KPHY:KPJ0:KPJ1:KPJ2:KPJ3:KPJ4:KPJ5:KPJ6:KPJ7:KPJ8:',
+		'iPhone;iphone/505753;111881;iPhone XS:KPFP:KPFQ:KPFR:KPFT:KPFV:KPFW:KPFX:KPFY:KPG0:KPG1:KPG2:KPG3:KPG4:KPG5:KPG6:KPG7:KPG8:KPG9:KPGC:KPGD:KPGF:KPGG:KPGH:KPGJ:KPGK:KPGL:KPGM:KPGN:KPGP:KPGQ:KPGT:KPGV:KPGW:KPGX:KPGY:KPH0:',
+		'iPhone;iphone/507808;111879;iPhone 11 Pro:N6XM:N6XN:N6XP:N6XQ:N6XR:N6XT:N6XV:N6XW:N6XX:N6XY:N6Y0:N6Y1:N6Y2:N6Y3:N6Y4:N6Y5:N6Y6:N6Y7:N6Y8:N6Y9:N6YC:N6YD:N6YF:N6YG:N6YH:N6YJ:N6YK:N6YL:N6YM:N6YN:N6YP:N6YQ:N6YR:N6YT:N6YV:N6YW:',
+		'iPhone;iphone/507845;111878;iPhone 11 Pro Max:N6YX:N6YY:N700:N701:N702:N703:N704:N705:N706:N707:N708:N709:N70C:N70D:N70F:N70G:N70H:N70J:N70K:N70L:N70M:N70N:N70P:N70Q:N70R:N70T:N70V:N70W:N70X:N70Y:N710:N711:N712:N713:N714:N715:',
+		'iPhone;iphone/507882;111865;iPhone 11:N72J:N72K:N72L:N72M:N72N:N72P:N72Q:N72R:N72T:N72V:N72W:N72X:N72Y:N730:N731:N732:N733:N734:N735:N736:N737:N738:N739:N73C:N73D:N73F:N73G:N73H:N73J:N73K:N73L:N73M:N73N:N73P:N73Q:N73R:N73T:N73V:N73W:N73X:N73Y:N740:N741:N742:N743:N744:N745:N746:N747:N748:N749:N74C:N74D:N74F:',
+		'iPhone;iphone/509370;111882;iPhone SE (2nd generation):PLJM:PLJN:PLJP:PLJQ:PLJR:PLJT:PLJV:PLJW:PLJX:PLJY:PLK0:PLK1:PLK2:PLK3:PLK4:PLK5:PLK6:PLK7:PMFG:PMFH:PMFJ:PMFK:PMFL:PMFM:PMFN:PMFP:PMFQ:',
+		'iPod;ipod/111393;112530;iPod (5 GB Scroll Wheel):LG6:NAM:NGD:',
+		'iPod;ipod/112374;112530;iPod (5 GB Scroll Wheel Personalized):MJ7:NAN:NT0:',
+		'iPod;ipod/112376;112530;iPod (10 GB Scroll Wheel):ML1:',
+		'iPod;ipod/112378;112530;iPod (10 GB Scroll Wheel Personalized):MRW:',
+		'iPod;ipod/113633;112462;iPod (10 GB Touchwheel):MMB:NGE:NSS:',
+		'iPod;ipod/113634;112462;iPod (10 GB Touchwheel, Personalized):MYX:NSW:NSY:',
+		'iPod;ipod/113635;112462;iPod (10 GB Touchwheel, Win):MME:NGH:',
+		'iPod;ipod/113636;112462;iPod (10 GB Touchwheel, Win, Personalized):MYZ:',
+		'iPod;ipod/113639;112462;iPod (20 GB Touchwheel, Win, Personalized):MZ0:',
+		'iPod;ipod/113640;112462;iPod (20 GB Touchwheel, Win):MMF:NGJ:',
+		'iPod;ipod/113641;112462;iPod (20 GB Touchwheel, Personalized):MYY:',
+		'iPod;ipod/113642;112462;iPod (20 GB Touchwheel):MMC:NGF:NSX:',
+		'iPod;ipod/113643;112462;iPod (5 GB Touchwheel, Win, Personalized):MRV:NSU:',
+		'iPod;ipod/113644;112462;iPod (5 GB Touchwheel, Win):MJ2:NGG:',
+		'iPod;ipod/119099;112515;iPod (10 GB, With Dock Connector):NRH:P66:Q4R:',
+		'iPod;ipod/119100;112515;iPod 15GB w/Dock Cntr (Early 2004):QQF:QQG:',
+		'iPod;ipod/119100;112515;iPod (15 GB, With Dock Connector):NLU:NLW:P67:PRV:Q4S:',
+		'iPod;ipod/119101;112515;iPod (30 GB, With Dock Connector):NLY:P68:Q4T:',
+		'iPod;ipod/119102;112515;iPod (10 GB, With Dock Connector, Personalized):NRK:PQ4:',
+		'iPod;ipod/119103;112515;iPod (15 GB, With Dock Connector, Personalized):NM6:',
+		'iPod;ipod/119104;112515;iPod (30 GB, With Dock Connector, Personalized):NM7:',
+		'iPod;ipod/120699;112515;iPod (20 GB with Dock Connector):PNT:QC8:',
+		'iPod;ipod/120700;112515;iPod (40 GB with Dock Connector):PNU:',
+		'iPod;ipod/120701;112515;iPod (20 GB with Dock Connector, Personalized):PQ5:',
+		'iPod;ipod/120702;112515;iPod (40 GB with Dock Connector, Personalized):PQ6:',
+		'iPod;ipod/122741;112317;iPod mini:PFW:PRC:PRH:QKJ:QKK:QKL:QKM:QKN:QKP:QKQ:QKR:S41:S42:S43:S44:S45:S46:S47:S48:S4C:S4D:S4E:S4F:S4G:S4H:S4J:S4K:',
+		'iPod;ipod/130003;112541;iPod (Click Wheel):PQ7:PS9:Q8U:Q8V:RFF:RFG:RFM:RFN:RUW:',
+		'iPod;ipod/130181;112449;iPod photo:R5Q:R5R:R5S:R5T:',
+		'iPod;ipod/130186;112541;iPod U2 Special Edition (20 GB):S2X:',
+		'iPod;ipod/130300;112493;iPod shuffle (1st Generation):RS9:RSA:TSX:TSY:U7T:UZ0:',
+		'iPod;ipod/130602;112539;iPod with color display:TDS:TDU:TM2:TYG:',
+		'iPod;ipod/130659;112507;iPod nano (1st Generation):SZB:SZC:SZV:SZW:TJT:TJU:TK2:TK3:UNA:UNB:UPR:UPS:VUQ:WS8:WS9:',
+		'iPod;ipod/130668;112539;iPod with color display Harry Potter (20GB):U5H:',
+		'iPod;ipod/130710;111923;iPod (5th generation):SZ9:SZA:SZT:SZU:TXK:TXL:TXM:TXN:U99:V6C:VHQ:VUP:WEC:WED:WEE:WEF:WEG:WEH:WEJ:WEK:',
+		'iPod;ipod/130879;unknown;iPod Hi-Fi:T2W:',
+		'iPod;ipod/131013;111923;iPod (5th generation U2):V9V:WEM:',
+		'iPod;ipod/131146;112454;iPod (5th generation Late 2006):V9K:V9L:V9M:V9N:V9P:V9Q:V9R:V9S:WU9:WUA:WUB:WUC:X3N:X82:XNJ:',
+		'iPod;ipod/131146;112454;iPod (5th generation U2 Late 2006):W9G:',
+		'iPod;ipod/131155;112309;iPod nano (2nd generation):V8T:V8U:V8W:V8X:VQ5:VQ6:VQH:VQJ:VQK:VQL:VQT:VQU:WL2:WL3:X9A:X9B:XNH:',
+		'iPod;ipod/131239;112455;iPod shuffle (2nd generation Late 2007):1ZH:1ZK:1ZM:1ZP:1ZR:8CQ:',
+		'iPod;ipod/131239;112455;iPod shuffle (2nd generation):VTE:VTF:XQS:XQU:XQV:XQX:XQY:XR0:XR1:XR3:',
+		'iPod;ipod/131639;112478;iPod classic:Y5N:YMU:YMV:YMX:',
+		'iPod;ipod/131645;112552;iPod nano (3rd generation):13F:Y0P:Y0R:YXR:YXT:YXV:YXX:',
+		'iPod;ipod/131660;112532;iPod touch (1st Generation):0JW:14N:14P:W4N:W4T:',
+		'iPod;ipod/132053;112320;iPod nano (4th generation):1P1:2ME:37G:37H:37K:37L:37P:37Q:37S:3QS:3QT:3QU:3QW:3QX:3QY:3QZ:3R0:5B7:5B8:5B9:5BA:5BB:5BC:5BD:5BE:5BF:',
+		'iPod;ipod/132054;112319;iPod touch (2nd generation):201:203:208:',
+		'iPod;ipod/132055;112321;iPod classic (120 GB):2C5:2C7:',
+		'iPod;ipod/132404;112497;iPod shuffle (3rd generation):4NZ:891:',
+		'iPod;ipod/132641;112319;iPod touch 8GB (2nd Generation):75J:',
+		'iPod;ipod/132643;112495;iPod nano (5th generation):71V:71Y:721:726:72A:72D:72F:72K:72L:72Q:72R:72S:72X:734:738:739:73A:73B:',
+		'iPod;ipod/132661;112497;iPod shuffle (3rd generation Late 2009):A1S:A1U:A78:A7B:A7D:ALB:ALD:ALG:',
+		'iPod;ipod/132670;112461;iPod touch 32GB 64GB (3rd generation):6K2:6K4:',
+		'iPod;ipod/132673;112601;iPod classic 160GB (Late 2009):9ZS:9ZU:',
+		'iPod;ipod/132681;112497;iPod shuffle (3rd generation Late 2009, Stainless Steel):A1L:',
+		'iPod;ipod/133017;112422;iPod shuffle (4th generation):DCMJ:DCMK:DFDM:DFDN:DFDP:',
+		'iPod;ipod/133018;112432;iPod nano (6th generation):DCMN:DCMP:DDVX:DDVY:DDW0:DDW1:DDW2:DDW3:DDW4:DDW5:DDW6:DDW7:DDW8:DDW9:',
+		'iPod;ipod/133019;112431;iPod touch (4th generation):DCP7:DCP9:DCPC:',
+		'iPod;ipod/133467;112431;iPod touch (4th generation):DNQW:DNQY:DNR0:DT75:DT77:DT78:F96T:F96V:',
+		'iPod;ipod/133772;112039;iPod nano (7th generation):F0GM:F0GN:F0GP:F0GQ:F0GR:F0GT:F0GV:F4LP:FJQ1:',
+		'iPod;ipod/133776;112422;iPod shuffle (4th generation, Late 2012):F4RT:F4RV:F4RW:F4RY:F4T0:F4T1:F4VF:F4VG:FJDH:',
+		'iPod;ipod/133777;112021;iPod touch (5th generation):DJFD:DJFF:F4JR:F4JT:F4JW:F4JY:F4K1:F4K2:F4K4:F4K5:F4Y5:F4Y6:FMJF:FMJG:G22Q:G22R:G22T:G22V:G22W:G22Y:',
+		'iPod;ipod/134023;118467;iPod touch 16 GB (5th generation, Mid 2013):FFCJ:',
+		'iPod;ipod/135428;112023;iPod touch (6th generation):GGK2:GGK3:GGK4:GGK5:GGK6:GGK7:GGK8:GGK9:GGNJ:GGNK:GGNL:GGNM:GGNN:GGNP:GGNQ:GGNR:GGNT:GGNW:GM16:GM17:GM18:GM19:GM1C:GM1D:',
+		'iPod;ipod/507223;111961;iPod touch (7th generation):M937:M938:M939:M93C:M93D:M93F:M93G:M93H:M93J:M93K:M93L:M93M:M93N:M93P:M93Q:M93R:M93T:M93V:',
+		'iPod;ipod/pl114;unknown;Nike + iPod Sport Kit:VSW:',
+		'macOS;mac/132617;112591;Mac OS X 10.6:BZF:BZH:',
+		'macOS;mac/132630;unknown;Mac OS X Server (early):8PS:FDV:',
+		'Mac Desktop;mac/7955;112296;Power Mac G4 (PCI Graphics):H7D:H7W:H8Y:HEA:HEC:HED:HEK:HFZ:HHC:HHD:HHF:HJ9:HJM:HJN:HJP:HJT:HJU:HK7:HL4:HM0:HM5:HN1:HN2:HN3:HN9:HNA:HV7:',
+		'Mac Desktop;mac/7956;112294;Power Mac G4 (AGP Graphics):DGG:FZC:G5G:G5H:GJE:GJF:H5S:HES:HGU:HHG:HLA:HLK:HLZ:HM1:HNH:HNZ:HP0:HPO:HSE:HSF:HSG:HUV:HV6:J2S:J92:J93:JJ1:JJ2:JMJ:JSC:JUB:JUC:JUL:JY8:JY9:JZG:K1B:K1D:K1E:',
+		'Mac Desktop;mac/8001;112301;iMac DV Special Edition (Slot Loading):HCW:HCX:HCY:HD0:HFU:HQS:HTN:HTP:HTQ:HTR:HTS:HVF:HVG:HVZ:HZ8:J0Y:J6T:J8W:JEE:JUX:',
+		'Mac Desktop;mac/8001;112301;iMac DV (Slot Loading):CJ7:GGE:H90:HAY:HB5:HB6:HB7:HCL:HCM:HCN:HCP:HCQ:HD1:HD2:HD3:HD4:HD6:HD7:HD8:HD9:HDB:HDC:HDD:HDG:HDH:HDK:HFT:HQK:HQL:HQM:HQN:HQP:HSL:HSM:HSN:HSP:HSQ:HSR:HTC:HTD:HTE:HTG:HTT:HTU:HTV:HTW:HTX:HTY:HTZ:HU0:HU1:HU2:HU3:HU4:HU5:HU6:HU7:HU8:HU9:HUA:HUB:HUC:HUO:HVU:HVV:HVW:HVX:HVY:HZ9:J6N:J6P:J6Q:J6S:J6V:J77:J78:J79:J7A:J7B:J7C:J7E:J7F:J7G:J7H:J7J:J7K:J89:J8A:J8B:J8C:J8D:J8E:J8G:J8H:J8J:J8K:J8L:J8M:J8V:JED:JRH:JST:JV3:',
+		'Mac Desktop;mac/8001;112301;iMac (Slot Loading):9HT:G42:HCS:HCV:HEG:HFS:HQJ:HSK:HTH:HTJ:HTK:HTL:HTM:HVE:HVT:HZA:HZN:HZP:HZQ:HZR:J6H:J74:J7D:J7Q:J7R:J7S:J7T:J88:J8F:J90:JEC:JEK:JEL:JEM:JEN:JUR:JVP:YHT:',
+		'Mac Desktop;mac/8355;112518;Power Mac G4 (Gigabit Ethernet):J3B:J3C:J3D:JFN:JFP:JFQ:JNX:JVN:JVQ:K4Z:K50:K51:K53:K5A:K5B:K5C:K5V:K5W:K5X:K5Z:K63:K69:K86:K8H:K8J:K8K:K98:KNW:KNX:KNY:',
+		'Mac Desktop;mac/8359;112527;iMac DV Special Edition (Summer 2000):JB0:JMR:JMU:JQK:JR5:JR6:JV7:JVA:JVM:JY5:KAK:',
+		'Mac Desktop;mac/8359;112527;iMac DV (Summer 2000):JAU:JMP:JMS:JQH:JQZ:JR0:JV5:JV8:JVK:JY6:KAG:KBD:KME:KNV:L2Z:',
+		'Mac Desktop;mac/8359;112527;iMac DV+ (Summer 2000):JAV:JMQ:JMT:JQJ:JR2:JR3:JV6:JV9:JVL:JY7:K4L:KAH:KAJ:KQ6:',
+		'Mac Desktop;mac/8359;112527;iMac (Summer 2000):JVG:JWQ:JYG:JYH:K2N:K2P:K2Q:K2R:',
+		'Mac Desktop;mac/8367;112466;Power Mac G4 (Cube):JAT:JDZ:JG0:JNW:JVR:JZV:K38:K59:K5F:K5G:K6A:K6K:K97:KBJ:KQ3:KQM:KQN:KUA:KYJ:L2J:L2K:L8H:LHY:LR1:LR3:',
+		'Mac Desktop;mac/108892;112549;Power Mac G4 (Digital Audio):HL1:JQF:K6V:K6W:K6X:K6Y:K6Z:K70:KAM:KAN:KAP:KKY:KKZ:KL1:KLT:KPF:KPG:KPH:KPJ:KQA:KVC:KX5:KXQ:KXR:KXS:KYC:KYD:KYE:KYK:KYZ:KZ0:KZ4:L0M:L1Z:L65:L81:L86:L8Z:L90:L91:L92:L95:LBU:LCW:LF6:LOM:LON:',
+		'Mac Desktop;mac/109132;112548;iMac (Early 2001):KDC:KDE:KJB:KJG:KJH:KJJ:KJK:KJL:KJM:KJN:KJP:KJQ:KJR:KJS:KJT:KJU:KJV:KLB:KLU:KLW:KLX:KM3:KM5:KM9:KMA:KMD:KQQ:KWE:KWF:KWG:KWH:KZ2:KZ3:L12:L13:L2C:L2D:L2E:L2F:L2G:L2W:L30:L31:L36:L37:L38:L39:L3D:L5A:L5C:L5E:L5G:L7A:L88:LCE:LCF:LFJ:LGO:',
+		'Mac Desktop;mac/110293;112502;iMac (Summer 2001):FCS:LAS:LFB:LFC:LFD:LFR:LFS:LFT:LFU:LFV:LFW:LFX:LFY:LFZ:LG0:LG1:LG2:LG3:LG4:LG8:LG9:LGA:LGB:LGC:LGD:LGE:LGQ:LGR:LGS:LGT:LLR:LLS:LLT:LMS:LMT:LNM:LP0:LQ7:LQ8:LR5:LR6:LR7:LRF:LRG:LRL:LUJ:LUK:LUL:LV7:LWW:M0E:M0F:M0Q:M5R:M8E:MB6:MBQ:MBR:MBS:MBW:MCW:MD5:MDE:MDF:MDG:MDH:MDJ:MEY:ML4:MUS:MUT:MUU:MZD:MZG:N0Q:N0Z:N47:N48:N49:N4A:N4B:N4C:N4D:N4F:N55:N7K:NDH:NDM:NDN:NNY:NT2:',
+		'Mac Desktop;mac/110334;112546;Power Mac G4 (QuickSilver):KLS:KSD:KSJ:KSK:KSL:L3E:L4Y:L4Z:L50:L51:L52:L53:L6Q:L6R:L8G:LF9:LJQ:LJR:LJS:LUX:LUY:LUZ:M4K:M4L:M5U:M5V:MJG:',
+		'Mac Desktop;mac/111858;112501;iMac (Flat Panel):L2T:L3V:L40:L4C:LF4:M7G:MAY:MDL:MEG:MFV:MHB:MHC:MHD:MHE:MHF:MHG:MHH:MHJ:MLQ:MQ4:MQH:MV7:MV8:MV9:MW8:MW9:MWC:N3R:N3S:N3T:N3U:N4U:N83:NB1:NB2:NB4:NC6:NFY:NFZ:NK8:NK9:NKA:P4C:',
+		'Mac Desktop;mac/111993;112450;Power Mac G4 (QuickSilver 2002):M1X:M1Y:M37:M38:M39:M3B:M8G:M8H:MDC:MDM:MDN:MDP:MJF:MJP:MK3:MK5:MK7:MK8:MK9:MQ8:MQV:MW6:N0N:N7N:N7P:NAD:NAQ:NAR:',
+		'Mac Desktop;mac/112793;112513;eMac:LL3:LL6:LL7:LRX:LRZ:M4M:MU4:MU5:MUF:MUG:MUH:MXM:MXN:MXP:MXQ:MXR:MXS:MXT:MXU:MXV:MXW:MXX:MXY:MXZ:N2B:N2C:N3B:N3C:N3D:N3Z:N53:N54:N8M:N8W:N8X:N8Y:N9J:N9K:N9L:NAH:NAJ:NAK:NAL:NAS:NAT:NAV:NAW:NAX:NC0:NC1:NC2:NC3:NC4:NC8:NCA:NCM:NCN:NCP:NCQ:NCR:NCS:NED:NH2:NHG:NHH:NKU:NKV:NRT:NRV:NT9:NTA:NTB:NTZ:NU0:NU1:NU2:NU5:NU6:NU7:NUA:NUB:NUC:NUD:NUE:NUF:NUG:NUH:NUJ:NUK:NZL:P33:P39:P7A:P7B:P7C:P8U:P8V:PFC:PFO:',
+		'Mac Desktop;mac/113574;112501;iMac (17 inch, Flat Panel):INT:L49:L4G:L4L:MZ9:N0S:N88:N89:N8A:N8B:NB3:NZJ:',
+		'Mac Desktop;mac/113853;112510;Power Mac G4 (Mirrored Drive Doors):LKB:LKC:MFX:MM7:MM8:MMA:MQ9:MQA:MUM:MXD:MYM:MYT:MYU:MYV:NF4:NFX:NHN:NJ1:NJQ:NKZ:NLP:NLQ:NLR:NLS:NTY:NZM:P93:PA2:PJU:PK0:',
+		'Mac Desktop;mac/114053;112450;Power Mac G4 (QuickSilver 2002ED):MFW:MM9:MRN:MYW:NF5:',
+		'Mac Desktop;mac/117646;112558;Power Mac G4 (FW 800):N1S:N1W:N1X:N1Y:NP1:NP3:NS5:NS6:NS7:NS8:NS9:NSA:NWN:NWP:NWQ:P60:P61:P65:P6N:P6W:P70:P95:P96:P97:PEN:PHU:PHV:PJ2:PQW:Q0D:',
+		'Mac Desktop;mac/117899;112516;iMac (17-inch 1GHz):NHX:NJ0:NL8:NL9:NLA:NLB:SD3:',
+		'Mac Desktop;mac/119225;112544;eMac (ATI Graphics):NLT:NLV:NLZ:NM0:NM1:NM2:P9E:P9F:P9G:P9H:P9J:P9K:P9L:P9M:P9N:P9P:P9Q:P9R:P9S:PDL:PDM:PE0:PE1:PE2:PE3:PE4:PP0:PP1:PP2:PP9:PPA:PPB:PQ8:PQ9:PQA:PQK:PQL:PQM:PRZ:PS0:PT0:PVU:Q0E:Q0W:Q0X:Q0Y:Q0Z:Q1M:Q2A:Q2B:Q2C:Q2D:Q2E:Q2F:Q2G:Q2H:Q2J:Q4C:Q4D:Q4E:Q4F:Q4G:Q4H:QA5:QHG:QHH:QKV:QLP:QN1:QN2:QN3:QN4:QN5:QN6:R61:',
+		'Mac Desktop;mac/119741;112531;Power Mac G4 (Mirrored Drive Door 2003):PC1:PC4:PHH:PJ1:PJK:PJL:PXP:Q1H:Q6P:Q91:Q92:Q93:Q96:QEC:QED:QL2:QLT:QU9:QUA:RDL:RTA:',
+		'Mac Desktop;mac/119767;112316;Power Mac G5:000:NV9:NVA:NVB:NVQ:NVR:NVS:PAY:PAZ:PB0:PB1:PB2:PB3:PGA:PGB:PGC:PXB:PXC:PXD:PXE:PXF:PXG:PXH:PXJ:PXK:PXL:Q3T:Q3V:Q5Y:Q5Z:Q65:Q66:Q67:Q68:Q6Y:Q6Z:Q7E:Q8Y:Q8Z:Q90:Q94:Q95:QBF:QBG:QCJ:QCK:QCL:QD3:QD4:QE6:QE7:QE8:QE9:QEA:QEB:QES:QEU:QF1:QF6:QF8:QGA:QGB:QKT:QN9:QNB:QNP:QNU:QNV:QQ0:QQ1:QSW:QU4:QUY:QVG:QVH:QVJ:QVK:QVL:QVM:QW1:QWA:QWD:QXD:R5H:R5J:R5K:R5M:R5N:R5P:R7J:R7X:R7Y:R7Z:R96:',
+		'Mac Desktop;mac/120619;112313;iMac (USB 2.0):PJG:PJH:PVJ:PVK:PVW:PVX:Q19:Q1A:Q1B:Q1C:Q1D:Q1E:Q1F:Q1G:Q8B:Q9Y:QA2:QB3:QB4:QB5:QB6:QB7:QB8:QD1:QDS:QG4:QG5:QG6:QG7:QGV:QGW:QGX:QGY:QL8:QLV:QQ2:QQ3:QQ4:QTL:QV5:RDJ:RE9:REH:REJ:',
+		'Mac Desktop;mac/124085;112451;eMac (USB 2.0):QGM:QGN:QGP:QGQ:QGR:QGS:QGT:QGU:QJ6:QJ7:QJ8:QJ9:QJA:QJB:QQH:QQJ:R91:R92:R93:R9S:R9T:R9U:R9V:R9X:RBE:RC5:RC6:RDG:RE7:REA:REB:REC:RFJ:RNS:RSK:RXE:S2S:T40:TCV:TEF:',
+		'Mac Desktop;mac/125005;112498;Power Mac G5 (June 2004):QPL:QPM:QPP:QPQ:QPR:QPS:QT6:QT7:QTA:QTB:QTD:QTE:QTF:QY0:QY1:RA3:RAG:RFT:RGK:RGL:RGM:RH8:RH9:RHA:RHN:RHP:RJG:RJZ:RK0:RK1:RK2:RK3:RK4:RK5:RK6:RK7:RK8:RK9:RKA:RKB:RKC:RKD:RKE:RKG:RKH:RKJ:RKK:RKL:RKM:RKN:RKP:RKQ:RKR:RKS:RKW:RKX:RKY:RKZ:RL0:RL1:RL2:RL3:RL4:RL5:RL6:RL7:RL8:RL9:RLA:RLB:RLC:RLD:RLE:RP4:RP5:RPJ:RQS:RQT:RQU:RQV:RQY:RQZ:RR0:RR1:RRH:RRJ:RRK:RRL:RRM:RRN:RRP:RRQ:RT6:RTB:RTC:RTD:RTE:RXU:RY0:RY1:S2T:S3T:S3U:S3V:S3W:S4B:S4R:S8H:S8J:S8K:S8L:S8M:S8N:S8P:S8U:S8V:S8W:SK8:SM2:SM3:SM4:SPX:SPY:SPZ:SQ0:SQV:T1S:T3V:TDR:TRF:TRH:',
+		'Mac Desktop;mac/130076;112310;iMac G5 (17-Inch):PNX:PNY:PP6:PP7:QC3:QC4:S2U:S2V:S40:S9S:SAT:SDR:SDS:SJ1:SLF:SQZ:TC3:TCK:TE0:TE2:TEH:TSG:TSH:',
+		'Mac Desktop;mac/130077;112310;iMac G5 (20-inch):PNZ:PP8:S2W:S9T:SAU:SK4:SLG:TCL:TE4:TSJ:',
+		'Mac Desktop;mac/130156;112312;Power Mac G5 (Late 2004):QYT:QYU:RWR:S8X:SD1:SDT:SEZ:SK7:SQ1:TKU:TMB:TYB:TYC:',
+		'Mac Desktop;mac/130299;112579;Mac mini:RHR:RHS:RHT:RHU:SMQ:SMR:SMS:SMT:SMU:SX4:T0H:T0J:T0K:T5C:TCW:TDX:THW:TVW:TYV:TYW:TYX:TZ1:',
+		'Mac Desktop;mac/130458;112557;Power Mac G5 (Early 2005):RTY:RTZ:RU0:RU2:RU3:RU4:THJ:THK:THL:TJ2:TJ3:TKE:TKT:TL2:TNS:TNT:TRN:TRV:TRW:TTA:',
+		'Mac Desktop;mac/130469;112521;eMac (2005):SCB:SCC:SCD:SCF:SCG:SCH:T8H:T8J:T8K:T8M:T8N:T8P:TDN:TDP:TDQ:TF2:TF3:TF4:TJ5:TJ7:TKG:TKP:TKQ:TL0:TL1:TMN:TMP:TMQ:TMT:TQU:TR4:TR5:TR6:TRP:TRQ:TU4:TVZ:UUH:UYS:V4J:',
+		'Mac Desktop;mac/130497;112556;iMac G5 ALS (20-Inch):SDW:SDZ:T54:T7Y:T9U:THF:TKM:TKX:TM9:TMA:TU6:TYS:UG4:',
+		'Mac Desktop;mac/130498;112556;iMac G5 ALS (17-Inch):SDU:SDV:SDX:SDY:SGX:T52:T53:T7W:T7X:T9T:THB:THC:TKR:TKS:TWE:TXA:UG2:UG3:',
+		'Mac Desktop;mac/130673;unknown;Mac mini (Late 2005):TA8:TA9:TAA:TAB:TAC:TAD:ULK:UWG:UWY:UWZ:UX0:',
+		'Mac Desktop;mac/130698;112492;iMac G5 (17-Inch iSight):T7Z:T80:T81:TAQ:TAT:U6Z:UGL:UM8:UQN:UWH:UX9:UXS:UXT:',
+		'Mac Desktop;mac/130699;112492;iMac G5 (20-Inch iSight):M11:TAR:TAU:U6A:U6B:U70:UGM:UM9:UQM:UWE:UXU:',
+		'Mac Desktop;mac/130750;112506;Power Mac G5 (Late 2005):R6U:R6V:R6W:R6Z:R70:T39:UKQ:UKR:UKS:UL5:URK:URL:URM:URN:US8:UUA:UUY:UUZ:UV0:UV1:UYT:UZW:UZX:UZY:UZZ:V5V:V5W:V5X:V6E:V76:V77:VS6:VS8:VS9:VU5:VU6:VW5:VWC:VWD:W06:W07:W08:W09:W4X:WAY:',
+		'Mac Desktop;mac/130825;112469;iMac (20-inch, Early 2006):U2P:U2S:V4P:V4Q:V4R:V67:VGC:VGM:VH0:VH2:VW4:VX0:WXN:X0U:',
+		'Mac Desktop;mac/130826;112469;iMac (17-inch, Early 2006):U2N:U2R:V4M:V4N:V4U:V66:VGB:VGZ:VH1:VHP:VV4:VV6:',
+		'Mac Desktop;mac/130881;112456;Mac mini (Early 2006):U35:U36:U38:U39:VJN:VLK:VS5:VS7:VU2:VU4:WBZ:WCU:WEN:',
+		'Mac Desktop;mac/131051;unknown;iMac (17-inch, Mid 2006):V2H:V2J:W8K:W9E:WAE:WCV:WD4:WKT:X11:',
+		'Mac Desktop;mac/131077;112520;Mac Pro:08S:09G:09H:0GN:0GP:0GV:0HA:0KT:0KU:0KV:0KW:0KX:0KY:0KZ:0L0:0L1:0L2:0L3:0L4:0L5:0L6:0L7:0L8:0L9:0LA:0LB:0LC:0LD:0LE:0LH:0LL:0LM:0LN:0LP:0LS:0LT:0LU:0N2:0PX:0PY:0PZ:0Q0:0VG:1MK:UPZ:UQ2:WKD:WRT:WRU:WS4:WSE:WUD:WWM:WWN:WWQ:WWX:X09:X0A:X0B:X0C:X13:X14:X24:X27:X2A:X68:X78:XAU:XAV:XCJ:XCK:XL3:XNK:XWZ:XZS:XZT:Y3P:Y5L:Y8F:YAB:YHA:YHY:YJ0:YKH:YX3:YY4:Z2G:Z2H:Z6M:Z6N:ZDY:ZNZ:ZP0:',
+		'Mac Desktop;mac/131114;112523;iMac (17-inch, Late 2006 CD):289:2JW:WH4:WH5:WQR:WRQ:WV7:X3P:X4W:Y4D:Y4E:Y4Q:YD4:YTN:ZCA:',
+		'Mac Desktop;mac/131116;112523;iMac (17-inch, Late 2006):AC1:VUX:VUY:WAR:WRR:WRW:WV8:WVR:X1A:X1W:X2W:X6Q:X9F:X9Y:XLF:Y3V:Y3W:Y3X:Y6K:Y94:Y97:YAG:YLJ:',
+		'Mac Desktop;mac/131125;112523;iMac (20-inch, Late 2006):VUV:VUW:WRS:WRX:WSD:X0E:X29:X6S:X9E:X9G:XA4:XCR:XCY:Y3R:Y3U:Y9B:YAE:YDW:',
+		'Mac Desktop;mac/131126;112468;Mac mini (Late 2006):W0A:W0B:W0C:W0D:WKN:X1X:X1Y:X1Z:X20:XAS:Y9E:',
+		'Mac Desktop;mac/131132;112523;iMac (24-inch, Late 2006):VGN:VGP:WR3:WSG:WYG:X3C:X6T:XA5:XA6:XLD:XSM:XWW:XZP:Y3Y:Y3Z:Y40:YAF:YX0:',
+		'Mac Desktop;mac/131598;112504;Mac mini (Mid 2007):4NP:YL1:YL2:YL3:YL4:Z5F:',
+		'Mac Desktop;mac/131599;112553;iMac (20-inch, Mid 2007):02X:09Q:0PQ:0PR:0PT:0U1:1NU:1NV:3PB:X85:X86:X87:X88:Z58:Z9G:ZEG:ZFD:',
+		'Mac Desktop;mac/131607;112553;iMac (24-inch, Mid 2007):0PL:0PM:0PN:0PP:0PU:1NW:1SC:2CB:3PA:X89:X8A:Z59:Z9F:ZCR:ZCT:ZCV:ZCW:ZEF:ZGH:ZGP:',
+		'Mac Desktop;mac/131819;112308;Mac Pro (Early 2008):12K:14L:16U:1BJ:1GP:1L1:1LS:1LY:1M3:1Z9:1ZA:200:27K:2BS:2DW:2EE:2MB:31E:31F:329:4R4:5J4:5JA:5JB:5U8:7AQ:XYK:XYL:',
+		'Mac Desktop;mac/131986;112494;iMac (20-inch, Early 2008):28B:2PN:2PR:3FF:3FG:3SZ:5A8:5J0:6F9:8R2:8R3:ZE2:ZE3:ZE5:ZE6:',
+		'Mac Desktop;mac/131987;112494;iMac (24-inch, Early 2008):0KM:0N4:1LW:28A:2E4:2NX:2PT:39S:3F9:3FH:3GS:3NX:5J1:5U6:6J3:6J6:6ZC:ZE4:ZE7:',
+		'Mac Desktop;mac/132294;112427;iMac (20-inch, Early 2009):0TF:0TH:6X0:8M5:8TS:8TT:9EX:9LN:',
+		'Mac Desktop;mac/132299;111345;Mac mini (Early 2009):19X:19Y:1BU:1BV:8NC:92G:9RR:9RS:AFR:BAV:',
+		'Mac Desktop;mac/132300;112427;iMac (24-inch, Early 2009):0TG:0TJ:0TL:0TM:250:259:6X1:6X2:6X3:8M6:8XH:9ET:9F3:9LP:9LQ:9LR:9LS:E1B:',
+		'Mac Desktop;mac/132392;112590;Mac Pro (Early 2009):20G:20H:4PC:4PD:7BF:8MC:8PZ:8Q0:8TR:8TU:8XG:8XL:93H:9EU:9EV:9MC:9MD:9MG:9MJ:9MK:9ML:9QK:ANS:BXD:BXE:BXT:CZ2:CZ3:CZ4:E1C:E1D:E1E:EAA:EYX:EYY:F6H:GYH:',
+		'Mac Desktop;mac/132468;112423;iMac (20-inch, Mid 2009):6MH:6MJ:9TH:BAH:DMV:DWY:E86:FUN:FXN:GM9:H1S:HS6:HS7:HT6:HUE:',
+		'Mac Desktop;mac/132686;112564;iMac (27-inch, Late 2009):5PE:5PJ:5PM:5RU:CYB:CYC:D4V:DMY:DMZ:DWZ:E1J:F0J:F0K:GRP:H9L:H9N:H9P:H9R:',
+		'Mac Desktop;mac/132699;112565;iMac (21.5-inch, Late 2009):5PC:5PK:B9S:B9U:CY8:DMW:DMX:DWR:DWU:E8D:E8E:E8F:F0G:F0H:FQH:FU1:H9K:HDF:',
+		'Mac Desktop;mac/132705;112482;Mac mini (Late 2009):306:307:9G5:9G6:9G7:9G8:AFK:B9X:CS6:DMG:DMH:F6J:',
+		'Mac Desktop;mac/132914;112588;Mac mini (Mid 2010):DD6H:DD6L:DDQ9:DDVN:DFDK:',
+		'Mac Desktop;mac/132915;112589;Mac mini Server (Mid 2010):DD6K:DD6N:DDJF:',
+		'Mac Desktop;mac/132941;112567;iMac (21.5-inch, Mid 2010):DAS:DB7:DNM:DNN:GQA:GQH:GTM:GTN:GVV:GVY:GX0:GX1:GX8:GX9:GY6:H0C:H1X:H1Z:H9F:H9G:HA1:HA2:HA5:HA6:HAB:HAC:HAD:HAK:HCF:HCJ:HCK:HCR:HJ4:HJ6:HJE:HJG:HJS:HJV:HJW:HPQ:HPR:HRV:',
+		'Mac Desktop;mac/132942;112566;iMac (27-inch, Mid 2010):DB5:DB6:DNP:DNR:GQJ:GQK:GRQ:GTP:GTQ:GVW:GVX:GWQ:GX2:GX3:GXA:GXB:GXC:GXD:GXU:GYG:GZN:GZP:GZQ:H0B:H20:H21:H22:H8H:H8P:H9H:H9J:HA3:HA4:HA7:HA8:HA9:HAA:HAE:HAF:HAG:HAJ:HAL:HC2:HC4:HC6:HJ7:HJA:HJC:HJH:HJJ:HJQ:HJR:HJX:HJY:HPB:HPG:HS0:HSC:',
+		'Mac Desktop;mac/132966;112578;Mac Pro (Mid 2010):EUE:EUF:EUG:EUH:GWR:GY5:GZH:GZJ:GZK:GZL:GZM:H0X:H2N:H2P:H97:H99:HF7:HF8:HF9:HFA:HFC:HFD:HFF:HFG:HFJ:HFK:HFL:HFN:HG1:HG3:HP9:HPA:',
+		'Mac Desktop;mac/133282;111983;iMac (21.5-inch, Mid 2011):DHJF:DHJN:DHJR:DHJT:DL8M:DL8N:DMP0:DNWY:DPM0:DPNT:DWTP:DWTQ:F611:',
+		'Mac Desktop;mac/133283;112569;iMac (27-inch, Mid 2011):DHJP:DHJQ:DHJV:DHJW:DL8P:DL8Q:DMW8:DNGH:DNJ9:DNY0:DPM1:DPM2:DPNV:DRVP:DWTR:DY6F:F610:FHCV:',
+		'Mac Desktop;mac/133334;112007;Mac mini (Mid 2011):DJD0:DJD1:DJD2:DJD3:DRHT:DTCJ:DTCK:DTCM:DW33:DW34:DW35:DW36:DW37:DW38:DW3C:DYQJ:',
+		'Mac Desktop;mac/133335;112006;Mac mini Server (Mid 2011):DJY7:DKDJ:DRHR:DTCL:DTCT:DTCV:DW39:DW3D:',
+		'Mac Desktop;mac/133435;112596;iMac (21.5-inch, Late 2011):DKL9:DKLH:DPNK:DPNW:',
+		'Mac Desktop;mac/133644;118464;Mac Pro (Mid 2012):F4MC:F4MD:F4MG:F4MH:F4YY:F500:F648:F649:F64C:F64D:F64F:F6T9:F6TC:F6TD:F6TF:F6TG:',
+		'Mac Desktop;mac/133840;111926;Mac mini (Late 2012):DWYL:DWYM:DY3G:DY3H:F9RK:F9RL:F9RM:F9VV:F9VW:F9W0:F9W1:F9W2:FD9G:FD9H:FD9J:FD9K:FDWK:FGML:FRFP:FW56:FW57:G430:',
+		'Mac Desktop;mac/133842;112435;iMac (21.5-inch, Late 2012):DNCR:DNCT:DNML:DNMM:F8QM:F8QN:F9RN:FC6M:FC6N:FC6P:FD55:FD5Y:FF7L:FFVW:FFVY:FG46:FGC4:FGMR:FGMT:FL8N:FM8L:FM8M:FM8N:FMLG:FP12:',
+		'Mac Desktop;mac/133843;112433;iMac (27-inch, Late 2012):DNCV:DNCW:DNMN:DNMP:F29N:F8QP:F8QQ:FD5T:FD5V:FFM8:FFM9:FFMC:FFMD:FFMF:FFMG:FFMJ:FFMK:FFML:FFMM:FFMN:FFW0:FFW1:FG47:FGMW:FGMY:FGRP:FL8M:FM8P:FM8Q:FMLH:FP13:FP62:FTQ4:FTQ5:',
+		'Mac Desktop;mac/133844;112012;Mac mini Server (Late 2012):DWYN:DY3J:F9VY:F9W3:FC08:FCCW:FP14:FP39:',
+		'Mac Desktop;mac/133982;unknown;iMac (21.5-inch, Early 2013):FFYV:FFYW:FGPL:FGPM:FJQQ:FLMH:',
+		'Mac Desktop;mac/134280;111967;iMac (21.5-inch, Late 2013):F8J2:F8J3:F8J7:F8J8:FPDV:FPDW:FPF1:FPF2:FQMV:FQMW:FQMY:FQN0:FR1Q:FR1R:FR1T:FR1V:FR21:FRM7:FRM8:FT4M:FVGW:FWJH:GHJH:H0HJ:H226:',
+		'Mac Desktop;mac/134281;111970;iMac (27-inch, Late 2013):F8J4:F8J5:F8J9:F8JC:FLHH:FPDY:FPF0:FPF3:FPF4:FQPG:FQPH:FQPJ:FQPK:FQPL:FQPM:FQPN:FQPP:FR1W:FR1Y:FR20:FR22:FR2W:FRM9:FT4N:FWQ5:FWQ6:FWQ7:FWQ8:FY15:FY9D:FY9F:G6DP:GHFF:GQCX:GRTV:GW0V:GW0W:',
+		'Mac Desktop;mac/134417;112025;Mac Pro (Late 2013):F693:F694:F9VM:F9VN:FRDW:FRDY:FRF0:FRF1:FRF2:FRF3:FRF4:FRF5:FRQC:FT3F:FT3G:FT3H:FT95:FT96:FT97:FT98:FT99:FT9C:FT9D:FY3Y:FY40:G1LJ:G1LK:G1LL:G1LM:G1LN:G1LP:G1LQ:G1LR:G1LT:G1LV:G1LW:G1LY:G1M0:G1M1:G8GC:G8GD:J3RW:J3RY:N1VW:N1VX:',
+		'Mac Desktop;mac/134642;112031;iMac (21.5-inch, Mid 2014):FY0T:FY0V:FY65:FY69:G56J:G56K:G5W4:G5W5:G5W6:G8L2:',
+		'Mac Desktop;mac/135120;111931;Mac mini (Late 2014):G1HV:G1HW:G1HY:G1J0:G1J1:G1J2:GCVG:GCVH:GCVJ:GCVN:GCVP:GCVQ:GCVV:GCVW:GCVY:GCW0:GCW1:GF1N:GF1Q:GF1T:GHRN:GJDC:GN02:GNL0:H84M:HCL5:L7FY:L9TM:L9TN:L9TP:',
+		'Mac Desktop;mac/135121;112436;iMac (Retina 5K, 27-inch, Late 2014):FY11:FY14:FY68:FY6F:GCTM:GDQY:GDR3:GDR4:GDR5:GDR6:GDR7:GDR8:GDR9:GDRC:GFFQ:GJDM:GJDN:GJDP:GJDQ:GPJN:GV7V:H5DN:H682:',
+		'Mac Desktop;mac/135391;112434;iMac (Retina 5K, 27-inch, Mid 2015):FY10:FY13:FY67:FY6D:GL1Q:GL1R:GL1T:GL1V:GL1W:',
+		'Mac Desktop;mac/300009;112036;iMac (21.5-inch, Late 2015):GG77:GG79:GG7D:GG7G:H0P6:H1F1:H1F2:H1WR:H25M:H2KW:H8KX:HQ9T:HQ9V:HYGQ:J0DH:J0DJ:',
+		'Mac Desktop;mac/300010;112036;iMac (21.5-inch, Late 2015):GF1J:GF1K:GF1L:GF1M:H0N6:H1DX:H1DY:HHMG:HQ9W:J0DG:',
+		'Mac Desktop;mac/300011;112035;iMac (Retina 5K, 27-inch, Late 2015):GG7J:GG7L:GG7N:GG7Q:GG7R:GG7T:GG7V:GG80:GG81:GG82:GQ17:GQ18:H0Q3:H0Q4:H0Q5:H1H9:H2YQ:H3GN:H3GP:H3GQ:H3GR:H3GT:H3GV:H3GW:H3GX:H3GY:H3H0:H3H1:H3H2:H3H3:H3H4:H3H5:H3H6:H3H7:H3H8:H3H9:H3HC:H3HD:H3HF:H3HG:H3HH:H3HJ:H4JM:H8L5:H8L6:HJRN:HMMQ:HN8P:J0DK:',
+		'Mac Desktop;mac/300012;112034;iMac (Retina 4K, 21.5-inch, Late 2015):GG78:GG7C:GG7F:GG7H:H0KF:H0P7:H15R:H1F3:H1F5:H1F7:H1F8:H1F9:H25N:H28H:H3RJ:H8KY:H8L0:H8L1:H8L2:H8L3:HLWV:',
+		'Mac Desktop;mac/300150;111907;Mac Pro (Rack, 2019):N5RH:N5RN:P7QQ:P7QR:P7QT:P7QV:PNTN:PNTP:PNTQ:PP3Y:',
+		'Mac Desktop;mac/300198;111913;iMac (Retina 5K, 27-inch, 2020):046L:046M:046N:046T:0472:07CK:08TD:090Y:0D1R:0D1T:0LCY:0LF0:0LF1:0LF2:0LF3:0LF4:0LKJ:0LKK:0V71:0VKP:1CTK:1H8Y:PN5T:PN5V:PN5W:PN5X:PN5Y:PN60:PN77:PN78:PN7C:PN7D:PNNY:PNRJ:',
+		'Mac Desktop;mac/300268;111894;Mac mini (M1, 2020):0T6L:0T6M:0T6N:1QG7:25M8:25WC:2686:2687:2688:2689:268C:268D:268F:268G:268H:268J:268K:268L:Q6NV:Q6NW:Q6NY:Q6P0:',
+		'Mac Desktop;mac/300352;111895;iMac (24-inch, M1, 2021):0RTN:13JX:Q6W1:Q6W2:Q6W3:Q6W4:Q6W5:Q6W6:Q6W7:Q6W8:Q6W9:Q6WC:Q6WD:Q6WF:Q6WG:Q6WH:Q6WJ:Q6WK:Q6WL:Q6WM:Q6WN:Q6WP:Q6WQ:Q6WR:Q6WT:Q6WV:Q6WW:Q6WX:Q6WY:Q6X0:Q6X2:Q6X3:Q6X4:Q6X5:Q6X6:Q6X7:Q6X8:Q6X9:Q6XC:Q6XD:Q6XF:Q6XG:Q6XH:Q6XJ:Q6XK:Q6XL:Q6XM:Q6XN:Q6XP:Q6XQ:Q6XR:Q6XT:Q6XV:Q6XW:Q6XX:Q6XY:Q6Y0:Q6Y1:',
+		'Mac Desktop;mac/300355;111895;iMac (24-inch, M1, 2021):1254:1255:1256:1257:1259:125C:125D:125F:125G:125H:125J:125K:Q7GN:Q7GX:Q7H6:Q7HG:',
+		'Mac Desktop;mac/503494;111921;iMac (21.5-inch, 2017):07DW:07DX:07DY:07F0:0LX3:0TN8:0V7R:H7JY:H7K0:H7VF:H7VG:JFRR:JGDR:KQFL:MCD7:MCD8:MCD9:',
+		'Mac Desktop;mac/503499;112026;iMac (Retina 4K, 21.5-inch, 2017):J1G5:J1G6:J1G7:J1G8:J1G9:J1GC:J1GD:J1GF:J608:J9X4:J9X5:JFPW:JGDT:JKF9:JP10:L7H6:LQHG:',
+		'Mac Desktop;mac/503513;111969;iMac (Retina 5K, 27-inch, 2017):J1GG:J1GH:J1GJ:J1GK:J1GL:J1GM:J1GN:J1GP:J1GQ:J1GR:J1GT:J1GV:J2GJ:J609:J60C:J9X6:J9X7:J9X8:J9X9:J9XC:JC5L:JCCR:JCCT:JCND:JM3R:JM3V:JNGD:JNGF:JT72:JX8H:',
+		'Mac Desktop;mac/504513;111995;iMac Pro (2017):0832:0833:HX87:HX8F:JL53:JL54:JL55:JLCN:JLCP:JLCR:JLCT:JLCV:JLCW:JLCX:JLCY:JLD0:JLD1:JLD2:M0XV:MC9H:',
+		'Mac Desktop;mac/505996;111912;Mac mini (2018):1TDF:1TDG:1TDH:1TDJ:1TDK:1TDL:1TDM:1TDN:JYVW:JYVX:JYVY:JYW0:L95X:L95Y:L960:LHPC:LVVJ:LVVK:LVVL:LVVM:LVVN:M7FT:M7FV:M99N:M99P:M99Q:MCD6:MHGQ:MJHL:MKTR:N6VR:P8KH:PJH7:PJH8:PJJ7:PJJ9:',
+		'Mac Desktop;mac/506651;111998;iMac (Retina 5K, 27-inch, 2019):0H1J:0H1K:0H1L:0H1M:JV3N:JV3P:JV3Q:JV3R:JV3T:JV3W:JV3X:JV3Y:JV40:JV41:JV42:JV43:MC9J:MC9K:MMTC:MQQP:MW2P:MW2Q:MW2R:MW2T:MW2V:MW2W:MX7W:NY2G:P1WV:PYPL:Q8MH:',
+		'Mac Desktop;mac/506666;111963;iMac (Retina 4K, 21.5-inch, 2019):03C7:07F1:07F2:07F3:07F4:07F5:07F6:07F7:07F8:0JVT:0KYN:0L08:0L09:0L0F:0L0G:0L0H:0LKD:0LX4:0LX7:0LX8:0MN1:0PYY:0RT9:192F:197R:197V:JWDW:JWDX:JWDY:JWF0:JWF1:JWF2:JWF3:JWF4:MC9L:MC9M:MCC1:MMTK:MMTL:MMTM:MMTN:MPM0:MQ87:MRVM:MTML:MW28:N07H:N6JT:N9LN:Q2H4:Q4HL:Q4V1:',
+		'Mac Desktop;mac/508176;118461;Mac Pro (2019):K7GD:K7GF:NYGV:P7QJ:P7QK:P7QL:P7QM:P7QN:P7QP:PLXV:PLXW:PLXX:PLXY:',
+		'Mac Desktop;mac/508929;111912;Mac mini (2018):Q7C8:',
+		'Mac Desktop;mac/unknown;112045;Power Mac G3 Minitower:BNN:C9A:CAP:CCD:CG9:CME:CPW:',
+		'Mac Desktop;mac/unknown;112279;Power Mac G3 Desktop:AK8:ESQ:',
+		'Mac Desktop;mac/unknown;112281;iMac:DFN:',
+		'Mac Desktop;mac/unknown;112286;iMac (333 MHz):GSN:',
+		'Mac Desktop;mac/unknown;112288;iMac (266 MHz):FMY:G2S:',
+		'Mac Laptop;mac/7142;112297;iBook:H5Q:H5U:H78:H79:HE5:HZT:HZU:J55:J5V:J5W:',
+		'Mac Laptop;mac/8258;112550;iBook Special Edition:HZS:J52:',
+		'Mac Laptop;mac/108912;112452;PowerBook G4:JBD:JF8:JXX:JXY:JXZ:JY0:K68:K6B:K9F:K9G:L5M:L6U:L6V:L98:L99:L9A:L9B:LAP:LAQ:LAU:LBW:LGG:LHW:LHX:LLP:LN0:LQZ:M2P:',
+		'Mac Laptop;mac/109592;112547;iBook (Dual USB):HLC:KB6:KB7:KB8:L2M:L2N:L3C:L6Y:L8X:L8Y:L9D:L9E:LAL:LAM:LAN:LB6:LB7:LBB:LBG:LBH:LBJ:LBL:LBM:LBN:LBP:LBR:LBT:LC3:LC9:LCA:LCB:LCC:LCD:LCX:LDG:LFH:LFL:LHB:LHC:LHD:LLB:LLD:LMZ:LQY:LYV:M1P:M1Q:M1R:M1S:M22:M23:M24:M25:M26:M27:M28:M29:M3F:',
+		'Mac Laptop;mac/111274;112487;PowerBook G4 (Gigabit Ethernet):KVB:KVF:KVH:KVM:KVN:LN9:LNA:LNB:LNC:LND:LNE:LY0:LY1:M2M:M2N:M2Q:M6R:MAA:MAB:MAC:MAD:MAE:MAF:MAH:MGL:MGQ:MGR:MGS:MGT:MGU:',
+		'Mac Laptop;mac/111275;112545;iBook (Late 2001):LLK:LLL:LPV:LPW:LPX:LPY:LPZ:LYY:LYZ:LZ0:LZ1:LZ2:LZ3:LZ4:LZ5:LZ6:LZO:M47:M48:M4B:M4Q:M5C:M6S:M7Y:M8F:MDT:MDU:MDV:MDW:ME2:MES:MET:MEU:MEV:MEW:MEX:MEZ:MFM:MGC:MGD:MGE:MGF:MGH:MHK:MHL:MHM:MHN:MHP:MHQ:MHR:MHS:MHT:MHU:MHV:MHW:MJM:MKZ:MM5:MM6:N1G:N1H:N1L:N3F:',
+		'Mac Laptop;mac/111795;112485;iBook (14.1 LCD):L2V:LL8:LL9:LLA:LLN:ME1:MGJ:MGK:MS7:MUV:MW7:',
+		'Mac Laptop;mac/112775;112483;PowerBook G4 (DVI):3LP:DVT:LP1:LP4:LP5:M16:M17:MTW:MTX:MTY:MTZ:MU0:MU1:MZP:N2K:N6A:N6B:NKM:',
+		'Mac Laptop;mac/112973;112540;iBook (14.1 LCD 16 VRAM):LQ3:LQ6:MEE:MRB:MRC:MRD:MVV:MZ3:N58:N59:N7L:N7V:NA4:NDG:NE0:NKL:NM3:',
+		'Mac Laptop;mac/112974;112540;iBook (16 VRAM):LQ0:LQ2:LQ4:LQ5:LQO:M4R:M4S:MRE:MRF:MRG:MRH:MRJ:MRK:MW3:MZ2:N56:N57:N60:N61:N65:N6P:N74:N7M:N7T:N9D:NA2:NAE:NAP:NBC:NHA:NHP:NL1:NM9:NNA:NND:NNE:NNU:NPT:NQ3:NVF:NVW:NYE:NZN:P1V:',
+		'Mac Laptop;mac/116219;112538;iBook (14.1 LCD 32 VRAM):N4R:N5C:NDV:NDW:NDX:NWR:NWS:NY4:NYG:NZ9:',
+		'Mac Laptop;mac/116220;112538;iBook (32 VRAM):N4Q:N5A:NDS:NDT:NDU:NRM:NRP:NWT:NWU:NY5:NYF:NZ8:NZH:PFB:QC9:',
+		'Mac Laptop;mac/116221;112538;iBook (Opaque 16VRAM):N4P:N4S:N4T:N5B:NDP:NDQ:NDR:NRL:NRN:NZ7:P94:PE6:PE8:PG8:PG9:PPZ:',
+		'Mac Laptop;mac/116222;112471;PowerBook G4 (1GHZ/867MHZ):N4K:N4L:N4M:NEM:NEN:NGK:NGL:NGM:NGN:NGP:NGQ:NQ9:NWL:NZA:NZB:NZG:NZK:PJ4:PQV:PT4:PT6:PT7:PT8:PVF:Q12:Q13:Q1Q:',
+		'Mac Laptop;mac/117207;112559;PowerBook G4 (12-inch):MRT:NMH:NMJ:NMK:NP4:P08:P0B:P2L:PEZ:PGK:PGL:PGM:PJ3:POB:',
+		'Mac Laptop;mac/117217;112457;PowerBook G4 (17-inch):MVZ:MW0:MWO:MYN:NL5:NL6:NL7:PFK:',
+		'Mac Laptop;mac/118919;112475;iBook (800 MHZ 32 VRAM):MRR:N1N:NDF:P7Y:PB8:PB9:PBA:PER:PES:PET:PGH:PKY:PKZ:PPT:PQ0:PQ1:PQ2:PS1:PS2:PSC:PSK:PXZ:PY0:QAD:QAX:QAY:QAZ:QC2:QD2:QH0:QYJ:QYL:QYM:QYN:QYP:',
+		'Mac Laptop;mac/118920;112475;iBook (900 MHZ 32 VRAM):NVH:PBB:PBC:PBD:PBM:PF2:PKX:PL1:PMA:PSZ:PT2:PT3:Q1R:QYH:QYK:QYQ:QYR:',
+		'Mac Laptop;mac/118921;112475;iBook (14.1 LCD 900 MHZ 32 VRAM):PBE:PBF:PBG:PBN:PF3:PKW:PL0:PPX:Q73:',
+		'Mac Laptop;mac/120840;112543;PowerBook G4 (17-inch 1.33GHZ):P21:P22:P23:R29:',
+		'Mac Laptop;mac/120844;112542;PowerBook G4 (15-inch FW800):NRW:NRX:NRY:NRZ:NS0:NS1:QA7:QA8:QCS:QDV:QDW:QFH:QFJ:QFU:QHB:QKU:QL0:QMQ:QWE:R2A:',
+		'Mac Laptop;mac/120852;112529;PowerBook G4 (12-inch DVI):PHK:PHL:Q76:Q77:QC6:QCA:QCT:QD0:QFT:QH9:QLU:QQ5:QV7:R2B:',
+		'Mac Laptop;mac/121579;112464;iBook G4:PGV:PGW:PGY:PGZ:PH1:PH2:PMM:QF9:QHA:QKY:QKZ:QL1:QLW:QME:QMF:QMN:QNA:QQC:QRD:QRE:QT5:QVZ:QW0:QWF:R2C:R41:R6E:R6S:R8F:',
+		'Mac Laptop;mac/121580;112464;iBook G4 (14-inch):PG7:PGX:PH0:QE2:QE4:QH7:QH8:QHK:QKX:QMP:QPZ:R6R:',
+		'Mac Laptop;mac/124165;112500;PowerBook G4 (17-inch 1.5GHZ):QRU:QRV:QRW:RBF:RCJ:RFL:RXR:',
+		'Mac Laptop;mac/124169;112499;PowerBook G4 (15-inch 1.5/1.33GHZ):QHX:QHY:QJD:QJE:QW2:QW3:RAA:RBC:RC9:RCH:RDK:REK:REL:RFK:RGV:RNF:RPS:SD2:SK1:',
+		'Mac Laptop;mac/124176;112514;PowerBook G4 (12-inch 1.33GHZ):PLG:PLH:PLW:PLX:RAN:RBB:RC8:RCG:RP3:SCQ:SD7:SD8:',
+		'Mac Laptop;mac/124181;112311;iBook G4 (14-inch Early 2004):QHU:QHV:R71:R72:RA9:RAM:RAZ:RBA:RCF:RD7:RDH:RE8:RED:REE:REF:REG:RFH:RP2:',
+		'Mac Laptop;mac/124181;112311;iBook G4 (Early 2004):QHW:QJP:QJQ:QJS:R12:R73:R74:R9C:RAK:RAL:RAP:RAS:RB8:RB9:RC7:RD8:REZ:RNE:RNG:RNR:RP1:RPN:RPZ:RQ0:RQ1:RQ2:RZR:S02:S03:S24:S25:S3Z:',
+		'Mac Laptop;mac/130159;112448;iBook G4 (12-inch Late 2004):RCQ:RCR:RCS:RCV:RER:S86:S87:SCR:SCU:SCY:SCZ:SDE:SDN:SDP:SEH:SHE:T5X:T5Y:TCF:TG2:TJE:TP4:TP5:TRR:TWR:TX8:TYE:',
+		'Mac Laptop;mac/130167;112448;iBook G4 (14-inch Late 2004):RCT:RCU:S85:S88:SCS:SCT:SD0:SD4:SD5:SEJ:SK2:SLJ:T2X:TCJ:TG0:TG1:TJD:TJF:TP6:TP7:TVX:',
+		'Mac Laptop;mac/130323;112537;PowerBook G4 (12-inch 1.5GHZ):RJ4:RJ5:RJ6:RJ7:SY2:SY3:SYH:SYS:T1C:TCG:TFZ:TG4:TJG:TKZ:UUF:',
+		'Mac Laptop;mac/130324;112537;PowerBook G4 (17-inch 1.67GHZ):RJ3:RJF:SQ5:SY8:SYL:T0V:TFW:',
+		'Mac Laptop;mac/130325;112537;PowerBook G4 (15-inch 1.67/1.5GHZ):C79:RG3:RG4:RG5:RG6:SB7:SQ6:SQ7:SXZ:SY5:SY6:SY7:SYG:SYP:T0U:T1V:T41:T5D:TBX:TCH:TFX:TFY:TG3:TG8:TJC:TSK:UB1:',
+		'Mac Laptop;mac/130622;112480;iBook G4 (12-inch Mid 2005):SE4:SE7:SEB:U6D:U6S:UK9:UZ9:V3B:VR3:VR4:VUZ:W4F:',
+		'Mac Laptop;mac/130623;112480;iBook G4 (14-inch Mid 2005):SE6:SE9:SEC:U6C:U6E:U6Q:U6R:U6U:UCR:UT8:UUG:UZA:VR5:VW1:',
+		'Mac Laptop;mac/130722;112490;PowerBook G4 (15-Inch Double-Layer SD):SWZ:SX2:U34:UDR:UDS:UDT:UDU:UDW:UDX:UE0:UE1:UE2:UEE:UEF:UEG:UEH:UF1:UQD:URC:URR:US6:UT6:UXA:UZB:',
+		'Mac Laptop;mac/130723;112490;PowerBook G4 (17-inch Double-Layer SD):SX0:SX3:UF6:UF7:UFA:UFB:UFE:UFF:UFG:URQ:UT7:UWV:',
+		'Mac Laptop;mac/130844;112481;MacBook Pro (original):THV:VGW:VGX:VGY:VJ0:VJ1:VJ2:VJ3:VJ5:VJ6:VJ7:VJM:VMU:VSD:VTZ:VU0:VWA:VWB:VXW:VXX:W2Q:',
+		'Mac Laptop;mac/130944;112536;MacBook Pro (17-inch):THY:TJ1:VTG:VVV:VW3:VW8:W32:W3P:W3Q:W3R:WQW:WVS:WVT:WVU:WVY:WVZ:WWU:',
+		'Mac Laptop;mac/130972;112511;MacBook (13-inch):U9B:U9C:U9D:U9E:VMM:VMN:VTH:VTJ:VWR:VWS:VWT:VWU:VWV:VXU:VXV:W90:W91:W9N:W9P:WB7:WB9:WBB:WBC:WBD:WBG:WBK:WBV:WBW:WBX:WBY:WC0:WC4:WE7:WE8:WE9:WK7:WSB:WWP:WWT:',
+		'Mac Laptop;mac/130988;112535;MacBook Pro (15-inch Glossy):VWW:VWX:VWY:VWZ:W3N:W92:W93:W94:W9F:W9Q:WAG:WAW:WB8:WBE:WBF:WBH:WBJ:WD7:WD8:WD9:WDA:WDB:WDC:WDD:WTS:WW0:WW1:WW2:WW3:',
+		'Mac Laptop;mac/131206;112489;MacBook Pro (15-inch Core 2 Duo):W0G:W0H:W0K:W0L:W4K:W4L:X2E:X2F:X2G:X2H:X2J:X2K:X2L:X5X:X6A:X6B:X9U:X9V:XAQ:XC6:XCS:XDB:XDK:XDL:XKU:Y1C:Y41:Y6N:Y98:Y99:YJ9:',
+		'Mac Laptop;mac/131220;112489;MacBook Pro (17-inch Core 2 Duo):W0J:W0M:W4M:X3Y:X40:X41:X42:X43:X44:X57:X6C:X9W:XCT:XWV:Y9M:',
+		'Mac Laptop;mac/131259;112522;MacBook (13-inch Late 2006):WGK:WGL:WGM:WGN:WGP:WGQ:WGS:WGT:WGU:WVN:X6G:X6H:X6J:X6K:X6L:X7X:X97:X98:XAR:XAT:XC5:XDN:XDR:XDS:XDT:XDU:XDV:XDW:XDX:XDY:XDZ:XE0:XE1:XE2:XE3:XHB:XHC:XKT:XMF:Y6L:Y6M:Y9A:YCU:',
+		'Mac Laptop;mac/131429;112554;MacBook (13-inch Mid 2007):YA2:YA3:YA4:YA5:YA6:YA7:YA8:YA9:YJJ:YJK:YJL:YJM:YJN:YQ7:YQ8:YRG:YRH:YRJ:YRK:YSH:YSJ:YSK:YSL:YSM:YTK:YTL:YV8:YX1:YX2:YX4:YX5:YXZ:YY1:YYW:Z5V:Z5W:Z5X:Z5Y:Z5Z:Z60:Z88:ZA8:ZA9:ZAP:ZAQ:ZAS:ZAU:ZAV:ZAW:ZAX:ZAY:ZAZ:ZB0:ZB1:ZB2:ZB7:ZB8:ZB9:ZBA:ZBB:ZBE:ZBF:ZBG:ZBH:ZBJ:ZBK:ZCN:',
+		'Mac Laptop;mac/131484;112519;MacBook Pro (15-inch, 2.4 2.2GHz):02V:0LQ:0LZ:0M0:0PA:0S3:0S6:1CY:1CZ:2QU:2QV:X91:X92:XAG:XAH:Y9S:Y9T:YAL:YAM:YKX:YKY:YKZ:YL0:YQ3:YW5:YW9:YWA:YWD:YYV:YYX:YZ0:Z05:Z09:Z0G:',
+		'Mac Laptop;mac/131485;112519;MacBook Pro (17-inch, 2.4GHZ):027:028:02D:09R:09S:0LR:0ND:0NM:0PD:1CW:1CX:1MF:1MG:2QW:X94:XA9:YAA:YAN:YAP:YNQ:YNS:YNW:YQ4:YQ5:YR2:YRD:YRE:YRF:YWB:YWC:YZ1:YZ2:Z5M:',
+		'Mac Laptop;mac/131712;112488;MacBook (13-inch Late 2007):01P:01V:01X:01Z:02Z:034:0HB:0HC:0NE:0NF:0NG:0NH:0PB:0PC:0PG:0S0:0S7:0S8:0S9:0TW:0TX:0TY:0TZ:0U4:0WR:0Z3:0Z4:Z62:Z63:Z64:Z65:Z66:Z67:',
+		'Mac Laptop;mac/131826;112533;MacBook Air (Original):12G:13Q:141:14J:18X:1AE:Y51:Y5G:',
+		'Mac Laptop;mac/131884;unknown;MacBook Pro (17-inch, Early 2008):1BY:1ED:1EN:1ER:1K2:1K8:1K9:1KA:1Q3:1SG:2CF:2DY:2DZ:2ED:3DC:3DD:3DE:3DF:3M0:3M4:3M5:YP3:YP4:ZLV:',
+		'Mac Laptop;mac/131896;unknown;MacBook Pro (15-inch Early 2008):1AJ:1EK:1EM:1JZ:1K0:1SH:1XR:1XW:27N:2AZ:2B0:2CE:2DT:2DX:2MF:2PK:33B:3LY:3LZ:48T:4R5:4R6:YJX:YJY:YJZ:YK0:ZLU:',
+		'Mac Laptop;mac/131916;112467;MacBook (13-inch, Early 2008):0P0:0P1:0P2:0P4:0P5:0P6:1LX:1PX:1Q2:1Q7:1QA:1QB:1QE:1ZY:27H:27J:28C:28D:28E:385:3N9:3NA:3ND:3NE:3NF:3X6:47Z:4R7:4R8:',
+		'Mac Laptop;mac/132121;112526;MacBook Pro (15-inch, Late 2008):1G0:1GA:1GK:1GN:4R9:4RA:4RB:5HX:5TY:5TZ:63X:6EJ:6EK:6GN:6GP:6HZ:6J1:6J2:6J4:6J5:6JJ:6JW:6ZB:71A:71C:76Z:7X0:7XL:7XM:7XN:7XP:852:8CR:8Q1:8Q2:8Q3:8Q5:8S6:8S7:8TQ:8TV:8TW:8TX:8TY:8TZ:93G:970:971:972:973:',
+		'Mac Laptop;mac/132132;112512;MacBook (13-inch, Aluminum, Late 2008):1AQ:1AX:1B0:1B5:51N:56G:56H:56J:56K:6EG:6EH:6ER:6ET:6EU:6J0:6J7:6J8:6J9:6JA:6JB:6JC:6JD:6JM:6KH:6KJ:6KL:6VE:74F:74G:74J:7WU:7WV:7WY:7WZ:804:80D:85J:85M:85Q:8A3:8AD:8AF:8AG:8AH:8Q6:8QR:8QS:8QT:8QU:8RA:8RB:8RC:8RD:8RE:8RL:8RM:8RP:8RQ:8RT:8S1:8S2:8S3:8S4:8S5:8SL:8SM:8SN:8SP:8SQ:8SR:8SS:8ST:8SU:8SV:8SW:8SX:8SY:8SZ:8T0:8T1:8T2:8T4:8T6:',
+		'Mac Laptop;mac/132142;unknown;MacBook Pro (17-inch, Late 2008):3R8:3R9:4RT:4RW:57J:5U0:634:65A:663:664:666:668:6CT:6JK:',
+		'Mac Laptop;mac/132149;112467;MacBook (13-inch, Late 2008):3VY:5AQ:5HS:5HU:67C:6ES:6HY:6LL:6LM:6M1:6V9:6YP:7XD:',
+		'Mac Laptop;mac/132154;112447;MacBook Air (Late 2008):22D:22E:5L9:5LA:5TX:5U1:5U7:60R:62W:63V:63W:6JN:',
+		'Mac Laptop;mac/132239;112526;MacBook Pro (17-inch, Early 2009):2QP:2QT:776:77A:7AP:7AS:7XQ:7XR:7XS:87K:87L:87M:87N:8FK:8FL:8FM:8FY:8FZ:8G0:',
+		'Mac Laptop;mac/132252;111344;MacBook (13-inch, Early 2009):4R1:4R2:4R3:79D:79E:79F:7A2:85D:88J:8CP:8SJ:93K:',
+		'Mac Laptop;mac/132475;112459;MacBook (13-inch, Mid 2009):9GU:9GV:A1W:A1X:A1Y:A9P:A9Q:A9Y:ABW:ASC:',
+		'Mac Laptop;mac/132487;112624;MacBook Pro (15-inch, 2.53GHz, Mid 2009):7XJ:7XK:A3B:A3C:A3F:A3G:AG7:AMF:AMG:AUT:AY9:B21:CS7:CS8:CS9:',
+		'Mac Laptop;mac/132494;112660;MacBook Air (Mid 2009):9A5:9A6:9A7:9A8:',
+		'Mac Laptop;mac/132499;112474;MacBook Pro (13-inch, Mid 2009):66D:66E:66H:66J:A3K:A3L:A4V:A4W:A4X:A4Y:A4Z:A50:A54:A55:A56:A57:AGH:AGJ:AGQ:ALJ:ALK:ALL:ALM:BKL:BKM:E40:E4R:E6R:F9W:',
+		'Mac Laptop;mac/132505;112473;MacBook Pro (17-inch, Mid 2009):8YA:8YB:91T:A3M:A3N:A5R:A5W:AF3:AKV:AKW:AMV:AMW:AN1:ANC:AND:ANE:ANF:ANJ:AUU:E6L:',
+		'Mac Laptop;mac/132511;112624;MacBook Pro (15-inch, Mid 2009):642:644:64B:64C:A39:A3A:A3H:A3J:ABX:AF2:ALN:ALP:ALQ:AMH:AMJ:AMK:AML:AMM:ANW:AUP:AUR:AY8:B20:B22:BKP:CJ1:CS1:CSA:CSB:CSC:CSD:CSE:CSF:CSG:CSH:CSJ:CVP:CVY:DTM:E6C:E6F:F9V:FJN:',
+		'Mac Laptop;mac/132689;112623;MacBook (13-inch, Late 2009):8PW:8PX:CJ6:CJ8:CJ9:DWG:E39:FYN:FYT:GA3:GAY:GAZ:GB0:GB4:GB5:',
+		'Mac Laptop;mac/132820;112606;MacBook Pro (17-inch, Mid 2010):DC79:DC7C:DCV9:DCVC:DD6Y:DDHM:DDHN:DDJT:DDJV:DDJW:DDJX:DDJY:DDK0:DDK1:DDK2:DDK3:DDK4:DHVV:DHYC:DJ6G:DJQK:DJQL:DK9H:DK9J:DK9K:',
+		'Mac Laptop;mac/132826;112604;MacBook Pro (13-inch, Mid 2010):ATM:ATN:ATP:ATQ:FXK:GNF:GNG:GNH:GP0:GP1:GPJ:GPK:GPL:GPM:GR8:GRL:HBT:HBU:HNC:HPC:',
+		'Mac Laptop;mac/132832;112605;MacBook Pro (15-inch, Mid 2010):5W7:AGU:AGV:AGW:AGX:AGY:AGZ:FR9:FRA:FXH:GD6:GND:GNE:GNK:GNW:GNX:GNY:GPH:GPN:GPP:GPQ:GPR:GPS:GPT:GPU:GPV:GPW:GPX:GPY:GPZ:GQ0:GQ1:GQL:GQM:GQN:GR7:GRC:GRD:GRE:H9M:HE6:HPE:HPF:HPH:HPJ:HPK:HPL:HPM:HPS:HQD:HQE:HQY:HQZ:HR5:HRR:',
+		'Mac Laptop;mac/132896;112581;MacBook (13-inch, Mid 2010):DV8H:F5W:F5X:FX9:GP6:GST:GUP:HST:HSU:HUD:',
+		'Mac Laptop;mac/133090;112585;MacBook Air (13-inch, Late 2010):DDR1:DDR2:DDR3:DDR4:DJ5F:DJ5G:DJ66:DJDK:DJLP:DJLQ:DMW4:',
+		'Mac Laptop;mac/133091;112580;MacBook Air (11-inch, Late 2010):DDQW:DDQX:DDQY:DDR0:DJ5H:DJ5J:DJ67:DJDL:DN00:DQQ6:',
+		'Mac Laptop;mac/133185;112600;MacBook Pro (13-inch, Early 2011):DH2G:DH2H:DH2L:DH2M:DLN5:DLN6:DM75:DMLF:DMLH:DMLJ:DNCM:DNGD:DNKP:DNKQ:DNTK:DNVY:DR7W:DRJ7:DRJ9:DRJJ:DRJK:DRW1:DRW2:DRW7:DT4G:DT4H:DT60:DT61:DT62:DT63:DT64:DT65:DT66:DT67:ST61:',
+		'Mac Laptop;mac/133186;112599;MacBook Pro (15-inch, Early 2011):DF8V:DF8X:DF8Y:DF91:DLN7:DLN8:DMC8:DMC9:DMDG:DMDH:DMDJ:DMGG:DMMF:DMMH:DMMJ:DMPG:DMPK:DMPL:DMPM:DMPN:DMPP:DMPQ:DMPR:DMQP:DNC3:DNCN:DNGF:DNH5:DNHY:DNKM:DNKY:DNM4:DNMW:DNRD:DNVK:DRJC:DRJD:DRJF:DRJL:DRJM:DRW3:DRW4:DRWD:DT4J:DT54:DT55:DT56:DT57:DT58:DT59:DT5C:DT5D:DT5F:DT5G:DT5H:DT5J:DT5L:DT68:DT69:DT6C:DT6D:DT6F:DT6G:DT6H:DT6J:DT6K:DT6L:DT6M:DT6R:',
+		'Mac Laptop;mac/133187;112598;MacBook Pro (17-inch, Early 2011):DF92:DF93:DLN9:DLNC:DMGH:DMQT:DMQW:DMR2:DMR4:DMR5:DMR7:DMR8:DMR9:DMRC:DNGG:DNKN:DRJG:DRJH:DRJN:DRW5:DRW6:DT5M:DT5N:DT5P:DT5Q:DT5R:DT5T:DT5V:DT5W:DT5Y:DT6N:DT6P:',
+		'Mac Laptop;mac/133336;112038;MacBook Air (13-inch, Mid 2011):DJWQ:DJWR:DJWT:DJWV:DRKG:DRQ4:DTJT:DTJV:DTK0:DW1N:DW4H:F14R:F14V:F2JQ:F75Y:',
+		'Mac Laptop;mac/133337;112439;MacBook Air (11-inch, Mid 2011):DJY8:DJY9:DJYC:DJYD:DRHF:DRKH:DTJW:DTJY:DTK1:DTK2:DW1C:DW4J:DWWM:DWWN:DY2M:F2JP:',
+		'Mac Laptop;mac/133515;111341;MacBook Pro (13-inch, Late 2011):DV13:DV14:DV16:DV17:DVHJ:DVHK:DVHP:DVHQ:DW13:DY1J:DY1K:DY5T:DY5V:DY6C:DY77:DYL0:DYL1:DYL2:F298:F299:',
+		'Mac Laptop;mac/133516;112586;MacBook Pro (15-inch, Late 2011):DV7L:DV7M:DV7N:DV7P:DVHL:DVHM:DVHR:DW3G:DW3H:DW3J:DW47:DY1L:DY1M:DY1N:DY1P:DY1Q:DY1R:DY1T:DY1V:DY1W:DY1Y:DY20:DY21:DY5K:DY5P:DY5Q:DY5R:DY5Y:DY60:DY7G:DYG6:DYG7:DYK9:DYKC:DYR1:F0K6:F0V2:',
+		'Mac Laptop;mac/133517;112418;MacBook Pro (17-inch, Late 2011):AY5W:DV10:DV11:DVHN:DVHV:DVHW:DW48:DY22:DY23:DY24:DY25:DY26:DY5W:DYG8:F13Y:F140:',
+		'Mac Laptop;mac/133639;112568;MacBook Pro (15-inch, Mid 2012):DV33:DV35:F1G3:F1G4:F24T:F2J4:F2J5:F38R:F38T:F5Y5:F5Y6:F5Y7:F5Y8:F5Y9:F5YC:F5YD:F5YF:F5YG:F5YH:F5YJ:F5YK:F5YL:F5YM:F5YN:F5YP:F686:F687:F761:F762:F7F5:F7F6:F8G8:F8G9:F97M:F9K9:FCQT:FHP7:FL98:FLNH:FLNJ:FLNK:FM89:FT14:',
+		'Mac Laptop;mac/133640;111958;MacBook Pro (13-inch, Mid 2012):DTY3:DTY4:DV30:DV31:F447:F4J2:F4JL:F5WV:F5WW:F5Y1:F5Y3:F5Y4:F68C:F68D:F6LH:F6LJ:F6VG:F7C1:F8D5:F973:F9Q0:FCMM:FWL4:FYG9:FYGC:FYGD:FYGF:G05T:G354:G3FY:G584:GDJL:GDL2:GF65:H1DK:H1DN:',
+		'Mac Laptop;mac/133641;112008;MacBook Air (11-inch, Mid 2012):DRV6:DRV7:DRV8:DRV9:F569:F56C:F56G:F57H:F5MV:F67D:F67F:F67K:F67L:F67M:F88G:F88K:F88V:F910:',
+		'Mac Laptop;mac/133642;111966;MacBook Air (13-inch, Mid 2012):DRVC:DRVD:DRVF:DRVG:F2FV:F56D:F56F:F56H:F56J:F57J:F5MW:F67G:F67H:F67J:F67P:F6TN:F760:F90Y:',
+		'Mac Laptop;mac/133643;112576;MacBook Pro (Retina, Mid 2012):DKQ1:DKQ2:DKQ4:DKQ5:F51R:F5Y2:F69W:F69Y:F6DN:F6F3:F6L9:F8JY:F96W:F9F1:F9F2:FCQ3:',
+		'Mac Laptop;mac/133841;118463;MacBook Pro (Retina, 13-inch, Late 2012):DR53:DR54:DR55:DR56:F775:F776:F7YF:F897:F8V6:F8V7:F8V8:F9JT:F9V1:F9VQ:FG7Q:FG7R:FL85:FMLJ:',
+		'Mac Laptop;mac/133953;118466;MacBook Pro (Retina, 13-inch, Early 2013):FFRP:FFRR:FG1F:FG28:FGM8:FGN5:FGN6:FGPJ:FHCH:FHN0:',
+		'Mac Laptop;mac/133954;118465;MacBook Pro (Retina, 15-inch, Early 2013):FFT0:FFT1:FFT2:FFT3:FFT4:FG1H:FG1J:FGFH:FGFJ:FGFK:FGFL:FGN7:FGWF:FGWG:FGWH:FHCQ:FHCR:FJ47:FJVJ:FL94:FMLK:FR8D:',
+		'Mac Laptop;mac/134026;112437;MacBook Air (11-inch, Mid 2013):F5N7:F5N8:F5YV:F5YW:FH51:FH52:FKYN:FKYP:FLCF:FMR5:FMR6:FMR9:FMRC:FMRD:FMRF:FMRG:FMRM:FMRN:FN5M:FN7F:FP2N:FP3C:FQLG:FT30:',
+		'Mac Laptop;mac/134027;111938;MacBook Air (13-inch, Mid 2013):F5V7:F5V8:F6T5:F6T6:FH53:FKYQ:FKYR:FLCG:FM23:FM3Y:FM74:FMR7:FMR8:FMRH:FMRJ:FMRK:FMRL:FMRV:FMRW:FMRY:FN3Y:FN40:FN7G:FP2P:FQL9:FQLC:FQLD:FQLF:G6PM:',
+		'Mac Laptop;mac/134325;111946;MacBook Pro (Retina, 13-inch, Late 2013):FGYY:FH00:FH01:FH02:FH03:FH04:FH05:FRF6:FRF7:FRQF:FT4Q:FT4R:FT4T:FT4V:FTC9:FTCD:FTCH:FTCK:FTCL:FTPH:FTPJ:FTPK:FTT4:FVVW:FVWQ:FWKF:G4N6:G4N7:',
+		'Mac Laptop;mac/134326;111971;MacBook Pro (Retina, 15-inch, Late 2013):FD56:FD57:FD58:FD59:FR1M:FRDM:FRG2:FRG3:FRQH:FRQJ:FRQK:FRQL:FT4P:FTK0:FTK1:FTPL:FTPM:FTPN:FTPP:FTPQ:FTPR:FTPT:FTPV:FTPW:FTPY:FTTJ:FVN4:FVYN:FWFY:FWHW:FWKK:FWKL:G4JQ:G5HL:',
+		'Mac Laptop;mac/134557;112032;MacBook Air (11-inch, Early 2014):FM72:G083:G084:G2CF:G2GH:G2GJ:G2PY:G2Q0:G4FY:G4H0:G4H4:G4HK:G4HM:G58J:G5RK:G5RL:G5RM:G6D3:GLK9:GP4N:GP4P:',
+		'Mac Laptop;mac/134558;111944;MacBook Air (13-inch, Early 2014):G085:G086:G2CC:G2CD:G2GK:G2GL:G2GM:G2GN:G356:G4H1:G4H2:G4H3:G4HN:G4HP:G58K:G5RN:G5RP:G5RQ:G6D4:G6D5:G829:G8J1:GLK7:GLK8:GP4L:GP4M:',
+		'Mac Laptop;mac/134681;111942;MacBook Pro (Retina, 13-inch, Mid 2014):G3QH:G3QJ:G3QK:G3QL:G3QQ:G3QR:G3QT:G7RD:G7RF:G7YQ:G7YR:G8L0:G96R:G96T:G96V:G96W:G96Y:G970:G971:G972:G9FL:G9FM:G9FN:G9FP:G9FQ:G9FR:GDJM:',
+		'Mac Laptop;mac/134682;111935;MacBook Pro (Retina, 15-inch, Mid 2014):G3QC:G3QD:G3QG:G3QN:G3QP:G85Y:G86P:G86Q:G86R:G8F4:G8J7:G8L1:G96K:G96L:G96M:G96N:G96P:G96Q:G973:G974:G9FT:G9JN:G9L6:G9L7:G9L8:G9L9:GDPP:ZORD:',
+		'Mac Laptop;mac/135270;112441;MacBook Air (11-inch, Early 2015):GFWK:GFWL:GFWM:GFWN:GFWP:GKJY:GKK0:GL26:GL27:GL28:GL29:GL2C:GL2D:GL2F:GL2H:GLCQ:GMC5:GMC6:GMC7:GMC8:GMC9:GNJG:GNJK:GNJL:HYVM:J762:',
+		'Mac Laptop;mac/135271;111956;MacBook Air (13-inch, Early 2015):G940:G941:G942:G943:G944:GKJT:GKJV:GL20:GL21:GL22:GL23:GL24:GL25:GLCN:GLCP:GM14:GM15:GM38:GM6M:GM9G:GMC3:GMD3:GN8C:GNJJ:GNKM:H3QD:H3QF:H3QJ:H3QK:H569:H8VT:H8VV:H8VW:H8VX:HD7X:HD80:HD98:HDV4:HDV5:HDV6:HF4F:HF4H:HF9N:J6VL:',
+		'Mac Laptop;mac/135274;112442;MacBook (Retina, 12-inch, Early 2015):FWW3:FWW4:FWW5:FWW6:GCN1:GCN2:GCN3:GCN4:GF82:GF83:GF84:GF85:GKJQ:GKJR:GKK2:GKK3:GKK4:GKK5:GL69:GL6C:GL6D:GL6F:GL6G:GL6H:GR88:GR89:GR8C:GR8D:GR8F:GR8G:',
+		'Mac Laptop;mac/135275;111959;MacBook Pro (Retina, 13-inch, Early 2015):FVH3:FVH4:FVH5:FVH6:FVH7:FVH8:FVH9:GKJG:GKJM:GKJN:GL34:GL35:GL36:GL37:GM0V:GM0W:GM0Y:GM10:GM11:GM12:GM13:GMDF:GN24:GQR4:GQR5:GQR6:H1DP:H1DQ:H1WK:HTYF:HV59:J4NY:J69C:',
+		'Mac Laptop;mac/135276;111955;MacBook Pro (Retina, 15-inch, Mid 2015):G8WL:G8WM:G8WN:G8WP:G8WQ:GP4H:GP4J:GPLM:GPLN:GPLP:GQ62:GQ63:GQ64:GQCL:GQCM:GQCP:GQCQ:GQCR:GQCT:GWDN:GWDP:HFG7:HMMF:HV2K:HV36:HV37:',
+		'Mac Laptop;mac/300177;111339;MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):0DHT:0H77:ML7H:ML7J:ML7K:ML7L:ML7M:ML85:ML86:ML87:ML88:Q1XG:Q7PJ:Q7PK:QCH3:',
+		'Mac Laptop;mac/300178;111981;MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):0056:049N:P3XY:P3Y0:P3Y1:P3Y2:P3YV:P3YW:P3YX:P3YY:Q1XH:Q7PL:',
+		'Mac Laptop;mac/300266;111893;MacBook Pro (13-inch, M1, 2020):0KPF:0T6Q:0T6R:0T6T:0T6V:0Y8G:0YDX:11GX:11GY:13X3:17KW:191W:19LV:19LW:1D29:Q05D:Q05F:Q05G:Q05H:Q05N:Q05P:Q05Q:Q05R:',
+		'Mac Laptop;mac/300267;111883;MacBook Air (M1, 2020):0RF8:0RF9:0RFC:0RFD:0RFF:0RFG:0YTW:10X4:13RL:17W4:17W6:1920:1C6N:1L1L:1WFT:1WFV:1WFW:1WFX:1WFY:1WG0:1WG1:1WG2:1WG3:1WG4:1WG5:1WG6:1WG7:1WG8:1WG9:1WGC:1WGD:1WGF:1WGG:1WGH:2397:2398:2399:239C:239D:239F:239G:239H:239J:2406:2413:265D:265F:265G:265H:265J:265K:Q6L3:Q6L4:Q6L5:Q6L6:Q6L7:Q6L8:Q6L9:Q6LC:Q6LD:Q6LQ:Q6LR:Q6LT:Q6LV:Q6LW:Q6LX:Q6LY:Q6M0:Q6M1:Q72X:Q72Y:',
+		'Mac Laptop;mac/501504;112033;MacBook (Retina, 12-inch, Early 2016):GTGW:GTHR:GTHT:GTHV:GTHW:GTHX:GTHY:GTJ0:GTJ1:GTJ2:GTJ3:GTJ4:GTJ6:GTJ7:GTJ8:GTJ9:GTJC:GTJD:H3QW:H3QX:H3QY:H3R5:H3R6:H3R7:HD8M:HDNK:HRMD:HRMF:HRMG:JC5J:',
+		'Mac Laptop;mac/502599;112003;MacBook Pro (13-inch, 2016, Four Thunderbolt 3 Ports):GTDX:GTFJ:GTFK:GYFH:GYGR:HF1P:HF1Q:HF1R:HF1T:HP49:HP4D:HWH2:HXD5:',
+		'Mac Laptop;mac/502608;111975;MacBook Pro (15-inch, 2016):GTDY:GTF1:GTFL:GTFM:GTFN:H03M:H03Q:H03T:H03Y:H040:HWCG:HXD3:HXF8:',
+		'Mac Laptop;mac/502621;111999;MacBook Pro (13-inch, 2016, Two Thunderbolt 3 ports):GVC1:GVC8:GY25:GY6N:HV5D:HV5G:HV5H:HV5J:HV5K:HV5L:HV5M:HV5N:HWCH:HYP5:J21W:J5KW:',
+		'Mac Laptop;mac/503543;111947;MacBook Pro (15-inch, 2017):HTD5:HTD6:HTD7:HTD8:HTD9:HTDC:HTDD:HTDF:HTDG:HTDH:J6CP:J6CQ:J8KC:J925:J926:J931:J932:J933:J934:J935:J936:J937:J938:J939:J93C:J93D:J93F:J93G:J93H:J93J:J93K:J93L:J93M:J93N:J93P:JD04:JD06:JHTD:',
+		'Mac Laptop;mac/503556;111972;MacBook Pro (13-inch, 2017, Four Thunderbolt 3 Ports):HV2L:HV2M:HV2N:HV2P:HV2Q:HV2R:HV2T:HV2V:HV2W:HV2X:J9J1:J9J2:J9J3:J9J4:J9J5:J9J6:J9J7:J9J8:J9J9:J9JD:J9JF:J9JG:J9JH:JCYQ:JHTF:JJ3F:JJ3G:JJ3H:JJ3J:JKXM:K141:',
+		'Mac Laptop;mac/503565;111951;MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):HV22:HV27:HV29:HV2D:HV2F:HV2G:HV2H:HV2J:J8DY:J8F0:J8F1:J8F2:J9JM:J9JN:J9JP:J9JQ:J9JR:J9JT:J9JV:J9JW:J9JX:J9JY:J9K0:J9K1:J9K2:J9K3:J9K4:J9K5:J9K6:J9K7:J9K8:J9K9:J9KC:JCPR:JD9D:JJ3D:JKXH:',
+		'Mac Laptop;mac/503576;111924;MacBook Air (13-inch, 2017):J1WK:J1WL:J1WM:J1WT:J1WV:J8N7:J8XG:J8XH:J9HX:J9TN:J9TP:J9TQ:JC9H:JCD6:JFLY:JKHD:JKHF:LQ07:LQF1:MFWJ:',
+		'Mac Laptop;mac/503580;111986;MacBook (Retina, 12-inch, 2017):HH21:HH22:HH23:HH24:HH25:HH26:HH27:HH28:HH29:HH2C:HH2D:HH2F:HH2G:HH2H:HH2J:HH2K:J64G:J64H:J64J:J65G:J9XD:JPXM:JPXN:JPXP:JPXQ:N86D:',
+		'Mac Laptop;mac/505469;111925;MacBook Pro (13-inch, 2018, Four Thunderbolt 3 Ports):JHC8:JHC9:JHCC:JHCD:JHCF:JHD2:JHD3:JHD4:JHD5:KK98:KK99:KK9C:KQ1X:KQ1Y:KQ20:KQ21:KQ22:KQ23:KQ24:KQ25:KQ26:KQ27:L42X:L4FC:L4FD:L4FF:L4FG:L4FJ:L4JT:L7GD:LK8C:',
+		'Mac Laptop;mac/505479;111949;MacBook Pro (15-inch, 2018):JG5H:JG5J:JG5K:JG5L:JG5M:JGH5:JGH6:JGH7:JGH8:KGYF:KGYG:KGYH:KQ9Q:KQ9R:KQ9T:KQ9V:KQ9W:KQ9X:KQ9Y:KQC0:KQC1:KQC2:KQC3:KQC4:KQC5:KQC6:KQC7:KQC8:KQC9:KQCC:KQCD:KQCF:KQCG:KQCH:KQCJ:KQCK:KQCL:KQCM:KQCN:KQCP:KQCQ:KQCR:KQCT:KQCV:KQCW:KQCX:KWJ2:L4HW:L4HX:L539:L53D:L7GC:LC8J:LC8K:LC8L:LCM6:MJLR:MJLT:',
+		'Mac Laptop;mac/506006;111933;MacBook Air (Retina, 13-inch, 2018):JK77:JK78:JK7C:JK7D:JK7F:JK7G:JK7L:JK7M:JK7P:JK7Q:JK7R:JK7T:LK86:LK87:LK88:LLDN:LLDP:LLDQ:LQDC:LQDD:LR0X:LR0Y:MCKP:MCKQ:MCKR:MCKT:',
+		'Mac Laptop;mac/507158;111997;MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):LVDC:LVDD:LVDF:LVDG:LVDH:LVDL:LVDM:LVDN:LVDP:MV9K:MV9R:N5T5:NCLV:NCLW:NCLX:NCLY:NCM0:NCM1:NCM2:NQM8:P4G1:P4G2:',
+		'Mac Laptop;mac/507170;111941;MacBook Pro (15-inch, 2019):LVCF:LVCG:LVCH:LVCJ:LVCK:LVCL:LVDQ:LVDR:LVDT:LVDV:MV9T:MVC0:N5T6:N6KF:N6RJ:NCM3:NCM4:NCM5:NCM6:NQM9:NQMC:NQMD:NQMF:',
+		'Mac Laptop;mac/507496;111945;MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):L40Y:L410:L411:L412:L413:L414:L415:L416:N71C:N71D:N71F:N71G:NR4Y:NXJM:NY17:NY18:NY19:NY1C:NY1F:NY1G:NY1H:P0LW:P4LF:',
+		'Mac Laptop;mac/507509;111948;MacBook Air (Retina, 13-inch, 2019):LYWG:LYWH:LYWJ:LYWK:LYWL:LYWM:LYWN:LYWP:LYWQ:LYWR:LYWT:LYWV:M6X5:M6X7:N797:NY1J:NY1K:P0GW:P0GX:P4L9:P4LC:P4LD:Q17C:Q1MR:',
+		'Mac Laptop;mac/508192;111932;MacBook Pro (16-inch, 2019):0051:03T9:05J5:0DH8:11GW:191T:1PG0:1PG1:1PG2:1PG3:1PG4:MD6M:MD6N:MD6P:MD6Q:MD6R:MD6T:MD6V:MD6W:MD6X:PG8T:PG8V:PG8W:PG8X:PG8Y:PG90:PG91:PQVJ:PT01:PWD5:PWD6:PWD7:PWD8:PWD9:PWDC:PWDD:PWDF:PWDG:PX1J:PX5K:PYP7:PYP8:PYRX:Q088:Q089:Q4V7:Q7MF:Q7MG:',
+		'Mac Laptop;mac/508935;111991;MacBook Air (Retina, 13-inch, 2020):M6KG:M6KH:M6KJ:M6KK:M6KL:M6KM:MLVD:MLVF:MNHP:MNHQ:MNHR:MNHX:MNHY:MNJ0:PV4J:PV4M:PV4N:Q0WM:Q0WN:Q0WP:Q55V:Q598:Q599:Q6KN:Q6NN:Q6PN:Q72V:Q73V:Q73W:Q7FQ:Q7FR:Q7V4:',
+		'Mac Laptop;mac/unknown;112178;PowerBook (FireWire):HDR:HDS:HKE:HZG:HZH:HZJ:HZK:HZL:HZM:JPR:JYY:K34:K35:K45:K4R:K6J:',
+		'Mac Laptop;mac/unknown;112180;PowerBook G3 Series (Bronze Keyboard):FZY:G00:',
+		'Mac Laptop;mac/unknown;112550;iBook (Firewire):JQ5:JU6:K1L:K5M:KT2:KT3:KT8:KWT:KWV:',
+		'Mac Server;mac/7956;112294;Power Mac G4 Server:GUH:GUJ:GYA:GYJ:HGD:HGE:HGF:HND:HNE:HNF:J2P:J2Q:J2R:JAR:JAS:JVF:',
+		'Mac Server;mac/8355;112518;Power Mac G4 Server (Gigabit):JMV:JMW:JW2:JW3:JW4:JYN:K6P:K6R:K6T:K8S:',
+		'Mac Server;mac/108892;112549;Power Mac G4 Server (Digital Audio):K4Y:K6M:K72:K73:K74:KHS:KHT:KHU:L4V:',
+		'Mac Server;mac/110334;112546;Power Mac G4 Server (QuickSilver):KVJ:LGY:LGZ:LLH:LLJ:LRC:LRD:M79:M7W:',
+		'Mac Server;mac/111993;112450;Power Mac G4 Server (QuickSilver 2002):GM8:M33:M34:M35:M36:M58:M59:N43:N44:',
+		'Mac Server;mac/113053;112315;Xserve:LZD:LZE:LZF:MVN:MVP:N45:N7Q:N7R:N7S:N9Z:NA5:NA6:ND1:ND2:NJN:NJV:NMN:NUT:NZF:',
+		'Mac Server;mac/113853;112510;Power Mac Server G4 (Mirrored Drive Doors):M5E:M5L:MBG:MGB:MR7:MR8:MXE:NHD:NMD:NN0:NN1:',
+		'Mac Server;mac/117960;112465;Xserve (Slot Load):N9A:N9B:N9C:NP2:P1W:P1X:P1Y:PBR:PDT:PM7:PVY:PVZ:PW0:Q5S:Q6L:Q6M:Q9T:QHC:QHD:QHE:QHF:QQ9:RQ7:RQ8:',
+		'Mac Server;mac/117972;112486;Xserve RAID:M8K:M8L:M8M:M98:NBL:NBM:NBN:QFB:',
+		'Mac Server;mac/118967;112465;Xserve (Cluster Node):P06:P1U:P3J:PWO:Q6N:',
+		'Mac Server;mac/122619;112314;Xserve RAID (SFP):PQD:PQE:PQF:PQG:Q7D:QCU:QCV:QCW:QCX:QWN:RXW:S53:S54:S55:',
+		'Mac Server;mac/123485;112318;Xserve G5:PMX:PMY:PMZ:PNH:PNJ:PNK:QPW:QPX:QPY:QTU:QTV:QTW:QV2:QW6:QWG:QWH:QWJ:QWK:R5B:R5C:R5D:R62:R63:R64:R65:RB3:RB4:RB5:RDM:RET:REU:RF8:RHQ:RJC:RJD:RJE:RXV:RXX:RXY:RXZ:RY2:S26:S4V:S4W:S4X:S8Y:S8Z:S90:S93:S94:S95:SC2:SK6:SP0:SP1:',
+		'Mac Server;mac/130243;112314;Xserve RAID (SFP Late 2004):RS4:RS5:RS6:SAA:SAB:SAH:SJ3:SJ4:SJ5:SP2:TYD:U3G:U3H:U3J:U3K:UAG:UAH:UKN:UKP:Y0T:Y0U:YY6:',
+		'Mac Server;mac/130268;112318;Xserve G5 (January 2005):RTP:RTQ:RTS:SLW:SLX:SLZ:SQW:SQX:SQY:SR0:SR1:SR2:SR8:SR9:SST:SV8:SV9:SVA:T1G:T3U:T8Q:T8R:T8S:TGG:TGH:TGJ:TRU:TS1:TXF:TXG:TXH:TXX:U3B:U75:U76:U77:UMB:UME:UMF:UMG:UQL:URS:UW0:UX4:UX5:V1Q:VJQ:VSA:VSC:VSK:VSS:W0W:W5U:W6F:WD1:WD2:WD3:WDE:WJ0:X2C:',
+		'Mac Server;mac/131089;112534;Xserve (Late 2006):00W:V2M:V2Q:WXM:X83:X84:XAW:XBF:XBG:XBR:XBS:XBT:XLR:XXC:XXD:XXE:XXF:Y8S:YWF:YZ8:YZ9:Z2F:',
+		'Mac Server;mac/131817;112551;Xserve (Early 2008):12E:1DR:1H4:1ZZ:20A:24B:25N:27P:31G:32A:3GM:3GN:5WD:5WE:6EM:X8S:X8T:',
+		'Mac Server;mac/132435;112625;Xserve (Early 2009):10J:10S:6HS:8DE:8M3:9N0:9SS:9ST:9VJ:9WM:9ZL:9ZP:9ZQ:A2U:A2V:A6Z:A70:AFS:AFT:AFU:AFV:BR7:CRZ:CS0:D5G:DFT:DFU:DL5:GQU:HDE:',
+		'Mac Server;mac/132966;112578;Mac Pro Server (Mid 2010):HPV:HPW:HPY:',
+		'Mac Server;mac/133644;118464;Mac Pro Server (Mid 2012):F4MF:F4MJ:F501:',
+		'Software;software/109833;unknown;WebObjects 5:L6C:L6D:L6E:L6F:L6G:L6H:L6J:L6K:L6L:L6M:L6N:LXZ:M0L:NH9:NX9:NYK:NYL:',
+		'Software;software/131004;unknown;Shake 4.X:SUH:SUJ:SUK:V9B:V9C:V9D:',
+		'Software;software/131100;112426;Apple Remote Desktop 3.X:0TP:0TQ:8KW:8KY:U6M:U6N:U6P:',
+		'Software;software/131700;unknown;iLife \'09:7Z5:',
+		'Software;software/132039;unknown;Xsan 1.4:VUJ:VUL:',
+		'Software;software/132221;unknown;iWork \'09:77B:',
+		'Software;software/132589;112646;Final Cut Server 1.5:85A:85B:',
+		'Software;software/133085;unknown;iLife \'11:DJGN:',
+		'Software;software/133281;111915;Motion:HT1:',
+		'Software;software/134082;111899;Logic Pro:ZTP:',
+		'Software;software/134083;unknown;134083 - Core Image for MainStage:ZTQ:',
+		'Software;software/300112;unknown;CORE Image - 300112:L918:',
+		'Software;software/pl155;111916;Compressor 4:HT3:',
+		'Software;software/pl155;111916;CORE Image - 134439:ZZ1:',
+		'Software;software/pl157;112030;Aperture 3.x:5S8:5S9:5SH:',
+		'Software;software/pl187;112645;Final Cut Express 4.0:Z26:Z27:ZP3:',
+		'Software;software/pl197;111903;CORE Image - 134432:0AA:',
+		'Software;software/pl199;112300;Final Cut Studio (2009):36X:373:37A:',
+		'Software;software/unknown;112602;Logic Studio (2009):41H:41K:41L:41M:'
+	];
+}
+
+function every_model_id_with_marketing_model_name_and_specs_id() {
+	// The following list is generated from: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_every_model_id_with_marketing_model_name_from_appledb.sh
+	// which uses data from AppleDB.dev (https://github.com/littlebyteorg/appledb) MIT License (https://github.com/littlebyteorg/appledb/blob/main/LICENSE)
+	// List last updated 5/29/25
+	return [
+		'Accessory;unknown;unknown:Apple Pencil Pro:A2538:',
+		'Accessory;unknown;unknown:Apple Pencil (1st generation):A1603:',
+		'Accessory;unknown;unknown:Apple Pencil (2nd generation):A2051:',
+		'Accessory;unknown;unknown:Apple Pencil (USB-C):A3085:',
+		'Apple TV;112555;AppleTV1,1:Apple TV (1st generation):A1218:',
+		'Apple TV;112428;AppleTV2,1:Apple TV (2nd generation):A1378:',
+		'Apple TV;112429;AppleTV3,1:Apple TV (3rd generation):A1427:',
+		'Apple TV;112429;AppleTV3,2:Apple TV (3rd generation, Rev A):A1469:',
+		'Apple TV;111928;AppleTV5,3:Apple TV HD (4th generation):A1625:',
+		'Apple TV;111929;AppleTV6,2:Apple TV 4K (1st generation):A1842:',
+		'Apple TV;111922;AppleTV11,1:Apple TV 4K (2nd generation):A2169:',
+		'Apple TV;111839;AppleTV14,1:Apple TV 4K (3rd generation) Wi-Fi + Ethernet:A2843:',
+		'Apple TV;111839;AppleTV14,1:Apple TV 4K (3rd generation) Wi-Fi:A2737:',
+		'Apple Vision;unknown;RealityDevice14,1:Vision Pro:A2117:',
+		'Apple Watch;unknown;Watch1,1:Apple Watch (1st generation) (38mm):A1553:',
+		'Apple Watch;unknown;Watch1,2:Apple Watch (1st generation) (42mm) (Store Display Model):A1638:',
+		'Apple Watch;unknown;Watch1,2:Apple Watch (1st generation) (42mm):A1554:',
+		'Apple Watch;unknown;Watch2,3:Apple Watch Series 2 (38mm):A1757:A1816:',
+		'Apple Watch;unknown;Watch2,4:Apple Watch Series 2 (42mm):A1758:A1817:',
+		'Apple Watch;unknown;Watch2,6:Apple Watch Series 1 (38mm):A1802:',
+		'Apple Watch;unknown;Watch2,7:Apple Watch Series 1 (42mm):A1803:',
+		'Apple Watch;unknown;Watch3,1:Apple Watch Series 3 (GPS + Cellular, 38mm):A1860:A1889:A1890:A1957:A1969:A1970:',
+		'Apple Watch;unknown;Watch3,2:Apple Watch Series 3 (GPS + Cellular, 42mm):A1861:A1891:A1892:A1958:A1972:A1973:',
+		'Apple Watch;unknown;Watch3,3:Apple Watch Series 3 (GPS, 38mm):A1858:A1959:',
+		'Apple Watch;unknown;Watch3,4:Apple Watch Series 3 (GPS, 42mm):A1859:A1960:',
+		'Apple Watch;unknown;Watch4,1:Apple Watch Series 4 (GPS, 40mm):A1977:',
+		'Apple Watch;unknown;Watch4,2:Apple Watch Series 4 (GPS, 44mm):A1978:',
+		'Apple Watch;unknown;Watch4,3:Apple Watch Series 4 (GPS + Cellular, 40mm):A1975:A2007:',
+		'Apple Watch;unknown;Watch4,4:Apple Watch Series 4 (GPS + Cellular, 44mm):A1976:A2008:',
+		'Apple Watch;unknown;Watch5,1:Apple Watch Series 5 (GPS, 40mm):A2092:',
+		'Apple Watch;unknown;Watch5,2:Apple Watch Series 5 (GPS, 44mm):A2093:',
+		'Apple Watch;unknown;Watch5,3:Apple Watch Series 5 (GPS + Cellular, 40mm):A2094:A2156:',
+		'Apple Watch;unknown;Watch5,4:Apple Watch Series 5 (GPS + Cellular, 44mm):A2095:A2157:',
+		'Apple Watch;unknown;Watch5,9:Apple Watch SE (1st generation, GPS, 40mm):A2351:',
+		'Apple Watch;unknown;Watch5,10:Apple Watch SE (1st generation, GPS, 44mm):A2352:',
+		'Apple Watch;unknown;Watch5,11:Apple Watch SE (1st generation, GPS + Cellular, 44mm):A2353:A2355:',
+		'Apple Watch;unknown;Watch5,12:Apple Watch SE (1st generation, GPS + Cellular, 44mm):A2354:A2356:',
+		'Apple Watch;unknown;Watch6,1:Apple Watch Series 6 (GPS, 40mm):A2291:',
+		'Apple Watch;unknown;Watch6,2:Apple Watch Series 6 (GPS, 44mm):A2292:',
+		'Apple Watch;unknown;Watch6,3:Apple Watch Series 6 (GPS + Cellular, 40mm):A2293:A2375:',
+		'Apple Watch;unknown;Watch6,4:Apple Watch Series 6 (GPS + Cellular, 44mm):A2294:A2376:',
+		'Apple Watch;unknown;Watch6,6:Apple Watch Series 7 (GPS, 41mm):A2473:',
+		'Apple Watch;unknown;Watch6,7:Apple Watch Series 7 (GPS, 45mm):A2474:',
+		'Apple Watch;unknown;Watch6,8:Apple Watch Series 7 (GPS + Cellular, 41mm):A2475:A2476:',
+		'Apple Watch;unknown;Watch6,9:Apple Watch Series 7 (GPS + Cellular, 45mm):A2477:A2478:',
+		'Apple Watch;unknown;Watch6,10:Apple Watch SE (2nd generation, GPS, 40mm):A2722:',
+		'Apple Watch;unknown;Watch6,11:Apple Watch SE (2nd generation, GPS, 44mm):A2723:',
+		'Apple Watch;unknown;Watch6,12:Apple Watch SE (2nd generation, GPS + Cellular, 40mm):A2725:A2726:A2855:',
+		'Apple Watch;unknown;Watch6,13:Apple Watch SE (2nd generation, GPS + Cellular, 44mm):A2724:A2727:A2856:',
+		'Apple Watch;unknown;Watch6,14:Apple Watch Series 8 (GPS, 41mm):A2770:',
+		'Apple Watch;unknown;Watch6,15:Apple Watch Series 8 (GPS, 45mm):A2771:',
+		'Apple Watch;unknown;Watch6,16:Apple Watch Series 8 (GPS + Cellular, 41mm):A2772:A2773:A2857:',
+		'Apple Watch;unknown;Watch6,17:Apple Watch Series 8 (GPS + Cellular, 45mm):A2774:A2775:A2858:',
+		'Apple Watch;unknown;Watch6,18:Apple Watch Ultra:A2622:A2684:A2859:',
+		'Apple Watch;unknown;Watch7,1:Apple Watch Series 9 (GPS, 41mm):A2978:',
+		'Apple Watch;unknown;Watch7,2:Apple Watch Series 9 (GPS, 45mm):A2980:',
+		'Apple Watch;unknown;Watch7,3:Apple Watch Series 9 (GPS + Cellular, 41mm):A2982:A2983:',
+		'Apple Watch;unknown;Watch7,4:Apple Watch Series 9 (GPS + Cellular, 45mm):A2984:A2985:',
+		'Apple Watch;unknown;Watch7,5:Apple Watch Ultra 2:A2986:A2987:',
+		'Apple Watch;unknown;Watch7,8:Apple Watch Series 10 (GPS, 42mm):A2997:A2998:',
+		'Apple Watch;unknown;Watch7,9:Apple Watch Series 10 (GPS, 46mm):A2999:A3000:',
+		'Apple Watch;unknown;Watch7,10:Apple Watch Series 10 (GPS + Cellular, 42mm):A3001:A3002:',
+		'Apple Watch;unknown;Watch7,11:Apple Watch Series 10 (GPS + Cellular, 46mm):A3003:A3206:',
+		'HomePod;unknown;AudioAccessory1,1:HomePod (1st generation):A1639:',
+		'HomePod;unknown;AudioAccessory5,1:HomePod mini (China Mainland):A2531:',
+		'HomePod;unknown;AudioAccessory5,1:HomePod mini:A2374:',
+		'HomePod;unknown;AudioAccessory6,1:HomePod (2nd generation) (China Mainland):A2878:',
+		'HomePod;unknown;AudioAccessory6,1:HomePod (2nd generation):A2825:',
+		'iPad;112438;iPad1,1:iPad:A1219:A1337:',
+		'iPad;111990;iPad2,1:iPad 2 Wi-Fi:A1395:',
+		'iPad;111990;iPad2,2:iPad 2 Wi-Fi + 3G (GSM):A1396:',
+		'iPad;111990;iPad2,3:iPad 2 Wi-Fi + 3G (CDMA):A1397:',
+		'iPad;111990;iPad2,4:iPad 2 Wi-Fi (Mid 2012):A1395:',
+		'iPad;111978;iPad2,5:iPad mini Wi-Fi:A1432:',
+		'iPad;111978;iPad2,6:iPad mini Wi-Fi + Cellular:A1454:',
+		'iPad;111978;iPad2,7:iPad mini Wi-Fi + Cellular (MM):A1455:',
+		'iPad;111992;iPad3,1:iPad (3rd generation) Wi-Fi:A1416:',
+		'iPad;111992;iPad3,2:iPad (3rd generation) Wi-Fi + Cellular (VZ):A1403:',
+		'iPad;111992;iPad3,3:iPad (3rd generation) Wi-Fi + Cellular:A1430:',
+		'iPad;111993;iPad3,4:iPad (4th generation) Wi-Fi:A1458:',
+		'iPad;111993;iPad3,5:iPad (4th generation) Wi-Fi + Cellular:A1459:',
+		'iPad;111993;iPad3,6:iPad (4th generation) Wi-Fi + Cellular (MM):A1460:',
+		'iPad;112020;iPad4,1:iPad Air Wi-Fi:A1474:',
+		'iPad;112020;iPad4,2:iPad Air Wi-Fi + Cellular:A1475:',
+		'iPad;112020;iPad4,3:iPad Air Wi-Fi + Cellular (TD-LTE):A1476:',
+		'iPad;112019;iPad4,4:iPad mini 2 Wi-Fi:A1489:',
+		'iPad;112019;iPad4,5:iPad mini 2 Wi-Fi + Cellular:A1490:',
+		'iPad;112019;iPad4,6:iPad mini 2 Wi-Fi + Cellular (TD-LTE):A1491:',
+		'iPad;112018;iPad4,7:iPad mini 3 Wi-Fi:A1599:',
+		'iPad;112018;iPad4,8:iPad mini 3 Wi-Fi + Cellular:A1600:',
+		'iPad;unknown;iPad4,9:iPad mini 3 Wi-Fi + Cellular (TD-LTE):A1601:',
+		'iPad;112002;iPad5,1:iPad mini 4 Wi-Fi:A1538:',
+		'iPad;112002;iPad5,2:iPad mini 4 Wi-Fi + Cellular:A1550:',
+		'iPad;112017;iPad5,3:iPad Air 2 Wi-Fi:A1566:',
+		'iPad;112017;iPad5,4:iPad Air 2 Wi-Fi + Cellular:A1567:',
+		'iPad;111965;iPad6,3:iPad Pro (9.7-inch) Wi-Fi:A1673:',
+		'iPad;111965;iPad6,4:iPad Pro (9.7-inch) Wi-Fi + Cellular:A1674:A1675:',
+		'iPad;112024;iPad6,7:iPad Pro (12.9-inch) (1st generation) Wi-Fi:A1584:',
+		'iPad;112024;iPad6,8:iPad Pro (12.9-inch) (1st generation) Wi-Fi + Cellular:A1652:',
+		'iPad;111960;iPad6,11:iPad (5th generation) Wi-Fi:A1822:',
+		'iPad;111960;iPad6,12:iPad (5th generation) Wi-Fi + Cellular:A1823:',
+		'iPad;111964;iPad7,1:iPad Pro (12.9-inch) (2nd generation) Wi-Fi:A1670:',
+		'iPad;111964;iPad7,2:iPad Pro (12.9-inch) (2nd generation) Wi-Fi + Cellular:A1671:A1821:',
+		'iPad;111927;iPad7,3:iPad Pro (10.5-inch) Wi-Fi:A1701:',
+		'iPad;111927;iPad7,4:iPad Pro (10.5-inch) Wi-Fi + Cellular:A1709:A1852:',
+		'iPad;111957;iPad7,5:iPad (6th generation) Wi-Fi:A1893:',
+		'iPad;111957;iPad7,6:iPad (6th generation) Wi-Fi + Cellular:A1954:',
+		'iPad;111911;iPad7,11:iPad (7th generation) Wi-Fi:A2197:',
+		'iPad;111911;iPad7,12:iPad (7th generation) Wi-Fi + Cellular:A2198:A2199:A2200:',
+		'iPad;111974;iPad8,1:iPad Pro 11-inch (1st generation) Wi-Fi:A1980:',
+		'iPad;111974;iPad8,2:iPad Pro 11-inch (1st generation) Wi-Fi (1TB):A1980:',
+		'iPad;111974;iPad8,3:iPad Pro 11-inch (1st generation) Wi-Fi + Cellular:A1934:A1979:A2013:',
+		'iPad;111974;iPad8,4:iPad Pro 11-inch (1st generation) Wi-Fi + Cellular (1TB):A1934:A1979:A2013:',
+		'iPad;111979;iPad8,5:iPad Pro 12.9-inch (3rd generation) Wi-Fi:A1876:',
+		'iPad;111979;iPad8,6:iPad Pro 12.9-inch (3rd generation) Wi-Fi (1TB):A1876:',
+		'iPad;111979;iPad8,7:iPad Pro 12.9-inch (3rd generation) Wi-Fi + Cellular:A1895:A1983:A2014:',
+		'iPad;111979;iPad8,8:iPad Pro 12.9-inch (3rd generation) Wi-Fi + Cellular (1TB):A1895:A1983:A2014:',
+		'iPad;118452;iPad8,9:iPad Pro 11-inch (2nd generation) Wi-Fi:A2228:',
+		'iPad;118452;iPad8,10:iPad Pro 11-inch (2nd generation) Wi-Fi + Cellular:A2068:A2230:A2231:',
+		'iPad;111977;iPad8,11:iPad Pro 12.9-inch (4th generation) Wi-Fi:A2229:',
+		'iPad;111977;iPad8,12:iPad Pro 12.9-inch (4th generation) Wi-Fi + Cellular:A2069:A2232:A2233:',
+		'iPad;111904;iPad11,1:iPad mini (5th generation) Wi-Fi:A2133:',
+		'iPad;111904;iPad11,2:iPad mini (5th generation) Wi-Fi + Cellular:A2124:A2125:A2126:',
+		'iPad;111939;iPad11,3:iPad Air (3rd generation) Wi-Fi:A2152:',
+		'iPad;111939;iPad11,4:iPad Air (3rd generation) Wi-Fi + Cellular:A2123:A2153:A2154:',
+		'iPad;118451;iPad11,6:iPad (8th generation) Wi-Fi:A2270:',
+		'iPad;118451;iPad11,7:iPad (8th generation) Wi-Fi + Cellular:A2428:A2429:A2430:',
+		'iPad;111898;iPad12,1:iPad (9th generation) Wi-Fi:A2602:',
+		'iPad;111898;iPad12,2:iPad (9th generation) Wi-Fi + Cellular:A2603:A2604:A2605:',
+		'iPad;111905;iPad13,1:iPad Air (4th generation) Wi-Fi:A2316:',
+		'iPad;111905;iPad13,2:iPad Air (4th generation) Wi-Fi + Cellular:A2072:A2324:A2325:',
+		'iPad;111897;iPad13,4:iPad Pro 11-inch (3rd generation) Wi-Fi:A2377:',
+		'iPad;111897;iPad13,5:iPad Pro 11-inch (3rd generation) Wi-Fi (1 or 2 TB):A2377:',
+		'iPad;111897;iPad13,6:iPad Pro 11-inch (3rd generation) Wi-Fi + Cellular:A2301:A2459:A2460:',
+		'iPad;111897;iPad13,7:iPad Pro 11-inch (3rd generation) Wi-Fi + Cellular (1 or 2 TB):A2301:A2459:A2460:',
+		'iPad;111896;iPad13,8:iPad Pro 12.9-inch (5th generation) Wi-Fi:A2378:',
+		'iPad;111896;iPad13,9:iPad Pro 12.9-inch (5th generation) Wi-Fi (1 or 2 TB):A2378:',
+		'iPad;111896;iPad13,10:iPad Pro 12.9-inch (5th generation) Wi-Fi + Cellular:A2379:A2461:A2462:',
+		'iPad;111896;iPad13,11:iPad Pro 12.9-inch (5th generation) Wi-Fi + Cellular (1 or 2 TB):A2379:A2461:A2462:',
+		'iPad;111887;iPad13,16:iPad Air (5th generation) Wi-Fi:A2588:',
+		'iPad;111887;iPad13,17:iPad Air (5th generation) Wi-Fi + Cellular:A2589:A2591:',
+		'iPad;111840;iPad13,18:iPad (10th generation) Wi-Fi:A2696:',
+		'iPad;111840;iPad13,19:iPad (10th generation) Wi-Fi + Cellular:A2757:A2777:A3162:',
+		'iPad;111886;iPad14,1:iPad mini (6th generation) Wi-Fi:A2567:',
+		'iPad;111886;iPad14,2:iPad mini (6th generation) Wi-Fi + Cellular:A2568:A2569:',
+		'iPad;111842;iPad14,3:iPad Pro 11-inch (4th generation) Wi-Fi:A2759:',
+		'iPad;111842;iPad14,4:iPad Pro 11-inch (4th generation) Wi-Fi + Cellular:A2435:A2761:A2762:',
+		'iPad;111841;iPad14,5:iPad Pro 12.9-inch (6th generation) Wi-Fi:A2436:',
+		'iPad;111841;iPad14,6:iPad Pro 12.9-inch (6th generation) Wi-Fi + Cellular:A2437:A2764:A2766:',
+		'iPad;119894;iPad14,8:iPad Air 11-inch (M2) Wi-Fi:A2902:',
+		'iPad;119894;iPad14,9:iPad Air 11-inch (M2) Wi-Fi + Cellular:A2903:A2904:',
+		'iPad;119893;iPad14,10:iPad Air 13-inch (M2) Wi-Fi:A2898:',
+		'iPad;119893;iPad14,11:iPad Air 13-inch (M2) Wi-Fi + Cellular:A2899:A2900:',
+		'iPad;122241;iPad15,3:iPad Air 11-inch (M3) Wi-Fi:A3266:',
+		'iPad;122241;iPad15,4:iPad Air 11-inch (M3) Wi-Fi + Cellular:A3267:A3270:',
+		'iPad;122242;iPad15,5:iPad Air 13-inch (M3) Wi-Fi:A3268:',
+		'iPad;122242;iPad15,6:iPad Air 13-inch (M3) Wi-Fi + Cellular:A3269:A3271:',
+		'iPad;122240;iPad15,7:iPad (A16) Wi-Fi:A3354:',
+		'iPad;122240;iPad15,8:iPad (A16) Wi-Fi + Cellular:A3355:A3356:',
+		'iPad;121456;iPad16,1:iPad mini (A17 Pro) Wi-Fi:A2993:',
+		'iPad;121456;iPad16,2:iPad mini (A17 Pro) Wi-Fi + Cellular:A2995:A2996:',
+		'iPad;119892;iPad16,3:iPad Pro 11-inch (M4) Wi-Fi:A2836:',
+		'iPad;119892;iPad16,4:iPad Pro 11-inch (M4) Wi-Fi + Cellular:A2837:A3006:',
+		'iPad;119891;iPad16,5:iPad Pro 13-inch (M4) Wi-Fi:A2925:',
+		'iPad;119891;iPad16,6:iPad Pro 13-inch (M4) Wi-Fi + Cellular:A2926:A3007:',
+		'iPhone;112445;iPhone1,1:iPhone:A1203:',
+		'iPhone;112496;iPhone1,2:iPhone 3G:A1241:A1324:',
+		'iPhone;112307;iPhone2,1:iPhone 3GS:A1303:A1325:',
+		'iPhone;112562;iPhone3,1:iPhone 4 (GSM):A1332:',
+		'iPhone;112562;iPhone3,2:iPhone 4 (GSM, 2012):A1332:',
+		'iPhone;112562;iPhone3,3:iPhone 4 (CDMA):A1349:',
+		'iPhone;112004;iPhone4,1:iPhone 4S:A1387:A1431:',
+		'iPhone;112016;iPhone5,1:iPhone 5 (GSM):A1428:A1429:',
+		'iPhone;112016;iPhone5,2:iPhone 5 (CDMA):A1429:A1442:',
+		'iPhone;111917;iPhone5,3:iPhone 5c (GSM):A1456:A1532:',
+		'iPhone;111917;iPhone5,4:iPhone 5c (CDMA):A1507:A1516:A1526:A1529:',
+		'iPhone;111973;iPhone6,1:iPhone 5s (GSM):A1453:A1533:',
+		'iPhone;111973;iPhone6,2:iPhone 5s (CDMA):A1457:A1518:A1528:A1530:',
+		'iPhone;111940;iPhone7,1:iPhone 6 Plus:A1522:A1524:A1593:',
+		'iPhone;111954;iPhone7,2:iPhone 6:A1549:A1586:A1589:',
+		'iPhone;111952;iPhone8,1:iPhone 6s:A1633:A1688:A1691:A1700:',
+		'iPhone;111996;iPhone8,2:iPhone 6s Plus:A1634:A1687:A1690:A1699:',
+		'iPhone;112005;iPhone8,4:iPhone SE (1st generation):A1662:A1723:A1724:',
+		'iPhone;111943;iPhone9,1:iPhone 7 (CDMA):A1660:A1779:A1780:',
+		'iPhone;111953;iPhone9,2:iPhone 7 Plus (CDMA):A1661:A1785:A1786:',
+		'iPhone;111943;iPhone9,3:iPhone 7 (GSM):A1778:',
+		'iPhone;111953;iPhone9,4:iPhone 7 Plus (GSM):A1784:',
+		'iPhone;111976;iPhone10,1:iPhone 8 (CDMA):A1863:A1906:A1907:',
+		'iPhone;111950;iPhone10,2:iPhone 8 Plus (CDMA):A1864:A1898:A1899:',
+		'iPhone;111864;iPhone10,3:iPhone X (CDMA):A1865:A1902:A1903:',
+		'iPhone;111976;iPhone10,4:iPhone 8 (GSM):A1905:',
+		'iPhone;111950;iPhone10,5:iPhone 8 Plus (GSM):A1897:',
+		'iPhone;111864;iPhone10,6:iPhone X (GSM):A1901:',
+		'iPhone;111881;iPhone11,2:iPhone XS:A1920:A2097:A2098:A2099:A2100:',
+		'iPhone;111880;iPhone11,4:iPhone XS Max (China mainland):A2103:',
+		'iPhone;111880;iPhone11,6:iPhone XS Max:A1921:A2101:A2102:A2104:',
+		'iPhone;111868;iPhone11,8:iPhone XR:A1984:A2105:A2106:A2107:A2108:',
+		'iPhone;111865;iPhone12,1:iPhone 11:A2111:A2221:A2222:A2223:',
+		'iPhone;111879;iPhone12,3:iPhone 11 Pro:A2160:A2215:A2216:A2217:',
+		'iPhone;111878;iPhone12,5:iPhone 11 Pro Max:A2161:A2218:A2219:A2220:',
+		'iPhone;111882;iPhone12,8:iPhone SE (2nd generation):A2275:A2296:A2297:A2298:',
+		'iPhone;111877;iPhone13,1:iPhone 12 mini:A2176:A2398:A2399:A2400:A2401:',
+		'iPhone;111876;iPhone13,2:iPhone 12:A2172:A2402:A2403:A2404:A2405:',
+		'iPhone;111875;iPhone13,3:iPhone 12 Pro:A2341:A2406:A2407:A2408:A2409:',
+		'iPhone;111874;iPhone13,4:iPhone 12 Pro Max:A2342:A2410:A2411:A2412:A2413:',
+		'iPhone;111871;iPhone14,2:iPhone 13 Pro:A2483:A2636:A2638:A2639:A2640:',
+		'iPhone;111870;iPhone14,3:iPhone 13 Pro Max:A2484:A2641:A2643:A2644:A2645:',
+		'iPhone;111873;iPhone14,4:iPhone 13 mini:A2481:A2626:A2628:A2629:A2630:',
+		'iPhone;111872;iPhone14,5:iPhone 13:A2482:A2631:A2633:A2634:A2635:',
+		'iPhone;111866;iPhone14,6:iPhone SE (3rd generation):A2595:A2782:A2783:A2784:A2785:',
+		'iPhone;111850;iPhone14,7:iPhone 14:A2649:A2881:A2882:A2883:A2884:',
+		'iPhone;111854;iPhone14,8:iPhone 14 Plus:A2632:A2885:A2886:A2887:A2888:',
+		'iPhone;111849;iPhone15,2:iPhone 14 Pro:A2650:A2889:A2890:A2891:A2892:',
+		'iPhone;111846;iPhone15,3:iPhone 14 Pro Max:A2651:A2893:A2894:A2895:A2896:',
+		'iPhone;111831;iPhone15,4:iPhone 15:A2846:A3089:A3090:A3092:',
+		'iPhone;111830;iPhone15,5:iPhone 15 Plus:A2847:A3093:A3094:A3096:',
+		'iPhone;111829;iPhone16,1:iPhone 15 Pro:A2848:A3101:A3102:A3104:',
+		'iPhone;111828;iPhone16,2:iPhone 15 Pro Max:A2849:A3105:A3106:A3108:',
+		'iPhone;121031;iPhone17,1:iPhone 16 Pro:A3083:A3292:A3293:A3294:',
+		'iPhone;121032;iPhone17,2:iPhone 16 Pro Max:A3084:A3295:A3296:A3297:',
+		'iPhone;121029;iPhone17,3:iPhone 16:A3081:A3286:A3287:A3288:',
+		'iPhone;121030;iPhone17,4:iPhone 16 Plus:A3082:A3289:A3290:A3291:',
+		'iPhone;122208;iPhone17,5:iPhone 16e:A3212:A3408:A3409:A3410:',
+		'iPod;unknown;iPod1,1:iPod touch (1st generation):A1213:',
+		'iPod;unknown;iPod2,1:iPod touch (2nd generation):A1288:A1319:',
+		'iPod;unknown;iPod3,1:iPod touch (3rd generation):A1318:',
+		'iPod;unknown;iPod4,1:iPod touch (4th generation):A1367:',
+		'iPod;unknown;iPod5,1:iPod touch (5th generation):A1421:A1509:',
+		'iPod;unknown;iPod7,1:iPod touch (6th generation):A1574:',
+		'iPod;unknown;iPod9,1:iPod touch (7th generation):A2178:',
+		'Mac Desktop;unknown;510:Power Macintosh G3 (All-in-One):M4787:',
+		'Mac Desktop;unknown;510:Power Macintosh G3 (Desktop):M3979:',
+		'Mac Desktop;unknown;510:Power Macintosh G3 (Mini Tower):M4405:',
+		'Mac Desktop;unknown;iMac4,1:iMac (17-inch, Early 2006):A1173:',
+		'Mac Desktop;unknown;iMac4,1:iMac (20-inch, Early 2006):A1174:',
+		'Mac Desktop;unknown;iMac4,2:iMac (17-inch, Mid 2006):A1195:',
+		'Mac Desktop;unknown;iMac5,1:iMac (17-inch, Late 2006, Dedicated Graphics):A1208:',
+		'Mac Desktop;unknown;iMac5,1:iMac (20-inch, Late 2006):A1207:',
+		'Mac Desktop;unknown;iMac5,2:iMac (17-inch, Late 2006, Integrated Graphics):A1195:',
+		'Mac Desktop;unknown;iMac6,1:iMac (24-inch, Late 2006):A1200:',
+		'Mac Desktop;unknown;iMac7,1:iMac (20-inch, Mid 2007):A1224:',
+		'Mac Desktop;unknown;iMac7,1:iMac (24-inch, Mid 2007):A1225:',
+		'Mac Desktop;unknown;iMac8,1:iMac (20-inch, Early 2008):A1224:',
+		'Mac Desktop;unknown;iMac8,1:iMac (24-inch, Early 2008):A1225:',
+		'Mac Desktop;112427;iMac9,1:iMac (20-inch, Early 2009):A1224:',
+		'Mac Desktop;112427;iMac9,1:iMac (20-inch, Mid 2009):A1224:',
+		'Mac Desktop;112427;iMac9,1:iMac (24-inch, Early 2009):A1225:',
+		'Mac Desktop;112565;iMac10,1:iMac (21.5-inch, Late 2009):A1311:',
+		'Mac Desktop;112564;iMac10,1:iMac (27-inch, Late 2009, Core 2 Duo):A1312:',
+		'Mac Desktop;unknown;iMac11,1:iMac (27-inch, Late 2009, Core i5/i7):A1312:',
+		'Mac Desktop;112567;iMac11,2:iMac (21.5-inch, Mid 2010):A1311:',
+		'Mac Desktop;112566;iMac11,3:iMac (27-inch, Mid 2010):A1312:',
+		'Mac Desktop;111983;iMac12,1:iMac (21.5-inch, Late 2011):A1311:',
+		'Mac Desktop;111983;iMac12,1:iMac (21.5-inch, Mid 2011):A1311:',
+		'Mac Desktop;112569;iMac12,2:iMac (27-inch, Mid 2011):A1312:',
+		'Mac Desktop;112435;iMac13,1:iMac (21.5-inch, Late 2012):A1418:',
+		'Mac Desktop;112433;iMac13,2:iMac (27-inch, Late 2012):A1419:',
+		'Mac Desktop;unknown;iMac13,3:iMac (21.5-inch, Early 2013):A1418:',
+		'Mac Desktop;111967;iMac14,1:iMac (21.5-inch, Late 2013, Integrated Graphics):A1418:',
+		'Mac Desktop;111970;iMac14,2:iMac (27-inch, Late 2013):A1419:',
+		'Mac Desktop;unknown;iMac14,3:iMac (21.5-inch, Late 2013, Dedicated Graphics):A1418:',
+		'Mac Desktop;112031;iMac14,4:iMac (21.5-inch, Mid 2014):A1418:',
+		'Mac Desktop;112436;iMac15,1:iMac (Retina 5K, 27-inch, Late 2014):A1419:',
+		'Mac Desktop;112434;iMac15,1:iMac (Retina 5K, 27-inch, Mid 2015):A1419:',
+		'Mac Desktop;112036;iMac16,1:iMac (21.5-inch, Late 2015):A1418:',
+		'Mac Desktop;112034;iMac16,2:iMac (21.5-inch, Late 2015):A1418:',
+		'Mac Desktop;112034;iMac16,2:iMac (Retina 4K, 21.5-inch, Late 2015):A1418:',
+		'Mac Desktop;112035;iMac17,1:iMac (Retina 5K, 27-inch, Late 2015):A1419:',
+		'Mac Desktop;111921;iMac18,1:iMac (21.5-inch, 2017):A1418:',
+		'Mac Desktop;112026;iMac18,2:iMac (Retina 4K, 21.5-inch, 2017):A1418:',
+		'Mac Desktop;111969;iMac18,3:iMac (Retina 5K, 27-inch, 2017):A1419:',
+		'Mac Desktop;111998;iMac19,1:iMac (Retina 5K, 27-inch, 2019):A2115:',
+		'Mac Desktop;111963;iMac19,2:iMac (Retina 4K, 21.5-inch, 2019):A2116:',
+		'Mac Desktop;111913;iMac20,1:iMac (Retina 5K, 27-inch, 2020):A2115:',
+		'Mac Desktop;111913;iMac20,2:iMac (Retina 5K, 27-inch, 2020, RX 5700/XT):A2115:',
+		'Mac Desktop;111895;iMac21,1:iMac (24-inch, M1, 2021, Four Ports):A2438:',
+		'Mac Desktop;111895;iMac21,2:iMac (24-inch, M1, 2021, Two Ports):A2439:',
+		'Mac Desktop;111995;iMacPro1,1:iMac Pro (Retina 5K, 27-inch, Late 2017):A1862:',
+		'Mac Desktop;unknown;iMac,1:iMac (1999):M4984:',
+		'Mac Desktop;unknown;iMac,1:iMac (Revision A):M4984:',
+		'Mac Desktop;unknown;iMac,1:iMac (Revision B):M4984:',
+		'Mac Desktop;111900;Mac13,1:Mac Studio (M1 Max):A2615:',
+		'Mac Desktop;111900;Mac13,2:Mac Studio (M1 Ultra):A2615:',
+		'Mac Desktop;111837;Mac14,3:Mac mini (M2, 2023):A2686:',
+		'Mac Desktop;111343;Mac14,8:Mac Pro (2023):A2786:',
+		'Mac Desktop;111343;Mac14,8:Mac Pro (Rack, 2023):A2787:',
+		'Mac Desktop;111837;Mac14,12:Mac mini (M2 Pro, 2023):A2816:',
+		'Mac Desktop;111835;Mac14,13:Mac Studio (M2 Max, 2023):A2901:',
+		'Mac Desktop;111835;Mac14,14:Mac Studio (M2 Ultra, 2023):A2901:',
+		'Mac Desktop;117733;Mac15,4:iMac (24-inch, M3, 2023, Two Ports):A2873:',
+		'Mac Desktop;117734;Mac15,5:iMac (24-inch, M3, 2023, Four Ports):A2874:',
+		'Mac Desktop;122211;Mac15,14:Mac Studio (M3 Ultra, 2025):A3389:',
+		'Mac Desktop;121556;Mac16,2:iMac (24-inch, M4, 2024, Two Ports):A3247:',
+		'Mac Desktop;121557;Mac16,3:iMac (24-inch, M4, 2024, Four Ports):A3137:',
+		'Mac Desktop;122211;Mac16,9:Mac Studio (M4 Max, 2025):A3143:',
+		'Mac Desktop;121555;Mac16,10:Mac mini (M4, 2024):A3238:',
+		'Mac Desktop;121555;Mac16,11:Mac mini (M4 Pro, 2024):A3239:',
+		'Mac Desktop;unknown;Macmini1,1:Mac mini (Early 2006):A1176:',
+		'Mac Desktop;unknown;Macmini1,1:Mac mini (Late 2006):A1176:',
+		'Mac Desktop;unknown;Macmini2,1:Mac mini (Mid 2007):A1176:',
+		'Mac Desktop;111345;Macmini3,1:Mac mini (Early 2009):A1283:',
+		'Mac Desktop;112482;Macmini3,1:Mac mini (Late 2009):A1283:',
+		'Mac Desktop;112588;Macmini4,1:Mac mini (Mid 2010):A1347:',
+		'Mac Desktop;112007;Macmini5,1:Mac mini (Mid 2011, Integrated graphics):A1347:',
+		'Mac Desktop;112007;Macmini5,2:Mac mini (Mid 2011, Dedicated graphics):A1347:',
+		'Mac Desktop;unknown;Macmini5,3:Mac mini (Mid 2011, Server):A1347:',
+		'Mac Desktop;111926;Macmini6,1:Mac mini (Late 2012, Core i5):A1347:',
+		'Mac Desktop;111926;Macmini6,2:Mac mini (Late 2012, Core i7):A1347:',
+		'Mac Desktop;111931;Macmini7,1:Mac mini (Late 2014):A1347:',
+		'Mac Desktop;111912;Macmini8,1:Mac mini (Late 2018):A1993:',
+		'Mac Desktop;111894;Macmini9,1:Mac mini (M1, Late 2020):A2348:',
+		'Mac Desktop;unknown;MacPro1,1:Mac Pro (Mid 2006):A1186:',
+		'Mac Desktop;unknown;MacPro2,1:Mac Pro (Early 2007):A1186:',
+		'Mac Desktop;unknown;MacPro3,1:Mac Pro (Early 2008):A1186:',
+		'Mac Desktop;112590;MacPro4,1:Mac Pro (Early 2009):A1289:',
+		'Mac Desktop;112578;MacPro5,1:Mac Pro Server (Mid 2010):A1289:',
+		'Mac Desktop;118464;MacPro5,1:Mac Pro Server (Mid 2012):A1289:',
+		'Mac Desktop;112578;MacPro5,1:Mac Pro (Mid 2010):A1289:',
+		'Mac Desktop;118464;MacPro5,1:Mac Pro (Mid 2012):A1289:',
+		'Mac Desktop;112025;MacPro6,1:Mac Pro (Late 2013):A1481:',
+		'Mac Desktop;118461;MacPro7,1:Mac Pro (2019):A1991:',
+		'Mac Desktop;111907;MacPro7,1:Mac Pro (Rack, 2019):A2304:',
+		'Mac Desktop;unknown;PowerMac1,1:Power Macintosh G3 (Blue & White):M5183:',
+		'Mac Desktop;unknown;PowerMac1,2:Power Mac G4 (PCI Graphics):M5183:',
+		'Mac Desktop;unknown;PowerMac2,1:iMac (Slot Loading):M5521:',
+		'Mac Desktop;unknown;PowerMac2,2:iMac (Summer 2000):M5521:',
+		'Mac Desktop;unknown;PowerMac3,1:Power Mac G4 (AGP Graphics):M5183:',
+		'Mac Desktop;unknown;PowerMac3,3:Power Mac G4 (Gigabit Internet):M5183:',
+		'Mac Desktop;unknown;PowerMac3,4:Power Mac G4 (Digital Audio):M5183:',
+		'Mac Desktop;unknown;PowerMac3,5:Power Mac G4 (QuickSilver 2002ED):M8493:',
+		'Mac Desktop;unknown;PowerMac3,5:Power Mac G4 (QuickSilver 2002):M8493:',
+		'Mac Desktop;unknown;PowerMac3,5:Power Mac G4 (QuickSilver):M8493:',
+		'Mac Desktop;unknown;PowerMac3,6:Power Mac G4 (FW800):M8570:',
+		'Mac Desktop;unknown;PowerMac3,6:Power Mac G4 (Mirrored Drive Doors 2003):M8570:',
+		'Mac Desktop;unknown;PowerMac3,6:Power Mac G4 (Mirrored Drive Doors):M8570:',
+		'Mac Desktop;unknown;PowerMac4,1:iMac (Early 2001):M5521:',
+		'Mac Desktop;unknown;PowerMac4,1:iMac (Summer 2001):M5521:',
+		'Mac Desktop;unknown;PowerMac4,2:iMac (15-inch Early 2003):M6498:',
+		'Mac Desktop;unknown;PowerMac4,2:iMac (Flat Panel):M6498:',
+		'Mac Desktop;unknown;PowerMac4,4:eMac (1GHz G4):A1002:',
+		'Mac Desktop;unknown;PowerMac4,4:eMac (ATI Graphics, 1 GHz):A1002:',
+		'Mac Desktop;unknown;PowerMac4,4:eMac (ATI Graphics, 800 MHz):A1002:',
+		'Mac Desktop;unknown;PowerMac4,4:eMac:A1002:',
+		'Mac Desktop;unknown;PowerMac4,5:iMac (17-inch Flat Panel):M6498:',
+		'Mac Desktop;unknown;PowerMac5,1:Power Mac G4 Cube:M7886:',
+		'Mac Desktop;unknown;PowerMac6,1:iMac (17-inch):M6498:',
+		'Mac Desktop;unknown;PowerMac6,3:iMac (15-inch USB 2.0):M6498:',
+		'Mac Desktop;unknown;PowerMac6,3:iMac (17-inch USB 2.0):M6498:',
+		'Mac Desktop;unknown;PowerMac6,3:iMac (20-inch USB 2.0):A1065:',
+		'Mac Desktop;unknown;PowerMac6,4:eMac (2005):A1002:',
+		'Mac Desktop;unknown;PowerMac6,4:eMac (USB 2.0):A1002:',
+		'Mac Desktop;unknown;PowerMac7,2:Power Mac G5 (Early 2005, dual 2.0 GHz):A1047:',
+		'Mac Desktop;unknown;PowerMac7,2:Power Mac G5:A1047:',
+		'Mac Desktop;unknown;PowerMac7,3:Power Mac G5 (Early 2005, dual 2.3/2.7 GHz):A1047:',
+		'Mac Desktop;unknown;PowerMac7,3:Power Mac G5 (June 2004):A1047:',
+		'Mac Desktop;unknown;PowerMac8,1:iMac G5 (17-inch):A1058:',
+		'Mac Desktop;unknown;PowerMac8,1:iMac G5 (20-inch):A1076:',
+		'Mac Desktop;unknown;PowerMac8,2:iMac G5 (17-inch, ALS):A1058:',
+		'Mac Desktop;unknown;PowerMac8,2:iMac G5 (20-inch, ALS):A1076:',
+		'Mac Desktop;unknown;PowerMac9,1:Power Mac G5 (Late 2004):A1093:',
+		'Mac Desktop;unknown;PowerMac10,1:Mac mini (Early 2005):A1103:',
+		'Mac Desktop;unknown;PowerMac10,2:Mac mini (Late 2005):A1103:',
+		'Mac Desktop;unknown;PowerMac11,2:Power Mac G5 (Late 2005):A1117:A1177:',
+		'Mac Desktop;unknown;PowerMac12,1:iMac G5 (17-inch, iSight):A1144:',
+		'Mac Desktop;unknown;PowerMac12,1:iMac G5 (20-inch, iSight):A1145:',
+		'Mac Desktop;unknown;unknown:Macintosh 128K:M0001:',
+		'Mac Desktop;unknown;unknown:Macintosh 512Ke:M0001E:',
+		'Mac Desktop;unknown;unknown:Macintosh 512K:M0001W:',
+		'Mac Desktop;unknown;unknown:Macintosh Centris 610:M1444:',
+		'Mac Desktop;unknown;unknown:Macintosh Centris 650:M1205:',
+		'Mac Desktop;unknown;unknown:Macintosh Centris 660AV:M9040:',
+		'Mac Desktop;unknown;unknown:Macintosh Classic II:M4150:',
+		'Mac Desktop;unknown;unknown:Macintosh Classic:M0420:M1420:',
+		'Mac Desktop;unknown;unknown:Macintosh Color Classic II:M1600:',
+		'Mac Desktop;unknown;unknown:Macintosh Color Classic:M1600:',
+		'Mac Desktop;unknown;unknown:Macintosh ED:M0001D:M0001ED:',
+		'Mac Desktop;unknown;unknown:Macintosh IIci:M5780:',
+		'Mac Desktop;unknown;unknown:Macintosh IIcx:M5650:',
+		'Mac Desktop;unknown;unknown:Macintosh IIfx:M5525:',
+		'Mac Desktop;unknown;unknown:Macintosh IIsi:M0360:',
+		'Mac Desktop;unknown;unknown:Macintosh IIvi:M1350:',
+		'Mac Desktop;unknown;unknown:Macintosh IIvx:M1350:',
+		'Mac Desktop;unknown;unknown:Macintosh IIx:M5840:',
+		'Mac Desktop;unknown;unknown:Macintosh II:M5000:',
+		'Mac Desktop;unknown;unknown:Macintosh LC 475:M1476:',
+		'Mac Desktop;unknown;unknown:Macintosh LC 520:M1640:',
+		'Mac Desktop;unknown;unknown:Macintosh LC 550:M1640:',
+		'Mac Desktop;unknown;unknown:Macintosh LC 575:M1640:',
+		'Mac Desktop;unknown;unknown:Macintosh LC 580:M3872:',
+		'Mac Desktop;unknown;unknown:Macintosh LC 630:M3076:',
+		'Mac Desktop;unknown;unknown:Macintosh LC III+:M1254:',
+		'Mac Desktop;unknown;unknown:Macintosh LC III:M1254:',
+		'Mac Desktop;unknown;unknown:Macintosh LC II:M1700:',
+		'Mac Desktop;unknown;unknown:Macintosh LC:M0350:',
+		'Mac Desktop;unknown;unknown:Macintosh Plus ED:M0001A:',
+		'Mac Desktop;unknown;unknown:Macintosh Plus:M0001A:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 605:M1476:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 610:M2113:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 630:M1476:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 650:M2118:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 660AV:M9040:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 700:M5920:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 800:M1206:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 840AV:M9020:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 900:M4200:',
+		'Mac Desktop;unknown;unknown:Macintosh Quadra 950:M4300:',
+		'Mac Desktop;unknown;unknown:Macintosh SE FDHD:M5011:',
+		'Mac Desktop;unknown;unknown:Macintosh SE/30:M5119:',
+		'Mac Desktop;unknown;unknown:Macintosh TV:M1580:',
+		'Mac Laptop;unknown;312:PowerBook G3 (1st Series, Wallstreet):M4753:',
+		'Mac Laptop;unknown;313:PowerBook G3:M3553:',
+		'Mac Laptop;unknown;314:PowerBook G3 (1st Series, Mainstreet):M4753:',
+		'Mac Laptop;unknown;406:PowerBook G3 (2nd Series):M4753:',
+		'Mac Laptop;111867;Mac14,2:MacBook Air (M2, 2022):A2681:',
+		'Mac Laptop;111340;Mac14,5:MacBook Pro (14-inch, M2 Max, 2023):A2779:',
+		'Mac Laptop;111838;Mac14,6:MacBook Pro (16-inch, M2 Max, 2023):A2780:',
+		'Mac Laptop;111869;Mac14,7:MacBook Pro (13-inch, M2, 2022):A2338:',
+		'Mac Laptop;111340;Mac14,9:MacBook Pro (14-inch, M2 Pro, 2023):A2779:',
+		'Mac Laptop;111838;Mac14,10:MacBook Pro (16-inch, M2 Pro, 2023):A2780:',
+		'Mac Laptop;111346;Mac14,15:MacBook Air (15-inch, M2, 2023):A2941:',
+		'Mac Laptop;117735;Mac15,3:MacBook Pro (14-inch, M3, Nov 2023):A2918:',
+		'Mac Laptop;117736;Mac15,6:MacBook Pro (14-inch, M3 Pro, Nov 2023):A2992:',
+		'Mac Laptop;117737;Mac15,7:MacBook Pro (16-inch, M3 Pro, Nov 2023):A2991:',
+		'Mac Laptop;117736;Mac15,8:MacBook Pro (14-inch, 16-core M3 Max, Nov 2023):A2992:',
+		'Mac Laptop;117737;Mac15,9:MacBook Pro (16-inch, 16-core M3 Max, Nov 2023):A2991:',
+		'Mac Laptop;117736;Mac15,10:MacBook Pro (14-inch, 14-core M3 Max, Nov 2023):A2992:',
+		'Mac Laptop;117737;Mac15,11:MacBook Pro (16-inch, 14-core M3 Max, Nov 2023):A2991:',
+		'Mac Laptop;118551;Mac15,12:MacBook Air (13-inch, M3, 2024):A3113:',
+		'Mac Laptop;118552;Mac15,13:MacBook Air (15-inch, M3, 2024):A3114:',
+		'Mac Laptop;121552;Mac16,1:MacBook Pro (14-inch, M4, Nov 2024):A3112:',
+		'Mac Laptop;121554;Mac16,5:MacBook Pro (16-inch, M4 Max, Nov 2024):A3186:',
+		'Mac Laptop;121553;Mac16,6:MacBook Pro (14-inch, M4 Max, Nov 2024):A3185:',
+		'Mac Laptop;121554;Mac16,7:MacBook Pro (16-inch, M4 Pro, Nov 2024):A3403:',
+		'Mac Laptop;121553;Mac16,8:MacBook Pro (14-inch, M4 Pro, Nov 2024):A3401:',
+		'Mac Laptop;122209;Mac16,12:MacBook Air (13-inch, M4, 2025):A3240:',
+		'Mac Laptop;122210;Mac16,13:MacBook Air (15-inch, M4, 2025):A3241:',
+		'Mac Laptop;unknown;MacBook1,1:MacBook (13-inch, Mid 2006):A1181:',
+		'Mac Laptop;unknown;MacBook2,1:MacBook (13-inch, Late 2006):A1181:',
+		'Mac Laptop;unknown;MacBook2,1:MacBook (13-inch, Mid 2007):A1181:',
+		'Mac Laptop;unknown;MacBook3,1:MacBook (13-inch, Late 2007):A1181:',
+		'Mac Laptop;unknown;MacBook4,1:MacBook (13-inch, Early 2008):A1181:',
+		'Mac Laptop;unknown;MacBook4,1:MacBook (13-inch, Late 2008):A1181:',
+		'Mac Laptop;unknown;MacBook5,1:MacBook (13-inch, Aluminum, Late 2008):A1278:',
+		'Mac Laptop;111344;MacBook5,2:MacBook (13-inch, Early 2009):A1181:',
+		'Mac Laptop;112459;MacBook5,2:MacBook (13-inch, Mid 2009):A1181:',
+		'Mac Laptop;112623;MacBook6,1:MacBook (13-inch, Late 2009):A1342:',
+		'Mac Laptop;112581;MacBook7,1:MacBook (13-inch, Mid 2010):A1342:',
+		'Mac Laptop;112442;MacBook8,1:MacBook (Retina, 12-inch, Early 2015):A1534:',
+		'Mac Laptop;112033;MacBook9,1:MacBook (Retina, 12-inch, Early 2016):A1534:',
+		'Mac Laptop;111986;MacBook10,1:MacBook (Retina, 12-inch, 2017):A1534:',
+		'Mac Laptop;unknown;MacBookAir1,1:MacBook Air (Early 2008):A1237:',
+		'Mac Laptop;unknown;MacBookAir2,1:MacBook Air (Late 2008):A1304:',
+		'Mac Laptop;112660;MacBookAir2,1:MacBook Air (Mid 2009):A1304:',
+		'Mac Laptop;112580;MacBookAir3,1:MacBook Air (11-inch, Late 2010):A1370:',
+		'Mac Laptop;112585;MacBookAir3,2:MacBook Air (13-inch, Late 2010):A1369:',
+		'Mac Laptop;112439;MacBookAir4,1:MacBook Air (11-inch, Mid 2011):A1370:',
+		'Mac Laptop;112038;MacBookAir4,2:MacBook Air (13-inch, Mid 2011):A1369:',
+		'Mac Laptop;112008;MacBookAir5,1:MacBook Air (11-inch, Mid 2012):A1465:',
+		'Mac Laptop;111966;MacBookAir5,2:MacBook Air (13-inch, Mid 2012):A1466:',
+		'Mac Laptop;112032;MacBookAir6,1:MacBook Air (11-inch, Early 2014):A1465:',
+		'Mac Laptop;112437;MacBookAir6,1:MacBook Air (11-inch, Mid 2013):A1465:',
+		'Mac Laptop;111944;MacBookAir6,2:MacBook Air (13-inch, Early 2014):A1466:',
+		'Mac Laptop;111938;MacBookAir6,2:MacBook Air (13-inch, Mid 2013):A1466:',
+		'Mac Laptop;112441;MacBookAir7,1:MacBook Air (11-inch, Early 2015):A1465:',
+		'Mac Laptop;111924;MacBookAir7,2:MacBook Air (13-inch, 2017):A1466:',
+		'Mac Laptop;111956;MacBookAir7,2:MacBook Air (13-inch, Early 2015):A1466:',
+		'Mac Laptop;111933;MacBookAir8,1:MacBook Air (Retina, 13-inch, 2018):A1932:',
+		'Mac Laptop;111948;MacBookAir8,2:MacBook Air (Retina, 13-inch, 2019):A1932:',
+		'Mac Laptop;111991;MacBookAir9,1:MacBook Air (Retina, 13-inch, 2020):A2179:',
+		'Mac Laptop;111883;MacBookAir10,1:MacBook Air (M1, 2020):A2337:',
+		'Mac Laptop;unknown;MacBookPro1,1:MacBook Pro (15-inch, Early 2006):A1150:',
+		'Mac Laptop;unknown;MacBookPro1,2:MacBook Pro (17-inch, Early 2006):A1151:',
+		'Mac Laptop;unknown;MacBookPro2,1:MacBook Pro (17-inch, Late 2006):A1212:',
+		'Mac Laptop;unknown;MacBookPro2,2:MacBook Pro (15-inch, Late 2006):A1211:',
+		'Mac Laptop;unknown;MacBookPro3,1:MacBook Pro (15-inch, Late 2007):A1226:',
+		'Mac Laptop;unknown;MacBookPro3,1:MacBook Pro (15-inch, Mid 2007):A1226:',
+		'Mac Laptop;unknown;MacBookPro3,1:MacBook Pro (17-inch, Late 2007):A1229:',
+		'Mac Laptop;unknown;MacBookPro3,1:MacBook Pro (17-inch, Mid 2007):A1229:',
+		'Mac Laptop;unknown;MacBookPro4,1:MacBook Pro (15-inch, Early 2008):A1260:',
+		'Mac Laptop;unknown;MacBookPro4,1:MacBook Pro (17-inch, Early 2008):A1261:',
+		'Mac Laptop;unknown;MacBookPro5,1:MacBook Pro (15-inch, Early 2009):A1286:',
+		'Mac Laptop;unknown;MacBookPro5,1:MacBook Pro (15-inch, Late 2008):A1286:',
+		'Mac Laptop;112526;MacBookPro5,2:MacBook Pro (17-inch, Early 2009):A1297:',
+		'Mac Laptop;112473;MacBookPro5,2:MacBook Pro (17-inch, Mid 2009):A1297:',
+		'Mac Laptop;112624;MacBookPro5,3:MacBook Pro (15-inch, Mid 2009, Dedicated Graphics):A1286:',
+		'Mac Laptop;unknown;MacBookPro5,4:MacBook Pro (15-inch, Mid 2009, Integrated Graphics):A1286:',
+		'Mac Laptop;112474;MacBookPro5,5:MacBook Pro (13-inch, Mid 2009):A1278:',
+		'Mac Laptop;112606;MacBookPro6,1:MacBook Pro (17-inch, Mid 2010):A1297:',
+		'Mac Laptop;112605;MacBookPro6,2:MacBook Pro (15-inch, Mid 2010):A1286:',
+		'Mac Laptop;112604;MacBookPro7,1:MacBook Pro (13-inch, Mid 2010):A1278:',
+		'Mac Laptop;112600;MacBookPro8,1:MacBook Pro (13-inch, Early 2011):A1278:',
+		'Mac Laptop;111341;MacBookPro8,1:MacBook Pro (13-inch, Late 2011):A1278:',
+		'Mac Laptop;112599;MacBookPro8,2:MacBook Pro (15-inch, Early 2011):A1286:',
+		'Mac Laptop;112586;MacBookPro8,2:MacBook Pro (15-inch, Late 2011):A1286:',
+		'Mac Laptop;112598;MacBookPro8,3:MacBook Pro (17-inch, Early 2011):A1297:',
+		'Mac Laptop;112418;MacBookPro8,3:MacBook Pro (17-inch, Late 2011):A1297:',
+		'Mac Laptop;112568;MacBookPro9,1:MacBook Pro (15-inch, Mid 2012):A1286:',
+		'Mac Laptop;111958;MacBookPro9,2:MacBook Pro (13-inch, Mid 2012):A1278:',
+		'Mac Laptop;118465;MacBookPro10,1:MacBook Pro (Retina, 15-inch, Early 2013):A1398:',
+		'Mac Laptop;112576;MacBookPro10,1:MacBook Pro (Retina, 15-inch, Mid 2012):A1398:',
+		'Mac Laptop;118466;MacBookPro10,2:MacBook Pro (Retina, 13-inch, Early 2013):A1425:',
+		'Mac Laptop;118463;MacBookPro10,2:MacBook Pro (Retina, 13-inch, Late 2012):A1425:',
+		'Mac Laptop;111946;MacBookPro11,1:MacBook Pro (Retina, 13-inch, Late 2013):A1502:',
+		'Mac Laptop;111942;MacBookPro11,1:MacBook Pro (Retina, 13-inch, Mid 2014):A1502:',
+		'Mac Laptop;111971;MacBookPro11,2:MacBook Pro (Retina, 15-inch, Late 2013, Integrated graphics):A1398:',
+		'Mac Laptop;111935;MacBookPro11,2:MacBook Pro (Retina, 15-inch, Mid 2014, Integrated graphics):A1398:',
+		'Mac Laptop;111971;MacBookPro11,3:MacBook Pro (Retina, 15-inch, Late 2013, Dedicated graphics):A1398:',
+		'Mac Laptop;111935;MacBookPro11,3:MacBook Pro (Retina, 15-inch, Mid 2014, Dedicated graphics):A1398:',
+		'Mac Laptop;111955;MacBookPro11,4:MacBook Pro (Retina, 15-inch, Mid 2015, Integrated graphics):A1398:',
+		'Mac Laptop;111955;MacBookPro11,5:MacBook Pro (Retina, 15-inch, Mid 2015, Dedicated graphics):A1398:',
+		'Mac Laptop;111959;MacBookPro12,1:MacBook Pro (Retina, 13-inch, Early 2015):A1502:',
+		'Mac Laptop;111999;MacBookPro13,1:MacBook Pro (13-inch, 2016, Two Thunderbolt 3 ports):A1708:',
+		'Mac Laptop;112003;MacBookPro13,2:MacBook Pro (13-inch, 2016, Four Thunderbolt 3 ports):A1706:',
+		'Mac Laptop;111975;MacBookPro13,3:MacBook Pro (15-inch, 2016):A1707:',
+		'Mac Laptop;111951;MacBookPro14,1:MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):A1708:',
+		'Mac Laptop;111972;MacBookPro14,2:MacBook Pro (13-inch, 2017, Four Thunderbolt 3 ports):A1706:',
+		'Mac Laptop;111947;MacBookPro14,3:MacBook Pro (15-inch, 2017):A1707:',
+		'Mac Laptop;111949;MacBookPro15,1:MacBook Pro (15-inch, 2018, Integrated graphics):A1990:',
+		'Mac Laptop;111941;MacBookPro15,1:MacBook Pro (15-inch, 2019, Integrated graphics):A1990:',
+		'Mac Laptop;111925;MacBookPro15,2:MacBook Pro (13-inch, 2018):A1989:',
+		'Mac Laptop;111997;MacBookPro15,2:MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):A1989:',
+		'Mac Laptop;unknown;MacBookPro15,3:MacBook Pro (15-inch, 2018, Dedicated graphics):A1990:',
+		'Mac Laptop;111941;MacBookPro15,3:MacBook Pro (15-inch, 2019, Dedicated graphics):A1990:',
+		'Mac Laptop;111945;MacBookPro15,4:MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):A2159:',
+		'Mac Laptop;111932;MacBookPro16,1:MacBook Pro (16-inch, 2019, Integrated graphics):A2141:',
+		'Mac Laptop;111339;MacBookPro16,2:MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):A2251:',
+		'Mac Laptop;111981;MacBookPro16,3:MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):A2289:',
+		'Mac Laptop;111932;MacBookPro16,4:MacBook Pro (16-inch, 2019, Dedicated graphics):A2141:',
+		'Mac Laptop;111893;MacBookPro17,1:MacBook Pro (13-inch, M1, 2020):A2338:',
+		'Mac Laptop;111901;MacBookPro18,1:MacBook Pro (16-inch, M1 Pro, 2021):A2485:',
+		'Mac Laptop;111901;MacBookPro18,2:MacBook Pro (16-inch, M1 Max, 2021):A2485:',
+		'Mac Laptop;111902;MacBookPro18,3:MacBook Pro (14-inch, M1 Pro, 2021):A2442:',
+		'Mac Laptop;111902;MacBookPro18,4:MacBook Pro (14-inch, M1 Max, 2021):A2442:',
+		'Mac Laptop;unknown;PowerBook1,1:PowerBook G3 (Bronze Keyboard):M5343:',
+		'Mac Laptop;unknown;PowerBook2,1:iBook SE:M2453:',
+		'Mac Laptop;unknown;PowerBook2,1:iBook:M2453:',
+		'Mac Laptop;unknown;PowerBook2,2:iBook (FireWire):M6411:',
+		'Mac Laptop;unknown;PowerBook3,1:PowerBook (FireWire):M7572:',
+		'Mac Laptop;unknown;PowerBook3,2:PowerBook G4:M5884:',
+		'Mac Laptop;unknown;PowerBook3,3:PowerBook G4 (Gigabit Ethernet):M8407:',
+		'Mac Laptop;unknown;PowerBook3,4:PowerBook G4:A1001:',
+		'Mac Laptop;unknown;PowerBook3,5:PowerBook G4 (1GHz/867MHz):A1025:',
+		'Mac Laptop;unknown;PowerBook4,1:iBook (Dual USB):M6497:',
+		'Mac Laptop;unknown;PowerBook4,1:iBook (Late 2001):M6497:',
+		'Mac Laptop;unknown;PowerBook4,2:iBook (14.1-inch):M8413:',
+		'Mac Laptop;unknown;PowerBook4,3:iBook (14.1-inch, 16 VRAM):A1007:',
+		'Mac Laptop;unknown;PowerBook4,3:iBook (14.1-inch, 32 VRAM):A1007:',
+		'Mac Laptop;unknown;PowerBook4,3:iBook (16 VRAM):A1005:',
+		'Mac Laptop;unknown;PowerBook4,3:iBook (32 VRAM):A1005:',
+		'Mac Laptop;unknown;PowerBook4,3:iBook (Opaque 16 VRAM):A1005:',
+		'Mac Laptop;unknown;PowerBook5,1:PowerBook G4 (17-inch):A1013:',
+		'Mac Laptop;unknown;PowerBook5,2:PowerBook G4 (15-inch FW800):A1046:',
+		'Mac Laptop;unknown;PowerBook5,3:PowerBook G4 (17-inch 1.33GHz):A1052:',
+		'Mac Laptop;unknown;PowerBook5,4:PowerBook G4 (15-inch 1.5/1.33 GHz):A1095:',
+		'Mac Laptop;unknown;PowerBook5,5:PowerBook G4 (17-inch 1.5GHz):A1085:',
+		'Mac Laptop;unknown;PowerBook5,6:PowerBook G4 (15-inch 1.67/1.5 GHz):A1106:',
+		'Mac Laptop;unknown;PowerBook5,7:PowerBook G4 (17-inch 1.67 GHz):A1107:',
+		'Mac Laptop;unknown;PowerBook5,8:PowerBook G4 (15-inch Double Layer SD):A1138:',
+		'Mac Laptop;unknown;PowerBook5,9:PowerBook G4 (17-inch Double Layer SD):A1139:',
+		'Mac Laptop;unknown;PowerBook6,1:PowerBook G4 (12-inch):A1010:',
+		'Mac Laptop;unknown;PowerBook6,2:PowerBook G4 (12-inch DVI):A1010:',
+		'Mac Laptop;unknown;PowerBook6,3:iBook G4 (12-inch 1 GHz):A1054:',
+		'Mac Laptop;unknown;PowerBook6,3:iBook G4 (12-inch 800 MHz):A1054:',
+		'Mac Laptop;unknown;PowerBook6,3:iBook G4 (14-inch 1 GHz):A1055:',
+		'Mac Laptop;unknown;PowerBook6,3:iBook G4 (14-inch 800 MHz):A1055:',
+		'Mac Laptop;unknown;PowerBook6,4:PowerBook G4 (12-inch 1.33GHz):A1010:',
+		'Mac Laptop;unknown;PowerBook6,5:iBook G4 (12-inch Early 2004):A1054:',
+		'Mac Laptop;unknown;PowerBook6,5:iBook G4 (12-inch Late 2004):A1054:',
+		'Mac Laptop;unknown;PowerBook6,5:iBook G4 (14-inch Early 2004):A1055:',
+		'Mac Laptop;unknown;PowerBook6,5:iBook G4 (14-inch Late 2004):A1055:',
+		'Mac Laptop;unknown;PowerBook6,7:iBook G4 (12-inch Mid 2005):A1133:',
+		'Mac Laptop;unknown;PowerBook6,7:iBook G4 (14-inch Mid 2005):A1134:',
+		'Mac Laptop;unknown;PowerBook6,8:PowerBook G4 (12-inch 1.5GHz):A1104:',
+		'Mac Server;unknown;RackMac1,1:Xserve:A1004:',
+		'Mac Server;unknown;RackMac1,2:Xserve (Cluster Node):unknown:',
+		'Mac Server;unknown;RackMac1,2:Xserve (Slot Load):A1004:',
+		'Mac Server;unknown;RackMac3,1:Xserve G5 (Cluster Node):unknown:',
+		'Mac Server;unknown;RackMac3,1:Xserve G5 (January 2005 Cluster Node):unknown:',
+		'Mac Server;unknown;RackMac3,1:Xserve G5 (January 2005):A1068:',
+		'Mac Server;unknown;RackMac3,1:Xserve G5:A1068:',
+		'Mac Server;unknown;Xserve1,1:Xserve (Late 2006):A1196:',
+		'Mac Server;unknown;Xserve2,1:Xserve (Early 2008):A1246:',
+		'Mac Server;unknown;Xserve3,1:Xserve (Early 2009):A1279:'
+	];
+}
+
+?>

@@ -5,7 +5,7 @@ get_marketing_model_name() {
 	##
 	## Created by Pico Mitchell (of Free Geek)
 	##
-	## Version: 2023.5.31-1
+	## Version: 2023.11.8-1
 	##
 	## MIT License
 	##
@@ -22,7 +22,7 @@ get_marketing_model_name() {
 	## WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	##
 
-	local PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add /usr/libexec to PATH for easy access to PlistBuddy.
+	local PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
 	# THE NEXT 3 VARIABLES CAN OPTIONALLY BE SET TO "true" MANUALLY OR BY PASSING THE SPECIFIED ARGUMENTS TO THIS FUNCTION TO ALTER THE OUTPUT:
 	local VERBOSE_LOGGING=false # Set to "true" or pass "v" argument for logging to stderr to see how the Marketing Model Name is being loaded and if and where it is being cached as well as other debug info.
@@ -30,6 +30,7 @@ get_marketing_model_name() {
 	local INCLUDE_MODEL_PART_NUMBER=false # Set to "true" or pass "p" argument if you want to include the "M####LL/A" style Model Part Number in the output after the Marketing Model Name for T2 and Apple Silicon Macs (it will be included in the output from this script but it won't be cached to not alter the "About This Mac" model name).
 
 	local this_option
+	local OPTIND=1
 	while getopts 'vip' this_option; do
 		case "${this_option}" in
 			'v') VERBOSE_LOGGING=true ;;
@@ -67,7 +68,7 @@ get_marketing_model_name() {
 	if $IS_APPLE_SILICON; then
 		# This local Marketing Model Name within "ioreg" only exists on Apple Silicon Macs.
 		if $VERBOSE_LOGGING; then >&2 echo 'DEBUG - LOADING FROM IOREG ON APPLE SILICON'; fi
-		possible_marketing_model_name="$(PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< "$(ioreg -arc IOPlatformDevice -k product-name)" 2> /dev/null | tr -d '[:cntrl:]')" # Remove control characters because this decoded value could end with a NUL char.
+		possible_marketing_model_name="$(/usr/libexec/PlistBuddy -c 'Print :0:product-name' /dev/stdin <<< "$(ioreg -arc IOPlatformDevice -k product-name)" 2> /dev/null | tr -d '[:cntrl:]')" # Remove control characters because this decoded value could end with a NUL char.
 
 		if $IS_VIRTUAL_MACHINE; then
 			# It appears that Apple Silicon Virtual Machines will always output "Apple Virtual Machine 1" as their local Marketing Model Name from the previous "ioreg" command.
@@ -86,253 +87,193 @@ get_marketing_model_name() {
 		fi
 	else
 		local SERIAL_NUMBER
-		SERIAL_NUMBER="$(PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< "$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)" 2> /dev/null)"
+		SERIAL_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< "$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)" 2> /dev/null)"
 		readonly SERIAL_NUMBER
 		if $VERBOSE_LOGGING; then >&2 echo "DEBUG - SERIAL: ${SERIAL_NUMBER}"; fi
 
-		local load_fallback_marketing_model_name=false
-
+		local SERIAL_CONFIG_CODE=''
 		if [[ -n "${SERIAL_NUMBER}" ]]; then
-			local marketing_model_name_was_cached=false
-
-			local serial_config_code=''
 			local serial_number_length="${#SERIAL_NUMBER}"
 			if (( serial_number_length == 11 || serial_number_length == 12 )); then
 				# The Configuration Code part of the Serial Number which indicates the model is the last 4 characters for 12 character serials and the last 3 characters for 11 character serials (which are very old and shouldn't actually be encountered: https://www.macrumors.com/2010/04/16/apple-tweaks-serial-number-format-with-new-macbook-pro/).
 				# Starting with the 2021 MacBook Pro models, randomized 10 character Serial Numbers are now used which do not have any model specific characters, but those Macs will never get here or need to load the Marketing Model Name over the internet since they are Apple Silicon and the local Marketing Model Name will have been retrieved above.
-				serial_config_code="${SERIAL_NUMBER:8}"
+				SERIAL_CONFIG_CODE="${SERIAL_NUMBER:8}"
+				if $VERBOSE_LOGGING; then >&2 echo "DEBUG - SERIAL CONFIG CODE: ${SERIAL_CONFIG_CODE}"; fi
 			fi
-
-			local logged_in_user_id
-			logged_in_user_id="$(echo 'show State:/Users/ConsoleUser' | scutil | awk '(($1 == "Name") && (($NF == "loginwindow") || ($NF ~ /^_/))) { exit } ($1 == "UID") { print $NF; exit }')"
-			# NOTES ABOUT RETRIEVING LOGGED IN USER VIA "scutil" (RATHER THAN USING "stat")
-			# Retrieving the logged in user UID with "stat -f '%u' /dev/console" will returns "0" (for the "root" user) very early on boot before any user is logged in and before even getting to the login window, and it will also return "0" when at the login window.
-			# Both of those scenarios could be mistaken for the "root" user actually being logged in graphically if the "stat" technique is used instead of "scutil".
-			# Using "scutil" (with some "awk" filtering) can do better in both of those situations vs using "stat" to be able to return an empty string early on boot and at the login window while correctly returning the logged in user UID when a user is actually logged in (even if that is actually the root user).
-			# Early on boot (before getting to the login window), "echo 'show State:/Users/ConsoleUser' | scutil" will return "No such key" so an empty string will be returned after piping to "awk" since no "UID" field would be found.
-			# When at the initial boot login window, there will be no top level "Name" or "UID" fields, but there will be "SessionInfo" array with either the "root" user (UID 0) indicated on macOS 10.14 Mojave and older or "_windowserver" user (UID 88)
-			# indicated on macOS 10.15 Catalina and newer, but those "SessionInfo" fields are NOT checked by this code. So an empty string will be properly returned when at the initial boot login window after piping to "awk".
-			# When at the login window after a user has logged out, the top level "Name" will be "loginwindow" (and "UID" will be "0") on macOS 10.15 Catalina and newer so we want to ignore it and return an empty string so that the "root" user is not
-			# considered to be logged in at the login window (on macOS 10.14 Mojave and older, the same info as the initial boot login window as described above is also shown after logout which will also result in an empty string being properly returned).
-			# Also, return an empty string if any service/role account is logged in which would start with "_" (such as "_mbsetupuser" which would indicate that the system is at Setup Assistant).
-			# Otherwise return the actual logged in user UID (which could be "0" if actually logged in as root, even though that is quite rare and not a recommended thing to do).
-			# For more information, see https://scriptingosx.com/2020/02/getting-the-current-user-in-macos-update/
-
-			local is_logged_in_as_root=false
-			if [[ -n "${logged_in_user_id}" ]] && (( logged_in_user_id == 0 )); then
-				is_logged_in_as_root=true
-			fi
-
-			local logged_in_user_name=''
-			if [[ -n "${serial_config_code}" ]]; then
-				if ! $is_logged_in_as_root && (( ${EUID:-$(id -u)} == 0 )); then
-					# If running as root (but not logged in graphically as root), check for the cached Marketing Model Name from the logged in user, if a user is logged it.
-					# If not found or no user is logged in, check for the cached Marketing Model Name from other users with home folders within "/Users".
-					# If runnning as root and the root user is graphically logged in (which is rare but possible), only their preferences will be checked (and cached to) just like any other running user (even though they could technically check other users preferences).
-
-					if [[ -n "${logged_in_user_id}" ]]; then
-						logged_in_user_name="$(dscl /Search -search /Users UniqueID "${logged_in_user_id}" 2> /dev/null | awk '{ print $1; exit }')"
-					fi
-
-					if [[ -n "${logged_in_user_name}" ]]; then # Always check cached preferences for logged in user first so that we know whether or not it needs to be cached for the logged in user if it is already cached for another user.
-						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING LOGGED IN USER ${logged_in_user_name} DEFAULTS"; fi
-						# Since "defaults read" has no option to traverse into keys of dictionary values, use the whole "defaults export" output and parse it with "PlistBuddy" to get at the specific key of the "CPU Names" dictionary value that we want.
-						# Using "defaults export" instead of accessing the plist file directly with "PlistBuddy" is important since preferences are not guaranteed to be written to disk if they were just set.
-						possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${serial_config_code}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${logged_in_user_id}" sudo -u "${logged_in_user_name}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)"
-
-						if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-							if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM LOGGED IN USER ${logged_in_user_name} CACHE"; fi
-							marketing_model_name="${possible_marketing_model_name}"
-							marketing_model_name_was_cached=true
-						fi
-					fi
-
-					if [[ -z "${marketing_model_name}" ]]; then # If was not cached for logged in user, check other users with home folders in "/Users" (there could technically users with home folders in other locations, but this is thorough enough for normal scenarios).
-						local this_home_folder
-						local user_name_for_home
-						local user_id_for_home
-						for this_home_folder in '/Users/'*; do
-							if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
-								user_name_for_home="$(dscl /Search -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
-
-								if [[ -n "${user_name_for_home}" ]]; then
-									user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath 'string(//string)' - 2> /dev/null)"
-
-									if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' && "${user_name_for_home}" != "${logged_in_user_name}" ]]; then # No need to check logged in user in this loop since it was already checked.
-										if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING ${this_home_folder} DEFAULTS"; fi
-										possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${serial_config_code}-en-US_US" /dev/stdin <<< "$(launchctl asuser "${user_id_for_home}" sudo -u "${user_name_for_home}" defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
-
-										if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-											if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM ${this_home_folder} CACHE"; fi
-											marketing_model_name="${possible_marketing_model_name}"
-
-											if [[ -z "${logged_in_user_name}" ]]; then # DO NOT consider the Marketing Model Name cached if there is a logged in user that it was not cached for so that it can be cached to the logged in user.
-												marketing_model_name_was_cached=true
-											elif $VERBOSE_LOGGING; then
-												>&2 echo 'DEBUG - NOT CONSIDERING IT CACHED SINCE THERE IS A LOGGED IN USER'
-											fi
-
-											break
-										fi
-									elif $VERBOSE_LOGGING; then
-										>&2 echo "DEBUG - SKIPPING ${this_home_folder} SINCE IS LOGGED IN USER"
-									fi
-								fi
-							fi
-						done
-					fi
-				else # If running as a user, won't be able to check others home folders, so only check running user preferences.
-					if $VERBOSE_LOGGING; then >&2 echo "DEBUG - CHECKING RUNNING USER $(id -un) DEFAULTS"; fi
-					possible_marketing_model_name="$(PlistBuddy -c "Print :'CPU Names':${serial_config_code}-en-US_US" /dev/stdin <<< "$(defaults export com.apple.SystemProfiler -)" 2> /dev/null)" # See notes above about using "PlistBuddy" with "defaults export".
-
-					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM RUNNING USER $(id -un) CACHE"; fi
-						marketing_model_name="${possible_marketing_model_name}"
-						marketing_model_name_was_cached=true
-					fi
-				fi
-			fi
-
-			if [[ -z "${marketing_model_name}" && -n "${serial_config_code}" ]]; then
-				local marketing_model_name_xml
-				marketing_model_name_xml="$(curl -m 5 -sfL "https://support-sp.apple.com/sp/product?cc=${serial_config_code}" 2> /dev/null)"
-
-				if [[ "${marketing_model_name_xml}" == '<?xml'* ]]; then
-					possible_marketing_model_name="$(echo "${marketing_model_name_xml}" | xmllint --xpath 'normalize-space(//configCode)' - 2> /dev/null)"
-
-					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM \"About This Mac\" URL API: ${possible_marketing_model_name}"; fi
-						marketing_model_name="${possible_marketing_model_name}"
-
-						if [[ "${marketing_model_name}" != *[[:digit:]]* ]]; then
-							# If Marketing Model Name does not contain a digit, the "About This Mac" URL API may have just returned the Short Model Name, such as how "MacBook Air" will only be returned for *SOME* 2013 "MacBookAir6,1" or "MacBookAir6,2" serials),
-							# But, the "Specs Search" URL API will retrieve the proper full Marketing Model Name of "MacBook Air (11-inch, Mid 2013)" for the 2013 "MacBookAir6,1" and "MacBook Air (13-inch, Mid 2013)" for the 2013 "MacBookAir6,2", so fallback to using that if there are no digits in the Marketing Model Name.
-							load_fallback_marketing_model_name=true
-						fi
-					else
-						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - INVALID FROM \"About This Mac\" URL API (${possible_marketing_model_name:-N/A}): ${marketing_model_name_xml}"; fi
-
-						marketing_model_name="${MODEL_IDENTIFIER} (Invalid Serial Number for Marketing Model Name)"
-						load_fallback_marketing_model_name=true
-					fi
-				elif $VERBOSE_LOGGING; then
-					>&2 echo 'DEBUG - FAILED TO LOAD FROM "About This Mac" URL API'
-				fi
-			fi
-
-			if $load_fallback_marketing_model_name || [[ -z "${marketing_model_name}" ]]; then
-				# The following URL API and JSON structure was discovered from examining how "https://support.apple.com/specs/${SERIAL_NUMBER}" loads the specs URL via JavaScript (as of August 9th, 2022 in case this breaks in the future).
-				# This alternate technique of getting the Marketing Model Name for a Serial Number from this "Specs Search" URL API should not be necessary as the previous one should have always worked for valid serials,
-				# but including it here anyway just in case the older "About This Mac" URL API stops working at some point and also as a reference for how this "Specs Search" URL API method can be used.
-				# Also worth noting that this technique also works for the new randomized 10 character serial numbers for Apple Silicon Macs, but the local Marketing Model Name will always be retrieved instead on Apple Silicon Macs.
-				# For more information about this "Specs Search" URL API, see: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_specs_url_from_serial.sh
-
-				local serial_search_results_json
-				serial_search_results_json="$(curl -m 10 -sfL "https://km.support.apple.com/kb/index?page=categorydata&serialnumber=${SERIAL_NUMBER}" 2> /dev/null)" # I have seem this URL API timeout after 5 seconds when called multiple times rapidly (likely because of rate limiting), so give it a 10 second timeout which seems to always work.
-
-				if [[ "${serial_search_results_json}" == *'"id":'* ]]; then # A valid JSON structure containing an "id" key should always be returned, even for invalid serials.
-					possible_marketing_model_name="$(osascript -l 'JavaScript' -e 'run = argv => JSON.parse(argv[0]).name.replace(/\s+/g, " ").trim()' -- "${serial_search_results_json}" 2> /dev/null)" # Parsing JSON with JXA: https://paulgalow.com/how-to-work-with-json-api-data-in-macos-shell-scripts & https://twitter.com/n8henrie/status/1529513429203300352
-
-					if [[ "${possible_marketing_model_name}" == *'Mac'* ]]; then
-						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOADED FROM \"Specs Search\" URL API: ${possible_marketing_model_name}"; fi
-						marketing_model_name="${possible_marketing_model_name}"
-						load_fallback_marketing_model_name=false
-					else
-						if $VERBOSE_LOGGING; then >&2 echo "DEBUG - INVALID FROM \"Specs Search\" URL API (${possible_marketing_model_name:-N/A}): $(echo "${serial_search_results_json}" | tr -d '[:space:]')"; fi # Remove all whitespace from JSON results just for a brief DEBUG display.
-
-						marketing_model_name="${MODEL_IDENTIFIER} (Invalid Serial Number for Marketing Model Name)"
-						load_fallback_marketing_model_name=true
-					fi
-				elif $VERBOSE_LOGGING; then
-					>&2 echo 'DEBUG - FAILED TO LOAD FROM "Specs Search" URL API'
-				fi
-			fi
-
-			if ! $load_fallback_marketing_model_name; then
-				if [[ -n "${marketing_model_name}" ]]; then
-					if ! $marketing_model_name_was_cached && [[ -n "${serial_config_code}" ]]; then
-						# Cache the Marketing Model Name into the "About This Mac" preference key...
-							# for the running user (if not running as root, unless graphically logged in as root) if the Marketing Model Name was downloaded,
-							# OR if running as root, for the logged in user (if a user is logged in) and the Marketing Model Name was downloaded or was loaded from another users cache,
-							# OR for the first valid home folder detected within "/Users" if running as root and there is no user logged in and the Marketing Model Name was downloaded.
-
-						local cpu_name_key_for_serial="${serial_config_code}-en-US_US"
-						local quoted_marketing_model_name_for_defaults
-						quoted_marketing_model_name_for_defaults="$([[ "${marketing_model_name}" =~ [\(\)] ]] && echo "'${marketing_model_name}'" || echo "${marketing_model_name}")"
-						# If the model contains parentheses, "defaults write" has trouble with it and the value needs to be specially quoted: https://apple.stackexchange.com/questions/300845/how-do-i-handle-e-g-correctly-escape-parens-in-a-defaults-write-key-val#answer-300853
-
-						if ! $is_logged_in_as_root && (( ${EUID:-$(id -u)} == 0 )); then # As noted above, if graphically logged in as root, only cache to their preferences just like when running as any other user.
-							local user_id_for_cache
-							local user_name_for_cache
-							if [[ -n "${logged_in_user_name}" ]]; then # Always cache for logged in user if there is one.
-								user_id_for_cache="${logged_in_user_id}"
-								user_name_for_cache="${logged_in_user_name}"
-							else # Otherwise cache to first valid home folder detected.
-								for this_home_folder in '/Users/'*; do
-									if [[ -d "${this_home_folder}" && "${this_home_folder}" != '/Users/Shared' && "${this_home_folder}" != '/Users/Guest' ]]; then
-										user_name_for_home="$(dscl /Search -search /Users NFSHomeDirectory "${this_home_folder}" | awk '{ print $1; exit }')"
-
-										if [[ -n "${user_name_for_home}" ]]; then
-											user_id_for_home="$(dscl -plist /Search -read "/Users/${user_name_for_home}" UniqueID 2> /dev/null | xmllint --xpath 'string(//string)' - 2> /dev/null)"
-
-											if [[ -n "${user_id_for_home}" && "${user_id_for_home}" != '0' ]]; then
-												user_id_for_cache="${user_id_for_home}"
-												user_name_for_cache="${user_name_for_home}"
-												break
-											fi
-										fi
-									fi
-								done
-							fi
-
-							if [[ -n "${user_id_for_cache}" && "${user_id_for_cache}" != '0' && -n "${user_name_for_cache}" ]]; then
-								launchctl asuser "${user_id_for_cache}" sudo -u "${user_name_for_cache}" defaults write com.apple.SystemProfiler 'CPU Names' -dict-add "${cpu_name_key_for_serial}" "${quoted_marketing_model_name_for_defaults}"
-
-								if $VERBOSE_LOGGING; then
-									if [[ "${logged_in_user_name}" == "${user_name_for_cache}" ]]; then
-										>&2 echo "DEBUG - CACHED FOR LOGGED IN USER ${user_name_for_cache}"
-									else
-										>&2 echo "DEBUG - CACHED FOR OTHER USER ${user_name_for_cache}"
-									fi
-
-									>&2 launchctl asuser "${user_id_for_cache}" sudo -u "${user_name_for_cache}" defaults read com.apple.SystemProfiler 'CPU Names'
-								fi
-							elif $VERBOSE_LOGGING; then
-								>&2 echo 'DEBUG - NO USER TO CACHE FOR'
-							fi
-						else
-							defaults write com.apple.SystemProfiler 'CPU Names' -dict-add "${cpu_name_key_for_serial}" "${quoted_marketing_model_name_for_defaults}"
-
-							if $VERBOSE_LOGGING; then
-								>&2 echo "DEBUG - CACHED FOR RUNNING USER $(id -un)"
-								>&2 defaults read com.apple.SystemProfiler 'CPU Names'
-							fi
-						fi
-					fi
-				else
-					marketing_model_name="${MODEL_IDENTIFIER} (Internet Required for Marketing Model Name)"
-					load_fallback_marketing_model_name=true
-				fi
-			fi
-		else
-			marketing_model_name="${MODEL_IDENTIFIER} (No Serial Number for Marketing Model Name)"
-			load_fallback_marketing_model_name=true
 		fi
+		readonly SERIAL_CONFIG_CODE
 
-		if $load_fallback_marketing_model_name; then
-			# A slightly different Marketing Model Name is available locally for all Intel Macs except for the last few models: https://scriptingosx.com/2017/11/get-the-marketing-name-for-a-mac/
-			# Since these are not the same a what is loaded in "About This Mac", these are only used as a fallback option and are never cached.
-			local si_machine_attributes_plist_path='/System/Library/PrivateFrameworks/ServerInformation.framework/Versions/A/Resources/en.lproj/SIMachineAttributes.plist' # The path to this file changed to this in macOS 10.15 Catalina.
-			if [[ ! -f "${si_machine_attributes_plist_path}" ]]; then si_machine_attributes_plist_path='/System/Library/PrivateFrameworks/ServerInformation.framework/Versions/A/Resources/English.lproj/SIMachineAttributes.plist'; fi
+		# The following list of Marketing Model Names with grouped Model IDs and Serial Config Codes is generated from: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/group_every_intel_mac_marketing_model_name_with_model_ids_and_serial_config_codes.sh
+		every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes='iMac (17-inch, Early 2006):iMac4,1:U2N:U2R:V4M:V4N:V4U:V66:VGB:VGZ:VH1:VHP:VV4:VV6:
+iMac (17-inch, Late 2006 CD):iMac5,2:
+iMac (17-inch, Late 2006):iMac5,1:AC1:VUX:VUY:WAR:WRR:WRW:WV8:WVR:X1A:X1W:X2W:X6Q:X9F:X9Y:XLF:Y3V:Y3W:Y3X:Y6K:Y94:Y97:YAG:YLJ:
+iMac (17-inch, Mid 2006):iMac4,2:
+iMac (20-inch, Early 2006):iMac4,1:U2P:U2S:V4P:V4Q:V4R:V67:VGC:VGM:VH0:VH2:VW4:VX0:WXN:X0U:
+iMac (20-inch, Early 2008):iMac8,1:28B:2PN:2PR:3FF:3FG:3SZ:5A8:5J0:6F9:8R2:8R3:ZE2:ZE3:ZE5:ZE6:
+iMac (20-inch, Early 2009):iMac9,1:0TF:0TH:6X0:8M5:8TS:8TT:9EX:9LN:
+iMac (20-inch, Late 2006):iMac5,1:VUV:VUW:WRS:WRX:WSD:X0E:X29:X6S:X9E:X9G:XA4:XCR:XCY:Y3R:Y3U:Y9B:YAE:YDW:
+iMac (20-inch, Mid 2007):iMac7,1:02X:09Q:0PQ:0PR:0PT:0U1:1NU:1NV:3PB:X85:X86:X87:X88:Z58:Z9G:ZEG:ZFD:
+iMac (20-inch, Mid 2009):iMac9,1:6MH:6MJ:9TH:BAH:DMV:DWY:E86:FUN:FXN:GM9:H1S:HS6:HS7:HT6:HUE:
+iMac (21.5-inch, 2017):iMac18,1:
+iMac (21.5-inch, Early 2013):iMac13,3:
+iMac (21.5-inch, Late 2009):iMac10,1:5PC:5PK:B9S:B9U:CY8:DMW:DMX:DWR:DWU:E8D:E8E:E8F:F0G:F0H:FQH:FU1:H9K:HDF:
+iMac (21.5-inch, Late 2011):iMac12,1:DKL9:DKLH:DPNK:DPNW:
+iMac (21.5-inch, Late 2012):iMac13,1:
+iMac (21.5-inch, Late 2013):iMac14,1:iMac14,3:
+iMac (21.5-inch, Late 2015):iMac16,1:iMac16,2:GF1J:GF1K:GF1L:GF1M:GG77:GG79:GG7D:GG7G:H0N6:H0P6:H1DX:H1DY:H1F1:H1F2:H1WR:H25M:H2KW:H8KX:HHMG:HQ9T:HQ9V:HQ9W:HYGQ:J0DG:J0DH:J0DJ:
+iMac (21.5-inch, Mid 2010):iMac11,2:
+iMac (21.5-inch, Mid 2011):iMac12,1:DHJF:DHJN:DHJR:DHJT:DL8M:DL8N:DMP0:DNWY:DPM0:DPNT:DWTP:DWTQ:F611:
+iMac (21.5-inch, Mid 2014):iMac14,4:
+iMac (24-inch, Early 2008):iMac8,1:0KM:0N4:1LW:28A:2E4:2NX:2PT:39S:3F9:3FH:3GS:3NX:5J1:5U6:6J3:6J6:6ZC:ZE4:ZE7:
+iMac (24-inch, Early 2009):iMac9,1:0TG:0TJ:0TL:0TM:250:259:6X1:6X2:6X3:8M6:8XH:9ET:9F3:9LP:9LQ:9LR:9LS:E1B:
+iMac (24-inch, Late 2006):iMac6,1:
+iMac (24-inch, Mid 2007):iMac7,1:0PL:0PM:0PN:0PP:0PU:1NW:1SC:2CB:3PA:X89:X8A:Z59:Z9F:ZCR:ZCT:ZCV:ZCW:ZEF:ZGH:ZGP:
+iMac (27-inch, Late 2009):iMac10,1:iMac11,1:5PE:5PJ:5PM:5RU:CYB:CYC:D4V:DMY:DMZ:DWZ:E1J:F0J:F0K:GRP:H9L:H9N:H9P:H9R:
+iMac (27-inch, Late 2012):iMac13,2:
+iMac (27-inch, Late 2013):iMac14,2:
+iMac (27-inch, Mid 2010):iMac11,3:
+iMac (27-inch, Mid 2011):iMac12,2:
+iMac (Retina 4K, 21.5-inch, 2017):iMac18,2:
+iMac (Retina 4K, 21.5-inch, 2019):iMac19,2:
+iMac (Retina 4K, 21.5-inch, Late 2015):iMac16,2:GG78:GG7C:GG7F:GG7H:H0KF:H0P7:H15R:H1F3:H1F5:H1F7:H1F8:H1F9:H25N:H28H:H3RJ:H8KY:H8L0:H8L1:H8L2:H8L3:HLWV:
+iMac (Retina 5K, 27-inch, 2017):iMac18,3:
+iMac (Retina 5K, 27-inch, 2019):iMac19,1:
+iMac (Retina 5K, 27-inch, 2020):iMac20,1:iMac20,2:
+iMac (Retina 5K, 27-inch, Late 2014):iMac15,1:FY11:FY14:FY68:FY6F:GCTM:GDQY:GDR3:GDR4:GDR5:GDR6:GDR7:GDR8:GDR9:GDRC:GFFQ:GJDM:GJDN:GJDP:GJDQ:GPJN:GV7V:H5DN:H682:
+iMac (Retina 5K, 27-inch, Late 2015):iMac17,1:
+iMac (Retina 5K, 27-inch, Mid 2015):iMac15,1:FY10:FY13:FY67:FY6D:GL1Q:GL1R:GL1T:GL1V:GL1W:
+iMac Pro (2017):iMacPro1,1:
+Mac mini (2018):Macmini8,1:
+Mac mini (Early 2006):Macmini1,1:U35:U36:U38:U39:VJN:VLK:VS5:VS7:VU2:VU4:WBZ:WCU:WEN:
+Mac mini (Early 2009):Macmini3,1:19X:19Y:1BU:1BV:8NC:92G:9RR:9RS:AFR:BAV:
+Mac mini (Late 2006):Macmini1,1:W0A:W0B:W0C:W0D:WKN:X1X:X1Y:X1Z:X20:XAS:Y9E:
+Mac mini (Late 2009):Macmini3,1:306:307:9G5:9G6:9G7:9G8:AFK:B9X:CS6:DMG:DMH:F6J:
+Mac mini (Late 2012):Macmini6,1:Macmini6,2:DWYL:DWYM:DY3G:DY3H:F9RK:F9RL:F9RM:F9VV:F9VW:F9W0:F9W1:F9W2:FD9G:FD9H:FD9J:FD9K:FDWK:FGML:FRFP:FW56:FW57:G430:
+Mac mini (Late 2014):Macmini7,1:
+Mac mini (Mid 2007):Macmini2,1:
+Mac mini (Mid 2010):Macmini4,1:DD6H:DD6L:DDQ9:DDVN:DFDK:
+Mac mini (Mid 2011):Macmini5,1:Macmini5,2:
+Mac mini Server (Late 2012):Macmini6,2:DWYN:DY3J:F9VY:F9W3:FC08:FCCW:FP14:FP39:
+Mac mini Server (Mid 2010):Macmini4,1:DD6K:DD6N:DDJF:
+Mac mini Server (Mid 2011):Macmini5,3:
+Mac Pro (2019):MacPro7,1:K7GD:K7GF:NYGV:P7QJ:P7QK:P7QL:P7QM:P7QN:P7QP:PLXV:PLXW:PLXX:PLXY:
+Mac Pro (Early 2008):MacPro3,1:
+Mac Pro (Early 2009):MacPro4,1:20G:20H:4PC:4PD:7BF:8MC:8PZ:8Q0:8TR:8TU:8XG:8XL:93H:9EU:9EV:9MC:9MD:9MG:9MJ:9MK:9ML:9QK:ANS:BXD:BXE:BXT:CZ2:CZ3:CZ4:E1C:E1D:E1E:EAA:EYX:EYY:F6H:GYH:
+Mac Pro (Late 2013):MacPro6,1:
+Mac Pro (Mid 2010):MacPro5,1:EUE:EUF:EUG:EUH:GWR:GY5:GZH:GZJ:GZK:GZL:GZM:H0X:H2N:H2P:H97:H99:HF7:HF8:HF9:HFA:HFC:HFD:HFF:HFG:HFJ:HFK:HFL:HFN:HG1:HG3:HP9:HPA:
+Mac Pro (Mid 2012):MacPro5,1:F4MC:F4MD:F4MG:F4MH:F4YY:F500:F648:F649:F64C:F64D:F64F:F6T9:F6TC:F6TD:F6TF:F6TG:
+Mac Pro (Rack, 2019):MacPro7,1:N5RH:N5RN:P7QQ:P7QR:P7QT:P7QV:PNTN:PNTP:PNTQ:PP3Y:
+Mac Pro Server (Mid 2010):MacPro5,1:HPV:HPW:HPY:
+Mac Pro Server (Mid 2012):MacPro5,1:F4MF:F4MJ:F501:
+Mac Pro:MacPro1,1:MacPro2,1:
+MacBook (13-inch):MacBook1,1:
+MacBook (13-inch, Aluminum, Late 2008):MacBook5,1:
+MacBook (13-inch, Early 2008):MacBook4,1:0P0:0P1:0P2:0P4:0P5:0P6:1LX:1PX:1Q2:1Q7:1QA:1QB:1QE:1ZY:27H:27J:28C:28D:28E:385:3N9:3NA:3ND:3NE:3NF:3X6:47Z:4R7:4R8:
+MacBook (13-inch, Early 2009):MacBook5,2:4R1:4R2:4R3:79D:79E:79F:7A2:85D:88J:8CP:8SJ:93K:
+MacBook (13-inch, Late 2006):MacBook2,1:WGK:WGL:WGM:WGN:WGP:WGQ:WGS:WGT:WGU:WVN:X6G:X6H:X6J:X6K:X6L:X7X:X97:X98:XAR:XAT:XC5:XDN:XDR:XDS:XDT:XDU:XDV:XDW:XDX:XDY:XDZ:XE0:XE1:XE2:XE3:XHB:XHC:XKT:XMF:Y6L:Y6M:Y9A:YCU:
+MacBook (13-inch, Late 2007):MacBook3,1:
+MacBook (13-inch, Late 2008):MacBook4,1:3VY:5AQ:5HS:5HU:67C:6ES:6HY:6LL:6LM:6M1:6V9:6YP:7XD:
+MacBook (13-inch, Late 2009):MacBook6,1:
+MacBook (13-inch, Mid 2007):MacBook2,1:YA2:YA3:YA4:YA5:YA6:YA7:YA8:YA9:YJJ:YJK:YJL:YJM:YJN:YQ7:YQ8:YRG:YRH:YRJ:YRK:YSH:YSJ:YSK:YSL:YSM:YTK:YTL:YV8:YX1:YX2:YX4:YX5:YXZ:YY1:YYW:Z5V:Z5W:Z5X:Z5Y:Z5Z:Z60:Z88:ZA8:ZA9:ZAP:ZAQ:ZAS:ZAU:ZAV:ZAW:ZAX:ZAY:ZAZ:ZB0:ZB1:ZB2:ZB7:ZB8:ZB9:ZBA:ZBB:ZBE:ZBF:ZBG:ZBH:ZBJ:ZBK:ZCN:
+MacBook (13-inch, Mid 2009):MacBook5,2:9GU:9GV:A1W:A1X:A1Y:A9P:A9Q:A9Y:ABW:ASC:
+MacBook (13-inch, Mid 2010):MacBook7,1:
+MacBook (Retina, 12-inch, 2017):MacBook10,1:
+MacBook (Retina, 12-inch, Early 2015):MacBook8,1:
+MacBook (Retina, 12-inch, Early 2016):MacBook9,1:
+MacBook Air (11-inch, Early 2014):MacBookAir6,1:FM72:G083:G084:G2CF:G2GH:G2GJ:G2PY:G2Q0:G4FY:G4H0:G4H4:G4HK:G4HM:G58J:G5RK:G5RL:G5RM:G6D3:GLK9:GP4N:GP4P:
+MacBook Air (11-inch, Early 2015):MacBookAir7,1:
+MacBook Air (11-inch, Late 2010):MacBookAir3,1:
+MacBook Air (11-inch, Mid 2011):MacBookAir4,1:
+MacBook Air (11-inch, Mid 2012):MacBookAir5,1:
+MacBook Air (11-inch, Mid 2013):MacBookAir6,1:F5N7:F5N8:F5YV:F5YW:FH51:FH52:FKYN:FKYP:FLCF:FMR5:FMR6:FMR9:FMRC:FMRD:FMRF:FMRG:FMRM:FMRN:FN5M:FN7F:FP2N:FP3C:FQLG:FT30:
+MacBook Air (13-inch, 2017):MacBookAir7,2:J1WK:J1WL:J1WM:J1WT:J1WV:J8N7:J8XG:J8XH:J9HX:J9TN:J9TP:J9TQ:JC9H:JCD6:JFLY:JKHD:JKHF:LQ07:LQF1:MFWJ:
+MacBook Air (13-inch, Early 2014):MacBookAir6,2:G085:G086:G2CC:G2CD:G2GK:G2GL:G2GM:G2GN:G356:G4H1:G4H2:G4H3:G4HN:G4HP:G58K:G5RN:G5RP:G5RQ:G6D4:G6D5:G829:G8J1:GLK7:GLK8:GP4L:GP4M:
+MacBook Air (13-inch, Early 2015):MacBookAir7,2:G940:G941:G942:G943:G944:GKJT:GKJV:GL20:GL21:GL22:GL23:GL24:GL25:GLCN:GLCP:GM14:GM15:GM38:GM6M:GM9G:GMC3:GMD3:GN8C:GNJJ:GNKM:H3QD:H3QF:H3QJ:H3QK:H569:H8VT:H8VV:H8VW:H8VX:HD7X:HD80:HD98:HDV4:HDV5:HDV6:HF4F:HF4H:HF9N:J6VL:
+MacBook Air (13-inch, Late 2010):MacBookAir3,2:
+MacBook Air (13-inch, Mid 2011):MacBookAir4,2:
+MacBook Air (13-inch, Mid 2012):MacBookAir5,2:
+MacBook Air (13-inch, Mid 2013):MacBookAir6,2:F5V7:F5V8:F6T5:F6T6:FH53:FKYQ:FKYR:FLCG:FM23:FM3Y:FM74:FMR7:FMR8:FMRH:FMRJ:FMRK:FMRL:FMRV:FMRW:FMRY:FN3Y:FN40:FN7G:FP2P:FQL9:FQLC:FQLD:FQLF:G6PM:
+MacBook Air (Late 2008):MacBookAir2,1:22D:22E:5L9:5LA:5TX:5U1:5U7:60R:62W:63V:63W:6JN:
+MacBook Air (Mid 2009):MacBookAir2,1:9A5:9A6:9A7:9A8:
+MacBook Air (Original):MacBookAir1,1:
+MacBook Air (Retina, 13-inch, 2018):MacBookAir8,1:
+MacBook Air (Retina, 13-inch, 2019):MacBookAir8,2:
+MacBook Air (Retina, 13-inch, 2020):MacBookAir9,1:
+MacBook Pro (13-inch, 2016, Four Thunderbolt 3 Ports):MacBookPro13,2:
+MacBook Pro (13-inch, 2016, Two Thunderbolt 3 ports):MacBookPro13,1:
+MacBook Pro (13-inch, 2017, Four Thunderbolt 3 Ports):MacBookPro14,2:
+MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):MacBookPro14,1:
+MacBook Pro (13-inch, 2018, Four Thunderbolt 3 Ports):MacBookPro15,2:JHC8:JHC9:JHCC:JHCD:JHCF:JHD2:JHD3:JHD4:JHD5:KK98:KK99:KK9C:KQ1X:KQ1Y:KQ20:KQ21:KQ22:KQ23:KQ24:KQ25:KQ26:KQ27:L42X:L4FC:L4FD:L4FF:L4FG:L4FJ:L4JT:L7GD:LK8C:
+MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):MacBookPro15,2:LVDC:LVDD:LVDF:LVDG:LVDH:LVDL:LVDM:LVDN:LVDP:MV9K:MV9R:N5T5:NCLV:NCLW:NCLX:NCLY:NCM0:NCM1:NCM2:NQM8:P4G1:P4G2:
+MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):MacBookPro15,4:
+MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):MacBookPro16,2:
+MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):MacBookPro16,3:
+MacBook Pro (13-inch, Early 2011):MacBookPro8,1:DH2G:DH2H:DH2L:DH2M:DLN5:DLN6:DM75:DMLF:DMLH:DMLJ:DNCM:DNGD:DNKP:DNKQ:DNTK:DNVY:DR7W:DRJ7:DRJ9:DRJJ:DRJK:DRW1:DRW2:DRW7:DT4G:DT4H:DT60:DT61:DT62:DT63:DT64:DT65:DT66:DT67:ST61:
+MacBook Pro (13-inch, Late 2011):MacBookPro8,1:DV13:DV14:DV16:DV17:DVHJ:DVHK:DVHP:DVHQ:DW13:DY1J:DY1K:DY5T:DY5V:DY6C:DY77:DYL0:DYL1:DYL2:F298:F299:
+MacBook Pro (13-inch, Mid 2009):MacBookPro5,5:
+MacBook Pro (13-inch, Mid 2010):MacBookPro7,1:
+MacBook Pro (13-inch, Mid 2012):MacBookPro9,2:
+MacBook Pro (15-inch, 2.4/2.2GHz):MacBookPro3,1:02V:0LQ:0LZ:0M0:0PA:0S3:0S6:1CY:1CZ:2QU:2QV:X91:X92:XAG:XAH:Y9S:Y9T:YAL:YAM:YKX:YKY:YKZ:YL0:YQ3:YW5:YW9:YWA:YWD:YYV:YYX:YZ0:Z05:Z09:Z0G:
+MacBook Pro (15-inch, 2.53GHz, Mid 2009):MacBookPro5,4:
+MacBook Pro (15-inch, 2016):MacBookPro13,3:
+MacBook Pro (15-inch, 2017):MacBookPro14,3:
+MacBook Pro (15-inch, 2018):MacBookPro15,1:MacBookPro15,3:JG5H:JG5J:JG5K:JG5L:JG5M:JGH5:JGH6:JGH7:JGH8:KGYF:KGYG:KGYH:KQ9Q:KQ9R:KQ9T:KQ9V:KQ9W:KQ9X:KQ9Y:KQC0:KQC1:KQC2:KQC3:KQC4:KQC5:KQC6:KQC7:KQC8:KQC9:KQCC:KQCD:KQCF:KQCG:KQCH:KQCJ:KQCK:KQCL:KQCM:KQCN:KQCP:KQCQ:KQCR:KQCT:KQCV:KQCW:KQCX:KWJ2:L4HW:L4HX:L539:L53D:L7GC:LC8J:LC8K:LC8L:LCM6:MJLR:MJLT:
+MacBook Pro (15-inch, 2019):MacBookPro15,1:MacBookPro15,3:LVCF:LVCG:LVCH:LVCJ:LVCK:LVCL:LVDQ:LVDR:LVDT:LVDV:MV9T:MVC0:N5T6:N6KF:N6RJ:NCM3:NCM4:NCM5:NCM6:NQM9:NQMC:NQMD:NQMF:
+MacBook Pro (15-inch, Core 2 Duo):MacBookPro2,2:
+MacBook Pro (15-inch, Early 2008):MacBookPro4,1:1AJ:1EK:1EM:1JZ:1K0:1SH:1XR:1XW:27N:2AZ:2B0:2CE:2DT:2DX:2MF:2PK:33B:3LY:3LZ:48T:4R5:4R6:YJX:YJY:YJZ:YK0:ZLU:
+MacBook Pro (15-inch, Early 2011):MacBookPro8,2:DF8V:DF8X:DF8Y:DF91:DLN7:DLN8:DMC8:DMC9:DMDG:DMDH:DMDJ:DMGG:DMMF:DMMH:DMMJ:DMPG:DMPK:DMPL:DMPM:DMPN:DMPP:DMPQ:DMPR:DMQP:DNC3:DNCN:DNGF:DNH5:DNHY:DNKM:DNKY:DNM4:DNMW:DNRD:DNVK:DRJC:DRJD:DRJF:DRJL:DRJM:DRW3:DRW4:DRWD:DT4J:DT54:DT55:DT56:DT57:DT58:DT59:DT5C:DT5D:DT5F:DT5G:DT5H:DT5J:DT5L:DT68:DT69:DT6C:DT6D:DT6F:DT6G:DT6H:DT6J:DT6K:DT6L:DT6M:DT6R:
+MacBook Pro (15-inch, Glossy):MacBookPro1,1:VWW:VWX:VWY:VWZ:W3N:W92:W93:W94:W9F:W9Q:WAG:WAW:WB8:WBE:WBF:WBH:WBJ:WD7:WD8:WD9:WDA:WDB:WDC:WDD:WTS:WW0:WW1:WW2:WW3:
+MacBook Pro (15-inch, Late 2008):MacBookPro5,1:
+MacBook Pro (15-inch, Late 2011):MacBookPro8,2:DV7L:DV7M:DV7N:DV7P:DVHL:DVHM:DVHR:DW3G:DW3H:DW3J:DW47:DY1L:DY1M:DY1N:DY1P:DY1Q:DY1R:DY1T:DY1V:DY1W:DY1Y:DY20:DY21:DY5K:DY5P:DY5Q:DY5R:DY5Y:DY60:DY7G:DYG6:DYG7:DYK9:DYKC:DYR1:F0K6:F0V2:
+MacBook Pro (15-inch, Mid 2009):MacBookPro5,3:
+MacBook Pro (15-inch, Mid 2010):MacBookPro6,2:
+MacBook Pro (15-inch, Mid 2012):MacBookPro9,1:
+MacBook Pro (16-inch, 2019):MacBookPro16,1:MacBookPro16,4:
+MacBook Pro (17-inch):MacBookPro1,2:
+MacBook Pro (17-inch, 2.4GHz):MacBookPro3,1:027:028:02D:09R:09S:0LR:0ND:0NM:0PD:1CW:1CX:1MF:1MG:2QW:X94:XA9:YAA:YAN:YAP:YNQ:YNS:YNW:YQ4:YQ5:YR2:YRD:YRE:YRF:YWB:YWC:YZ1:YZ2:Z5M:
+MacBook Pro (17-inch, Core 2 Duo):MacBookPro2,1:
+MacBook Pro (17-inch, Early 2008):MacBookPro4,1:1BY:1ED:1EN:1ER:1K2:1K8:1K9:1KA:1Q3:1SG:2CF:2DY:2DZ:2ED:3DC:3DD:3DE:3DF:3M0:3M4:3M5:YP3:YP4:ZLV:
+MacBook Pro (17-inch, Early 2009):MacBookPro5,2:2QP:2QT:776:77A:7AP:7AS:7XQ:7XR:7XS:87K:87L:87M:87N:8FK:8FL:8FM:8FY:8FZ:8G0:
+MacBook Pro (17-inch, Early 2011):MacBookPro8,3:DF92:DF93:DLN9:DLNC:DMGH:DMQT:DMQW:DMR2:DMR4:DMR5:DMR7:DMR8:DMR9:DMRC:DNGG:DNKN:DRJG:DRJH:DRJN:DRW5:DRW6:DT5M:DT5N:DT5P:DT5Q:DT5R:DT5T:DT5V:DT5W:DT5Y:DT6N:DT6P:
+MacBook Pro (17-inch, Late 2008):MacBookPro4,1:3R8:3R9:4RT:4RW:57J:5U0:634:65A:663:664:666:668:6CT:6JK:
+MacBook Pro (17-inch, Late 2011):MacBookPro8,3:AY5W:DV10:DV11:DVHN:DVHV:DVHW:DW48:DY22:DY23:DY24:DY25:DY26:DY5W:DYG8:F13Y:F140:
+MacBook Pro (17-inch, Mid 2009):MacBookPro5,2:8YA:8YB:91T:A3M:A3N:A5R:A5W:AF3:AKV:AKW:AMV:AMW:AN1:ANC:AND:ANE:ANF:ANJ:AUU:E6L:
+MacBook Pro (17-inch, Mid 2010):MacBookPro6,1:
+MacBook Pro (Original):MacBookPro1,1:THV:VGW:VGX:VGY:VJ0:VJ1:VJ2:VJ3:VJ5:VJ6:VJ7:VJM:VMU:VSD:VTZ:VU0:VWA:VWB:VXW:VXX:W2Q:
+MacBook Pro (Retina, 13-inch, Early 2013):MacBookPro10,2:FFRP:FFRR:FG1F:FG28:FGM8:FGN5:FGN6:FGPJ:FHCH:FHN0:
+MacBook Pro (Retina, 13-inch, Early 2015):MacBookPro12,1:
+MacBook Pro (Retina, 13-inch, Late 2012):MacBookPro10,2:DR53:DR54:DR55:DR56:F775:F776:F7YF:F897:F8V6:F8V7:F8V8:F9JT:F9V1:F9VQ:FG7Q:FG7R:FL85:FMLJ:
+MacBook Pro (Retina, 13-inch, Late 2013):MacBookPro11,1:FGYY:FH00:FH01:FH02:FH03:FH04:FH05:FRF6:FRF7:FRQF:FT4Q:FT4R:FT4T:FT4V:FTC9:FTCD:FTCH:FTCK:FTCL:FTPH:FTPJ:FTPK:FTT4:FVVW:FVWQ:FWKF:G4N6:G4N7:
+MacBook Pro (Retina, 13-inch, Mid 2014):MacBookPro11,1:G3QH:G3QJ:G3QK:G3QL:G3QQ:G3QR:G3QT:G7RD:G7RF:G7YQ:G7YR:G8L0:G96R:G96T:G96V:G96W:G96Y:G970:G971:G972:G9FL:G9FM:G9FN:G9FP:G9FQ:G9FR:GDJM:
+MacBook Pro (Retina, 15-inch, Early 2013):MacBookPro10,1:FFT0:FFT1:FFT2:FFT3:FFT4:FG1H:FG1J:FGFH:FGFJ:FGFK:FGFL:FGN7:FGWF:FGWG:FGWH:FHCQ:FHCR:FJ47:FJVJ:FL94:FMLK:FR8D:
+MacBook Pro (Retina, 15-inch, Late 2013):MacBookPro11,2:MacBookPro11,3:FD56:FD57:FD58:FD59:FR1M:FRDM:FRG2:FRG3:FRQH:FRQJ:FRQK:FRQL:FT4P:FTK0:FTK1:FTPL:FTPM:FTPN:FTPP:FTPQ:FTPR:FTPT:FTPV:FTPW:FTPY:FTTJ:FVN4:FVYN:FWFY:FWHW:FWKK:FWKL:G4JQ:G5HL:
+MacBook Pro (Retina, 15-inch, Mid 2014):MacBookPro11,2:MacBookPro11,3:G3QC:G3QD:G3QG:G3QN:G3QP:G85Y:G86P:G86Q:G86R:G8F4:G8J7:G8L1:G96K:G96L:G96M:G96N:G96P:G96Q:G973:G974:G9FT:G9JN:G9L6:G9L7:G9L8:G9L9:GDPP:ZORD:
+MacBook Pro (Retina, 15-inch, Mid 2015):MacBookPro11,4:MacBookPro11,5:
+MacBook Pro (Retina, Mid 2012):MacBookPro10,1:DKQ1:DKQ2:DKQ4:DKQ5:F51R:F5Y2:F69W:F69Y:F6DN:F6F3:F6L9:F8JY:F96W:F9F1:F9F2:FCQ3:
+Xserve (Early 2008):Xserve2,1:
+Xserve (Early 2009):Xserve3,1:
+Xserve (Late 2006):Xserve1,1:'
 
-			if [[ -f "${si_machine_attributes_plist_path}" ]]; then
-				local fallback_marketing_model_name
-				fallback_marketing_model_name="$(PlistBuddy -c "Print :${MODEL_IDENTIFIER}:_LOCALIZABLE_:marketingModel" "${si_machine_attributes_plist_path}" 2> /dev/null)"
-
-				if [[ -n "${fallback_marketing_model_name}" ]]; then
-					marketing_model_name+=" / Fallback: ${fallback_marketing_model_name}"
-				fi
+		while IFS=':' read -r this_marketing_model_name these_model_ids_and_serial_config_codes; do
+			if [[ -n "${SERIAL_CONFIG_CODE}" && ":${these_model_ids_and_serial_config_codes}:" == *":${SERIAL_CONFIG_CODE}:"* ]]; then
+				if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOCAL LIST SERIAL CONFIG CODE MATCH: ${this_marketing_model_name}"; fi
+				possible_marketing_model_name="${this_marketing_model_name}"
+				break
+			elif [[ ":${these_model_ids_and_serial_config_codes}:" == *":${MODEL_IDENTIFIER}:"* ]]; then
+				if $VERBOSE_LOGGING; then >&2 echo "DEBUG - LOCAL LIST MODEL IDENTIFIER MATCH: ${this_marketing_model_name}"; fi
+				if [[ -n "${possible_marketing_model_name}" ]]; then possible_marketing_model_name+=$'\n'; fi
+				possible_marketing_model_name+="${this_marketing_model_name}"
 			fi
+		done <<< "${every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes}"
+
+		if [[ "${possible_marketing_model_name}" == *$'\n'* ]]; then
+			if $VERBOSE_LOGGING; then >&2 echo 'DEBUG - LOADED MULTIPLE POSSIBILITIES FROM LOCAL LIST (NO SERIAL CONFIG CODE MATCH)'; fi
+			marketing_model_name="${MODEL_IDENTIFIER} (No Serial Number for Marketing Model Name) / ${possible_marketing_model_name//$'\n'/ or } - $(echo "${possible_marketing_model_name}" | wc -l | tr -d '[:space:]') POSSIBLE MODELS"
+		elif [[ -n "${possible_marketing_model_name}" ]]; then
+			if $VERBOSE_LOGGING; then >&2 echo 'DEBUG - LOADED FROM LOCAL LIST'; fi
+			marketing_model_name="${possible_marketing_model_name}"
+		else
+			marketing_model_name="${MODEL_IDENTIFIER} (UNKNOWN Marketing Model Name)"
 		fi
 
 		if $IS_VIRTUAL_MACHINE; then

@@ -24,6 +24,15 @@ PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 SCRIPT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)"
 readonly SCRIPT_DIR
 
+readonly OUTPUT_DIR="${SCRIPT_DIR}/serial-config-codes-output"
+
+
+include_docs_urls=false
+if [[ "$1" == '--include-docs-urls' ]]; then
+	include_docs_urls=true
+fi
+
+
 # The goal of this script is to combine Intel Mac Marketing Model Names with Model IDs (which are not always unique for each Marketing Model Name) and Serial Number Configuration Codes (which are unique for each Marketing Model Name).
 # A Configuration Code is the last 3 characters of 11 character serials and the last 4 characters of 12 character serials.
 
@@ -172,74 +181,80 @@ Xserve1,1:V2Q:
 Xserve2,1:X8S:
 Xserve3,1:6HS:'
 
-every_mac_marketing_model_name_with_grouped_serial_config_codes_file_path="${SCRIPT_DIR}/every_mac_marketing_model_name_with_grouped_serial_config_codes.txt" # This file is generated from the "get_every_apple_serial_config_code.sh" script.
+every_mac_marketing_model_name_with_grouped_serial_config_codes_file_path="${OUTPUT_DIR}/every_mac_marketing_model_name$($include_docs_urls && echo '_and_docs_url')_with_grouped_serial_config_codes.txt" # This file is generated from the "get_every_config_code_with_marketing_model_name_from_apple_api.sh" script.
 
 if [[ -f "${every_mac_marketing_model_name_with_grouped_serial_config_codes_file_path}" ]]; then
-	# Get Marketing Model Names for each Model ID based on the KNOWN Config Codes for that Model ID since one Model ID may be associated with multiple Marketing Model Names.
-	every_marketing_model_name_with_model_id=''
-	while IFS=':' read -ra this_model_id_and_known_serial_config_codes; do
-		this_model_id="${this_model_id_and_known_serial_config_codes[0]}"
-		for this_known_serial_config_code in "${this_model_id_and_known_serial_config_codes[@]:1}"; do
-			while IFS=':' read -r this_marketing_model_name these_serial_config_codes; do
-				if [[ ":${these_serial_config_codes}:" == *":${this_known_serial_config_code}:"* ]]; then
-					every_marketing_model_name_with_model_id+=$'\n'"${this_marketing_model_name}:${this_model_id}"
-					break
-				fi
-			done < "${every_mac_marketing_model_name_with_grouped_serial_config_codes_file_path}"
-		done
-	done <<< "${every_intel_mac_model_id_with_known_serial_config_codes}"
+	every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes_file_path="${OUTPUT_DIR}/every_intel_mac_marketing_model_name$($include_docs_urls && echo '_and_docs_url')_with_grouped_model_ids_and_serial_config_codes.txt"
 
-	# Group the Model IDs together for each unique Marketing Model Name.
-	every_marketing_model_name_with_grouped_model_ids=''
-	previous_marketing_model_name=''
-	while IFS=':' read -r this_marketing_model_name this_model_id; do
-		if [[ "${this_marketing_model_name}" != "${previous_marketing_model_name}" ]]; then
-			every_marketing_model_name_with_grouped_model_ids+=$'\n'"${this_marketing_model_name}:${this_model_id}:"
-			previous_marketing_model_name="${this_marketing_model_name}"
-		else
-			every_marketing_model_name_with_grouped_model_ids+="${this_model_id}:"
-		fi
-	done < <(echo "${every_marketing_model_name_with_model_id}" | grep '.' | sort -uf)
+	if [[ ! -f "${every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes_file_path}" ]]; then
+		# Get Marketing Model Names for each Model ID based on the KNOWN Config Codes for that Model ID since one Model ID may be associated with multiple Marketing Model Names.
+		every_marketing_model_name_with_model_id=''
+		while IFS=':' read -ra this_model_id_and_known_serial_config_codes; do
+			this_model_id="${this_model_id_and_known_serial_config_codes[0]}"
+			for this_known_serial_config_code in "${this_model_id_and_known_serial_config_codes[@]:1}"; do
+				while IFS=':' read -r this_marketing_model_name these_serial_config_codes; do
+					if [[ ":${these_serial_config_codes}:" == *":${this_known_serial_config_code}:"* ]]; then
+						every_marketing_model_name_with_model_id+=$'\n'"${this_marketing_model_name}:${this_model_id}"
+						break
+					fi
+				done < "${every_mac_marketing_model_name_with_grouped_serial_config_codes_file_path}"
+			done
+		done <<< "${every_intel_mac_model_id_with_known_serial_config_codes}"
 
-	# For Marketing Model Names which DON'T have unique Model IDs, add ALL Config Codes to the row after with the associated Model IDs.
-	every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes=''
-	while IFS=':' read -ra this_marketing_model_name_and_model_ids; do
-		this_marketing_model_name="${this_marketing_model_name_and_model_ids[0]}"
-		model_id_has_multiple_marketing_model_names=false
-		for this_model_id in "${this_marketing_model_name_and_model_ids[@]:1}"; do
-			if [[ "${this_model_id}" == 'MacPro4,1' ]] || (( $(echo "${every_marketing_model_name_with_grouped_model_ids}" | grep -c ":${this_model_id}:") > 1 )); then
-				# Always inluding Config Codes for "MacPro4,1" since they are commonly flash to "MacPro5,1" to allow OS upgrades but the Config Code wouldn't properly match any of the "MacPro5,1" Config Codes.
-				model_id_has_multiple_marketing_model_names=true
-				break
+		# Group the Model IDs together for each unique Marketing Model Name.
+		every_marketing_model_name_with_grouped_model_ids=''
+		previous_marketing_model_name=''
+		while IFS=':' read -r this_marketing_model_name this_model_id; do
+			if [[ "${this_marketing_model_name}" != "${previous_marketing_model_name}" ]]; then
+				every_marketing_model_name_with_grouped_model_ids+=$'\n'"${this_marketing_model_name}:${this_model_id}:"
+				previous_marketing_model_name="${this_marketing_model_name}"
+			else
+				every_marketing_model_name_with_grouped_model_ids+="${this_model_id}:"
 			fi
-		done
+		done < <(echo "${every_marketing_model_name_with_model_id}" | grep '.' | sort -uf"$($include_docs_urls && echo 'V')")
 
-		if $model_id_has_multiple_marketing_model_names; then
-			while IFS=':' read -r that_marketing_model_name these_serial_config_codes; do
-				if [[ "${this_marketing_model_name}" == "${that_marketing_model_name}" ]]; then
-					every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes+=$'\n'"$(printf '%s:' "${this_marketing_model_name_and_model_ids[@]}")${these_serial_config_codes}"
+		# For Marketing Model Names which DON'T have unique Model IDs, add ALL Config Codes to the row after with the associated Model IDs.
+		every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes=''
+		while IFS=':' read -ra this_marketing_model_name_and_model_ids; do
+			this_marketing_model_name="${this_marketing_model_name_and_model_ids[0]}"
+			model_id_has_multiple_marketing_model_names=false
+			for this_model_id in "${this_marketing_model_name_and_model_ids[@]:1}"; do
+				if [[ "${this_model_id}" == 'MacPro4,1' ]] || (( $(echo "${every_marketing_model_name_with_grouped_model_ids}" | grep -c ":${this_model_id}:") > 1 )); then
+					# Always inluding Config Codes for "MacPro4,1" since they are commonly flash to "MacPro5,1" to allow OS upgrades but the Config Code wouldn't properly match any of the "MacPro5,1" Config Codes.
+					model_id_has_multiple_marketing_model_names=true
 					break
 				fi
-			done < "${every_mac_marketing_model_name_with_grouped_serial_config_codes_file_path}"
-		else
-			every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes+=$'\n'"$(printf '%s:' "${this_marketing_model_name_and_model_ids[@]}")"
-		fi
-	done < <(echo "${every_marketing_model_name_with_grouped_model_ids}" | grep '.')
+			done
 
-	# Cleanup funky Marketing Model Names (making small tweaks to make things more consistent among all model names).
-	every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//original/Original}" # MacBook Pro (original) > MacBook Pro (Original)
-	every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//-inch /-inch, }" # MacBook Pro (15-inch Core 2 Duo) > MacBook Pro (15-inch, Core 2 Duo) - AND OTHERS
-	every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//  / }" # MacBook Pro (15-inch,  2.4 2.2GHz) > MacBook Pro (15-inch, 2.4 2.2GHz)
-	every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//2.4 2.2GHz/2.4/2.2GHz}" # MacBook Pro (15-inch, 2.4 2.2GHz) > MacBook Pro (15-inch, 2.4/2.2GHz)
-	every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//GHZ/GHz}" # MacBook Pro (17-inch, 2.4GHZ) > MacBook Pro (17-inch, 2.4GHz)
+			if $model_id_has_multiple_marketing_model_names; then
+				while IFS=':' read -r that_marketing_model_name these_serial_config_codes; do
+					if [[ "${this_marketing_model_name}" == "${that_marketing_model_name}" ]]; then
+						every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes+=$'\n'"$(printf '%s:' "${this_marketing_model_name_and_model_ids[@]}")${these_serial_config_codes}"
+						break
+					fi
+				done < "${every_mac_marketing_model_name_with_grouped_serial_config_codes_file_path}"
+			else
+				every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes+=$'\n'"$(printf '%s:' "${this_marketing_model_name_and_model_ids[@]}")"
+			fi
+		done < <(echo "${every_marketing_model_name_with_grouped_model_ids}" | grep '.')
 
-	echo "${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes}" | sort -f | grep '.' | tee "${SCRIPT_DIR}/every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes.txt"
+		# Cleanup funky Marketing Model Names (making small tweaks to make things more consistent among all model names).
+		every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//original/Original}" # MacBook Pro (original) > MacBook Pro (Original)
+		every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//-inch /-inch, }" # MacBook Pro (15-inch Core 2 Duo) > MacBook Pro (15-inch, Core 2 Duo) - AND OTHERS
+		# DOUBLE SPACES ARE NOW CLEANED IN "get_every_config_code_with_marketing_model_name_from_apple_api.sh" every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//  / }" # MacBook Pro (15-inch,  2.4 2.2GHz) > MacBook Pro (15-inch, 2.4 2.2GHz)
+		every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//2.4 2.2GHz/2.4/2.2GHz}" # MacBook Pro (15-inch, 2.4 2.2GHz) > MacBook Pro (15-inch, 2.4/2.2GHz)
+		every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes="${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes//GHZ/GHz}" # MacBook Pro (17-inch, 2.4GHZ) > MacBook Pro (17-inch, 2.4GHz)
 
-	# The following lists of Model IDs for different OS support are directly from combining the Model IDs in the "PlatformSupport.plist" file for the specified OS version and newer.
-	# el_capitan_and_newer_supported_model_ids=( 'iMac7,1' 'iMac8,1' 'iMac9,1' 'iMac10,1' 'iMac11,1' 'iMac11,2' 'iMac11,3' 'iMac12,1' 'iMac12,2' 'iMac13,1' 'iMac13,2' 'iMac13,3' 'iMac14,1' 'iMac14,2' 'iMac14,3' 'iMac14,4' 'iMac15,1' 'iMac16,1' 'iMac16,2' 'iMac17,1' 'iMac18,1' 'iMac18,2' 'iMac18,3' 'iMac19,1' 'iMac19,2' 'iMac20,1' 'iMac20,2' 'iMacPro1,1' 'MacBook5,1' 'MacBook5,2' 'MacBook6,1' 'MacBook7,1' 'MacBook8,1' 'MacBook9,1' 'MacBook10,1' 'MacBookAir2,1' 'MacBookAir3,1' 'MacBookAir3,2' 'MacBookAir4,1' 'MacBookAir4,2' 'MacBookAir5,1' 'MacBookAir5,2' 'MacBookAir6,1' 'MacBookAir6,2' 'MacBookAir7,1' 'MacBookAir7,2' 'MacBookAir8,1' 'MacBookAir8,2' 'MacBookAir9,1' 'MacBookPro3,1' 'MacBookPro4,1' 'MacBookPro5,1' 'MacBookPro5,2' 'MacBookPro5,3' 'MacBookPro5,4' 'MacBookPro5,5' 'MacBookPro6,1' 'MacBookPro6,2' 'MacBookPro7,1' 'MacBookPro8,1' 'MacBookPro8,2' 'MacBookPro8,3' 'MacBookPro9,1' 'MacBookPro9,2' 'MacBookPro10,1' 'MacBookPro10,2' 'MacBookPro11,1' 'MacBookPro11,2' 'MacBookPro11,3' 'MacBookPro11,4' 'MacBookPro11,5' 'MacBookPro12,1' 'MacBookPro13,1' 'MacBookPro13,2' 'MacBookPro13,3' 'MacBookPro14,1' 'MacBookPro14,2' 'MacBookPro14,3' 'MacBookPro15,1' 'MacBookPro15,2' 'MacBookPro15,3' 'MacBookPro15,4' 'MacBookPro16,1' 'MacBookPro16,2' 'MacBookPro16,3' 'MacBookPro16,4' 'Macmini3,1' 'Macmini4,1' 'Macmini5,1' 'Macmini5,2' 'Macmini5,3' 'Macmini6,1' 'Macmini6,2' 'Macmini7,1' 'Macmini8,1' 'MacPro3,1' 'MacPro4,1' 'MacPro5,1' 'MacPro6,1' 'MacPro7,1' 'Xserve3,1' )
-	# high_sierra_and_newer_supported_model_ids=( 'iMac10,1' 'iMac11,1' 'iMac11,2' 'iMac11,3' 'iMac12,1' 'iMac12,2' 'iMac13,1' 'iMac13,2' 'iMac13,3' 'iMac14,1' 'iMac14,2' 'iMac14,3' 'iMac14,4' 'iMac15,1' 'iMac16,1' 'iMac16,2' 'iMac17,1' 'iMac18,1' 'iMac18,2' 'iMac18,3' 'iMac19,1' 'iMac19,2' 'iMac20,1' 'iMac20,2' 'iMacPro1,1' 'MacBook6,1' 'MacBook7,1' 'MacBook8,1' 'MacBook9,1' 'MacBook10,1' 'MacBookAir3,1' 'MacBookAir3,2' 'MacBookAir4,1' 'MacBookAir4,2' 'MacBookAir5,1' 'MacBookAir5,2' 'MacBookAir6,1' 'MacBookAir6,2' 'MacBookAir7,1' 'MacBookAir7,2' 'MacBookAir8,1' 'MacBookAir8,2' 'MacBookAir9,1' 'MacBookPro6,1' 'MacBookPro6,2' 'MacBookPro7,1' 'MacBookPro8,1' 'MacBookPro8,2' 'MacBookPro8,3' 'MacBookPro9,1' 'MacBookPro9,2' 'MacBookPro10,1' 'MacBookPro10,2' 'MacBookPro11,1' 'MacBookPro11,2' 'MacBookPro11,3' 'MacBookPro11,4' 'MacBookPro11,5' 'MacBookPro12,1' 'MacBookPro13,1' 'MacBookPro13,2' 'MacBookPro13,3' 'MacBookPro14,1' 'MacBookPro14,2' 'MacBookPro14,3' 'MacBookPro15,1' 'MacBookPro15,2' 'MacBookPro15,3' 'MacBookPro15,4' 'MacBookPro16,1' 'MacBookPro16,2' 'MacBookPro16,3' 'MacBookPro16,4' 'Macmini4,1' 'Macmini5,1' 'Macmini5,2' 'Macmini5,3' 'Macmini6,1' 'Macmini6,2' 'Macmini7,1' 'Macmini8,1' 'MacPro5,1' 'MacPro6,1' 'MacPro7,1' )
-	# catalina_and_newer_supported_model_ids=( 'iMac13,1' 'iMac13,2' 'iMac13,3' 'iMac14,1' 'iMac14,2' 'iMac14,3' 'iMac14,4' 'iMac15,1' 'iMac16,1' 'iMac16,2' 'iMac17,1' 'iMac18,1' 'iMac18,2' 'iMac18,3' 'iMac19,1' 'iMac19,2' 'iMac20,1' 'iMac20,2' 'iMacPro1,1' 'MacBook8,1' 'MacBook9,1' 'MacBook10,1' 'MacBookAir5,1' 'MacBookAir5,2' 'MacBookAir6,1' 'MacBookAir6,2' 'MacBookAir7,1' 'MacBookAir7,2' 'MacBookAir8,1' 'MacBookAir8,2' 'MacBookAir9,1' 'MacBookPro9,1' 'MacBookPro9,2' 'MacBookPro10,1' 'MacBookPro10,2' 'MacBookPro11,1' 'MacBookPro11,2' 'MacBookPro11,3' 'MacBookPro11,4' 'MacBookPro11,5' 'MacBookPro12,1' 'MacBookPro13,1' 'MacBookPro13,2' 'MacBookPro13,3' 'MacBookPro14,1' 'MacBookPro14,2' 'MacBookPro14,3' 'MacBookPro15,1' 'MacBookPro15,2' 'MacBookPro15,3' 'MacBookPro15,4' 'MacBookPro16,1' 'MacBookPro16,2' 'MacBookPro16,3' 'MacBookPro16,4' 'Macmini6,1' 'Macmini6,2' 'Macmini7,1' 'Macmini8,1' 'MacPro6,1' 'MacPro7,1' )
-	# TODO: Maybe make new lists that are only for El Capitan, High Sierra, and Catalina and newer to not include models that will never be seen in code that only runs on those versions of macOS.
+		echo "${every_marketing_model_name_with_grouped_model_ids_and_serial_config_codes}" | sort -f"$($include_docs_urls && echo 'V')" | grep '.' | tee "${every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes_file_path}"
+
+		# The following lists of Model IDs for different OS support are directly from combining the Model IDs in the "PlatformSupport.plist" file for the specified OS version and newer.
+		# el_capitan_and_newer_supported_model_ids=( 'iMac7,1' 'iMac8,1' 'iMac9,1' 'iMac10,1' 'iMac11,1' 'iMac11,2' 'iMac11,3' 'iMac12,1' 'iMac12,2' 'iMac13,1' 'iMac13,2' 'iMac13,3' 'iMac14,1' 'iMac14,2' 'iMac14,3' 'iMac14,4' 'iMac15,1' 'iMac16,1' 'iMac16,2' 'iMac17,1' 'iMac18,1' 'iMac18,2' 'iMac18,3' 'iMac19,1' 'iMac19,2' 'iMac20,1' 'iMac20,2' 'iMacPro1,1' 'MacBook5,1' 'MacBook5,2' 'MacBook6,1' 'MacBook7,1' 'MacBook8,1' 'MacBook9,1' 'MacBook10,1' 'MacBookAir2,1' 'MacBookAir3,1' 'MacBookAir3,2' 'MacBookAir4,1' 'MacBookAir4,2' 'MacBookAir5,1' 'MacBookAir5,2' 'MacBookAir6,1' 'MacBookAir6,2' 'MacBookAir7,1' 'MacBookAir7,2' 'MacBookAir8,1' 'MacBookAir8,2' 'MacBookAir9,1' 'MacBookPro3,1' 'MacBookPro4,1' 'MacBookPro5,1' 'MacBookPro5,2' 'MacBookPro5,3' 'MacBookPro5,4' 'MacBookPro5,5' 'MacBookPro6,1' 'MacBookPro6,2' 'MacBookPro7,1' 'MacBookPro8,1' 'MacBookPro8,2' 'MacBookPro8,3' 'MacBookPro9,1' 'MacBookPro9,2' 'MacBookPro10,1' 'MacBookPro10,2' 'MacBookPro11,1' 'MacBookPro11,2' 'MacBookPro11,3' 'MacBookPro11,4' 'MacBookPro11,5' 'MacBookPro12,1' 'MacBookPro13,1' 'MacBookPro13,2' 'MacBookPro13,3' 'MacBookPro14,1' 'MacBookPro14,2' 'MacBookPro14,3' 'MacBookPro15,1' 'MacBookPro15,2' 'MacBookPro15,3' 'MacBookPro15,4' 'MacBookPro16,1' 'MacBookPro16,2' 'MacBookPro16,3' 'MacBookPro16,4' 'Macmini3,1' 'Macmini4,1' 'Macmini5,1' 'Macmini5,2' 'Macmini5,3' 'Macmini6,1' 'Macmini6,2' 'Macmini7,1' 'Macmini8,1' 'MacPro3,1' 'MacPro4,1' 'MacPro5,1' 'MacPro6,1' 'MacPro7,1' 'Xserve3,1' )
+		# high_sierra_and_newer_supported_model_ids=( 'iMac10,1' 'iMac11,1' 'iMac11,2' 'iMac11,3' 'iMac12,1' 'iMac12,2' 'iMac13,1' 'iMac13,2' 'iMac13,3' 'iMac14,1' 'iMac14,2' 'iMac14,3' 'iMac14,4' 'iMac15,1' 'iMac16,1' 'iMac16,2' 'iMac17,1' 'iMac18,1' 'iMac18,2' 'iMac18,3' 'iMac19,1' 'iMac19,2' 'iMac20,1' 'iMac20,2' 'iMacPro1,1' 'MacBook6,1' 'MacBook7,1' 'MacBook8,1' 'MacBook9,1' 'MacBook10,1' 'MacBookAir3,1' 'MacBookAir3,2' 'MacBookAir4,1' 'MacBookAir4,2' 'MacBookAir5,1' 'MacBookAir5,2' 'MacBookAir6,1' 'MacBookAir6,2' 'MacBookAir7,1' 'MacBookAir7,2' 'MacBookAir8,1' 'MacBookAir8,2' 'MacBookAir9,1' 'MacBookPro6,1' 'MacBookPro6,2' 'MacBookPro7,1' 'MacBookPro8,1' 'MacBookPro8,2' 'MacBookPro8,3' 'MacBookPro9,1' 'MacBookPro9,2' 'MacBookPro10,1' 'MacBookPro10,2' 'MacBookPro11,1' 'MacBookPro11,2' 'MacBookPro11,3' 'MacBookPro11,4' 'MacBookPro11,5' 'MacBookPro12,1' 'MacBookPro13,1' 'MacBookPro13,2' 'MacBookPro13,3' 'MacBookPro14,1' 'MacBookPro14,2' 'MacBookPro14,3' 'MacBookPro15,1' 'MacBookPro15,2' 'MacBookPro15,3' 'MacBookPro15,4' 'MacBookPro16,1' 'MacBookPro16,2' 'MacBookPro16,3' 'MacBookPro16,4' 'Macmini4,1' 'Macmini5,1' 'Macmini5,2' 'Macmini5,3' 'Macmini6,1' 'Macmini6,2' 'Macmini7,1' 'Macmini8,1' 'MacPro5,1' 'MacPro6,1' 'MacPro7,1' )
+		# catalina_and_newer_supported_model_ids=( 'iMac13,1' 'iMac13,2' 'iMac13,3' 'iMac14,1' 'iMac14,2' 'iMac14,3' 'iMac14,4' 'iMac15,1' 'iMac16,1' 'iMac16,2' 'iMac17,1' 'iMac18,1' 'iMac18,2' 'iMac18,3' 'iMac19,1' 'iMac19,2' 'iMac20,1' 'iMac20,2' 'iMacPro1,1' 'MacBook8,1' 'MacBook9,1' 'MacBook10,1' 'MacBookAir5,1' 'MacBookAir5,2' 'MacBookAir6,1' 'MacBookAir6,2' 'MacBookAir7,1' 'MacBookAir7,2' 'MacBookAir8,1' 'MacBookAir8,2' 'MacBookAir9,1' 'MacBookPro9,1' 'MacBookPro9,2' 'MacBookPro10,1' 'MacBookPro10,2' 'MacBookPro11,1' 'MacBookPro11,2' 'MacBookPro11,3' 'MacBookPro11,4' 'MacBookPro11,5' 'MacBookPro12,1' 'MacBookPro13,1' 'MacBookPro13,2' 'MacBookPro13,3' 'MacBookPro14,1' 'MacBookPro14,2' 'MacBookPro14,3' 'MacBookPro15,1' 'MacBookPro15,2' 'MacBookPro15,3' 'MacBookPro15,4' 'MacBookPro16,1' 'MacBookPro16,2' 'MacBookPro16,3' 'MacBookPro16,4' 'Macmini6,1' 'Macmini6,2' 'Macmini7,1' 'Macmini8,1' 'MacPro6,1' 'MacPro7,1' )
+		# TODO: Maybe make new lists that are only for El Capitan, High Sierra, and Catalina and newer to not include models that will never be seen in code that only runs on those versions of macOS.
+	else
+		>&2 echo "FILE ALREADY CREATED: ${every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes_file_path}"
+	fi
 else
 	>&2 echo "MISSING REQUIRED FILE: ${every_mac_marketing_model_name_with_grouped_serial_config_codes_file_path}"
 fi

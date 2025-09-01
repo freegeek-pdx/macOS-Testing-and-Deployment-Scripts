@@ -30,11 +30,11 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2023.6.16-1'
+readonly SCRIPT_VERSION='2025.6.24-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
-DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc.
+DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 18 = 10.14, 19 = 10.15, 20 = 11.0, 21 = 12.0, 22 = 13.0, 23 = 14.0, etc.
 readonly DARWIN_MAJOR_VERSION
 
 TMPDIR="$([[ -d "${TMPDIR}" && -w "${TMPDIR}" ]] && echo "${TMPDIR%/}/" || echo '/private/tmp/')" # Make sure "TMPDIR" is always set and that it always has a trailing slash for consistency regardless of the current environment.
@@ -105,7 +105,9 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		touch '/private/var/db/.AppleSetupDone'
 		chown 0:0 '/private/var/db/.AppleSetupDone' # Make sure this file is properly owned by root:wheel.
 
-		if [[ ! -f '/private/var/db/.AppleSetupDone' ]]; then
+		rm -f '/private/var/db/.AppleSetupTermsOfService' # Starting in macOS 15.4 Sequoia, this file may exist by default and is DELETED when the "Terms and Conditions" are manually agreed to during Setup Assistant. So, delete it so that the T&C Setup Assistant screen is not shown when we are trying to totally skip Setup Assistant.
+
+		if [[ ! -f '/private/var/db/.AppleSetupDone' || -f '/private/var/db/.AppleSetupTermsOfService' ]]; then
 			write_to_log 'ERROR: Failed to Skip Setup Assistant'
 			critical_error_occurred=true
 		fi
@@ -196,7 +198,9 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		while (( $# > 0 )); do
 			if [[ -n "$1" ]]; then
 				this_arg="$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" # Make args all caps so they can be case-insensitive and so that Team IDs are always valid since they must always be all caps.
-				if [[ "${this_arg}" == 'APPLE' ]]; then
+				if [[ "${this_arg}" == 'DO-NOT-VERIFY' ]]; then
+					return 0
+				elif [[ "${this_arg}" == 'APPLE' ]]; then
 					verify_apple_signed=true
 				elif [[ "${this_arg}" == 'NOTARIZED' || "${this_arg}" == 'NOTARIZATION' ]]; then
 					if (( DARWIN_MAJOR_VERSION >= 18 )); then
@@ -497,24 +501,30 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			return 1
 		fi
 
-		local this_packaged_app_filename
-		this_packaged_app_filename="$(pkgutil --payload-files "${package_to_install}" | grep -im 1 '\.app$')" # NOTE: There technically could be multiple apps or apps that install into locations other than "/Applications" within a package, but none that we install are like that so not worrying about that complexity (but they would still get installed, just not verified or logged properly).
-		local this_packaged_app_filename="${this_packaged_app_filename##*/}"
-		printf '%s' "${this_packaged_app_filename}" # Output file name for retrieval via command substitution for usage in other commands and logging (whether or not there is an error).
+		if [[ "${package_to_install}" == *'/Safari'* ]]; then # NOTE: Just install and do not check for app within package for Safari packages since they more complex, especially for macOS 13 Ventura with Cryptexes.
+			if ! verify_code_signature "${app_verification_args[@]}" "${package_to_install}" &> /dev/null || ! installer -pkg "${package_to_install}" -target '/'; then
+				return 3
+			fi
+		else
+			local this_packaged_app_filename
+			this_packaged_app_filename="$(pkgutil --payload-files "${package_to_install}" | grep -im 1 '\.app$')" # NOTE: There technically could be multiple apps or apps that install into locations other than "/Applications" within a package, but none that we install are like that so not worrying about that complexity (but they would still get installed, just not verified or logged properly).
+			local this_packaged_app_filename="${this_packaged_app_filename##*/}"
+			printf '%s' "${this_packaged_app_filename}" # Output file name for retrieval via command substitution for usage in other commands and logging (whether or not there is an error).
 
-		if [[ -z "${this_packaged_app_filename}" ]]; then
-			return 2
+			if [[ -z "${this_packaged_app_filename}" ]]; then
+				return 2
+			fi
+
+			rm -rf "/Applications/${this_packaged_app_filename}" # Delete app if it already exist from previous customization before reset.
+
+			if ! verify_code_signature "${app_verification_args[@]}" "${package_to_install}" &> /dev/null || ! installer -pkg "${package_to_install}" -target '/' || ! verify_code_signature "${app_verification_args[@]}" "/Applications/${this_packaged_app_filename}" &> /dev/null; then
+				rm -rf "/Applications/${this_packaged_app_filename}"
+				return 3
+			fi
+
+			xattr -drs com.apple.quarantine "/Applications/${this_packaged_app_filename}"
+			touch "/Applications/${this_packaged_app_filename}"
 		fi
-
-		rm -rf "/Applications/${this_packaged_app_filename}" # Delete app if it already exist from previous customization before reset.
-
-		if ! verify_code_signature "${app_verification_args[@]}" "${package_to_install}" &> /dev/null || ! installer -pkg "${package_to_install}" -target '/' || ! verify_code_signature "${app_verification_args[@]}" "/Applications/${this_packaged_app_filename}" &> /dev/null; then
-			rm -rf "/Applications/${this_packaged_app_filename}"
-			return 3
-		fi
-
-		xattr -drs com.apple.quarantine "/Applications/${this_packaged_app_filename}"
-		touch "/Applications/${this_packaged_app_filename}"
 	}
 
 	install_app_from_archive() {
@@ -545,17 +555,43 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		local this_archived_app_filename
 		this_archived_app_filename="$(zipinfo -1 "${archive_to_install}" | grep -im 1 '\.app/$')" # NOTE: There technically could be multiple apps within an archive, but none that we install are like that so not worrying about that complexity (but they would still get installed, just not verified or logged properly).
 		local this_archived_app_filename="${this_archived_app_filename%/}"
+
+		local this_archived_app_parent_folder=''
+		if [[ "${this_archived_app_filename}" == *'/'* ]]; then # Detect if the archive will extract the app within a folder rather than directly in the target install folder.
+			this_archived_app_parent_folder="${this_archived_app_filename%/*}"
+			this_archived_app_filename="${this_archived_app_filename##*/}"
+		fi
+
 		printf '%s' "${this_archived_app_filename}" # Output file name for retrieval via command substitution for usage in other commands and logging (whether or not there is an error).
 
 		if [[ -z "${this_archived_app_filename}" ]]; then
 			return 2
 		fi
 
-		rm -rf "${app_install_folder:?}/${this_archived_app_filename}" # Delete app if it already exist from previous customization before reset.
+		if [[ -n "${this_archived_app_parent_folder}" ]]; then
+			rm -rf "${app_install_folder:?}/${this_archived_app_parent_folder}" # Delete parent folder if it already exist from previous installation.
+		fi
 
-		if ! ditto -xk --noqtn "${archive_to_install}" "${app_install_folder}" &> /dev/null || ! verify_code_signature "${app_verification_args[@]}" "${app_install_folder}/${this_archived_app_filename}" &> /dev/null; then
+		rm -rf "${app_install_folder:?}/${this_archived_app_filename}" # Delete app if it already exist from previous installation.
+
+		if ! ditto -xk --noqtn "${archive_to_install}" "${app_install_folder}" &> /dev/null; then
+			if [[ -n "${this_archived_app_parent_folder}" ]]; then
+				rm -rf "${app_install_folder:?}/${this_archived_app_parent_folder}" # Delete parent folder if it already exist from previous installation.
+			fi
+
 			rm -rf "${app_install_folder:?}/${this_archived_app_filename}"
+
 			return 3
+		fi
+
+		if [[ -n "${this_archived_app_parent_folder}" ]]; then # If archive extracted app into a folder, move the app to the target install folder and delete the parent folder.
+			mv -f "${app_install_folder:?}/${this_archived_app_parent_folder}/${this_archived_app_filename}" "${app_install_folder:?}/${this_archived_app_filename}"
+			rm -rf "${app_install_folder:?}/${this_archived_app_parent_folder}"
+		fi
+
+		if [[ ! -d "${app_install_folder}/${this_archived_app_filename}" ]] || ! verify_code_signature "${app_verification_args[@]}" "${app_install_folder}/${this_archived_app_filename}" &> /dev/null; then
+			rm -rf "${app_install_folder:?}/${this_archived_app_filename}"
+			return 4
 		fi
 
 		touch "${app_install_folder}/${this_archived_app_filename}"
@@ -654,26 +690,32 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 						declare -a global_app_verification_args=( 'YRW6NUGA63' ) # Use my (Pico Mitchell) Team ID as the default value, which means any newly added apps that are not internal testing tools and are not explictly specified with a different value below will fail verification.
 
 						if [[ "${this_global_app_installer}" == *'.'[Pp][Kk][Gg] ]]; then
-							write_to_log "Installing Global App \"${this_global_app_installer_name}\" From Package"
+							if [[ "${this_global_app_installer_name}" != 'Safari'* || -z "$(ioreg -rc AppleSEPManager)" ]] || (( DARWIN_MAJOR_VERSION < 21 )); then # DON'T BOTHER updating Safari on T2 or Apple Silicon Macs running macOS 12 Monterey or newer that would be reset via "Erase All Content & Settings" since that would revert the update anyways, but do update Safari on Macs that will be reset by Snapshot since the update will be preserved for them.
+								write_to_log "Installing Global App \"${this_global_app_installer_name}\" From Package"
 
-							if [[ "${this_global_app_installer_name}" == 'Firefox'* ]]; then
-								global_app_verification_args=( 'notarized' '43AQ936H96' ) # Team ID of "Mozilla Corporation"
-							fi
-
-							this_packaged_app_filename="$(install_app_from_package "${global_app_verification_args[@]}" "${this_global_app_installer}")"
-							install_app_from_package_exit_code="$?"
-
-							if (( install_app_from_package_exit_code == 0 )); then
-								chown -R 501:20 "/Applications/${this_packaged_app_filename}" # Make sure the customer user account ends up owning the pre-installed apps.
-							else
-								if (( install_app_from_package_exit_code == 2 )); then
-									write_to_log "ERROR: Failed to Detect App Within \"${this_global_app_installer_name}\" Package for Global App"
-								elif (( install_app_from_package_exit_code == 3 )); then
-									write_to_log "ERROR: Failed to Install or Verify Global App \"${this_packaged_app_filename}\""
+								if [[ "${this_global_app_installer_name}" == 'Safari'* ]]; then
+									global_app_verification_args=( 'apple' )
+								elif [[ "${this_global_app_installer_name}" == 'Firefox'* ]]; then
+									global_app_verification_args=( 'notarized' '43AQ936H96' ) # Team ID of "Mozilla Corporation"
 								fi
 
-								critical_error_occurred=true
-								break
+								this_packaged_app_filename="$(install_app_from_package "${global_app_verification_args[@]}" "${this_global_app_installer}")"
+								install_app_from_package_exit_code="$?"
+
+								if (( install_app_from_package_exit_code == 0 )); then
+									if [[ -n "${this_packaged_app_filename}" ]]; then
+										chown -R 501:20 "/Applications/${this_packaged_app_filename}" # Make sure the customer user account ends up owning the pre-installed apps.
+									fi
+								else
+									if (( install_app_from_package_exit_code == 2 )); then
+										write_to_log "ERROR: Failed to Detect App Within \"${this_global_app_installer_name}\" Package for Global App"
+									elif (( install_app_from_package_exit_code == 3 )); then
+										write_to_log "ERROR: Failed to Install or Verify Global App \"${this_packaged_app_filename:-${this_global_app_installer_name}}\""
+									fi
+
+									critical_error_occurred=true
+									break
+								fi
 							fi
 						elif [[ "${this_global_app_installer}" == *'.'[Zz][Ii][Pp] ]]; then # There are not currently any global apps installed via ZIP, but keep this code for easy future use.
 							write_to_log "Installing Global App \"${this_global_app_installer_name}\" From Archive"
@@ -687,7 +729,9 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 								if (( install_app_from_archive_exit_code == 2 )); then
 									write_to_log "ERROR: Failed to Detect App Within \"${this_global_app_installer_name}\" Archive for Global App"
 								elif (( install_app_from_archive_exit_code == 3 )); then
-									write_to_log "ERROR: Failed to Install or Verify Global App \"${this_archived_app_filename}\""
+									write_to_log "ERROR: Failed to Install Global App \"${this_archived_app_filename}\""
+								elif (( install_app_from_archive_exit_code == 4 )); then
+									write_to_log "ERROR: Failed to Verify Global App \"${this_archived_app_filename}\""
 								fi
 
 								critical_error_occurred=true
@@ -1015,7 +1059,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 		# CONNECTING TO WI-FI
 
-		wifi_ssid='FG Reuse'
+		wifi_ssid='FG Staff'
 		wifi_password='[BUILD PACKAGE SCRIPT WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]'
 
 		while read -ra this_network_hardware_ports_line_elements; do
@@ -1271,7 +1315,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 						# DISABLE NOTIFICATIONS
 
 						if (( DARWIN_MAJOR_VERSION >= 20 )); then
-							# On macOS 11 Big Sur, the Do Not Distrub data is stored as an encoded binary plist within the "dnd_prefs" key of "com.apple.ncprefs": https://www.reddit.com/r/osx/comments/ksbmay/big_sur_how_to_test_do_not_disturb_status_in/gjb72av/
+							# On macOS 11 Big Sur, the Do Not Disturb data is stored as an encoded binary plist within the "dnd_prefs" key of "com.apple.ncprefs": https://www.reddit.com/r/osx/comments/ksbmay/comment/gq5fu0m/
 							# On macOS 12 Monterey and newer, the DND Schedule settings have moved to being stored in "~/Library/DoNotDisturb/DB/ModeConfigurations.json" (within data[0].modeConfigurations["com.apple.donotdisturb.mode.default"].triggers),
 							# but these old settings are migrated (a "migratedLegacySchedule" key is set to "true" in the "com.apple.ncprefs" preferences) and still properly take effect (even on macOS 13 Ventura) so continue only setting these for simplicity.
 
@@ -1337,9 +1381,10 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 						this_user_apps_folder="${this_home_folder}/Applications"
 
 						if [[ -d "${this_user_resources_folder}" ]]; then
-							if [[ -d "${this_user_resources_folder}/Pics" ]]; then
+							if (( DARWIN_MAJOR_VERSION <= 22 )) && [[ -d "${this_user_resources_folder}/Pics" ]]; then
 
 								# UNZIP FREE GEEK PROMO PICS TO USER PICTURES FOLDER (FOR SCREENSAVER AUTOMATION DURING DEMO MODE)
+								# UNLESS running on macOS 14 Sonoma or newer since only the new Aerial screen savers will be used there.
 
 								this_user_pictures_folder="${this_home_folder}/Pictures"
 
@@ -1395,12 +1440,12 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 															user_app_verification_args=( 'notarized' '4ZNF85T75D' ) # Team ID of "Kirill Luzanov"
 														elif [[ "${this_user_app_installer_name}" == 'Geekbench'* ]]; then
 															user_app_verification_args=( 'notarized' 'SRW94G4YYQ' ) # Team ID of "Primate Labs Inc."
+														elif [[ "${this_user_app_installer_name}" == 'KeyboardCleanTool'* ]]; then
+															user_app_verification_args=( 'notarized' 'DAFVSXZ82P' ) # Team ID of "folivora.AI GmbH"
 														elif [[ "${this_user_app_installer_name}" == 'Mactracker'* ]]; then
 															user_app_verification_args=( 'notarized' '63TP32R3AB' ) # Team ID of "Ian Page"
 														elif [[ "${this_user_app_installer_name}" == 'QA Helper' ]]; then
 															user_app_verification_args+=( 'notarized' ) # The Team ID of "Pico Mitchell" is already the default value, so just ALSO check notarization since "QA Helper" is notarized (unlike other internal testing apps).
-														elif [[ "${this_user_app_installer_name}" == 'KeyboardCleanTool' ]]; then
-															user_app_verification_args=( 'notarized' 'DAFVSXZ82P' ) # Team ID of "folivora.AI GmbH"
 														fi # All other apps should be internal testing apps signed with my Team ID (specified in the original declaration), but are NOT notarized (since it's not worth the extra time on each build).
 
 														this_archived_app_filename="$(install_app_from_archive "${user_app_verification_args[@]}" "${this_user_apps_folder}" "${this_user_app_installer}")"
@@ -1412,7 +1457,9 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 															if (( install_app_from_archive_exit_code == 2 )); then
 																write_to_log "ERROR: Failed to Detect App Within \"${this_user_app_installer_name}\" Archive for User App"
 															elif (( install_app_from_archive_exit_code == 3 )); then
-																write_to_log "ERROR: Failed to Install or Verify User App \"${this_archived_app_filename}\" for \"${this_username}\""
+																write_to_log "ERROR: Failed to Install User App \"${this_archived_app_filename}\" for \"${this_username}\""
+															elif (( install_app_from_archive_exit_code == 4 )); then
+																write_to_log "ERROR: Failed to Verify User App \"${this_archived_app_filename}\" for \"${this_username}\""
 															fi
 
 															critical_error_occurred=true

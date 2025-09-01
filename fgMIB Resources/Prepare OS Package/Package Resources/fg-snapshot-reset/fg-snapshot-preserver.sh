@@ -26,7 +26,7 @@
 # Solution 1: MANIPULATE DATE AND TIME
 	# Manipulate the date and time so that macOS never thinks 24 hours have passed. Through investigation I also found that if a Snapshot is in the future, macOS will purge it.
 	# So, this script will compare the current date with the reset Snapshot date and set the date back to the reset Snapshot date so that macOS does not think 24 hours have passed.
-	# Since Network Time must be turned off to set the date back, worldtimeapi.org is used to keep the actual time in sync even though the date will be set back to the reset Snapshot date.
+	# Since Network Time must be turned off to set the date back, api.freegeek.org/datetime is used to keep the actual time in sync even though the date will be set back to the reset Snapshot date.
 	# There is a possible edge case where the actual time could be earlier the reset Snapshots time, which would put the reset Snapshot in the future.
 	# This is edge case is checked for and the time will be set to the reset Snapshot time if the actual time would put the reset Snapshot in the future.
 	# To help avoid this issue, the time was set back to midnight when creating the reset Snapshot so that the reset Snapshot could really only be in the future for a few seconds near midnight.
@@ -46,7 +46,7 @@
 	# It seems that somehow the "deleted" daemon is maybe marking the reset Snapshot as unusable and preventing it from being able to show up in "Restore from Time Machine Backup" in Recovery. This seems to not be an issue on macOS 11 Big Sur though.
 	# So, ALWAYS manipulate the system date (Solution 1) to keep set to the Snapshot date on macOS 10.15 Catalina and do not bother mounting the Snapshot (since knowing the Snapshot got purged is better user feedback than it just not showing in Recovery).
 
-readonly SCRIPT_VERSION='2023.4.7-1'
+readonly SCRIPT_VERSION='2024.10.29-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
@@ -59,7 +59,7 @@ readonly DEMO_USERNAME='fg-demo'
 DEMO_USER_UID="$(id -u "${DEMO_USERNAME}" 2> /dev/null || echo '502')"
 readonly DEMO_USER_UID
 
-DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 17 = 10.13, 18 = 10.14, 19 = 10.15, 20 = 11.0, etc.
+DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 18 = 10.14, 19 = 10.15, 20 = 11.0, 21 = 12.0, 22 = 13.0, 23 = 14.0, etc.
 readonly DARWIN_MAJOR_VERSION
 
 write_to_log() {
@@ -79,10 +79,10 @@ fi
 
 manually_sync_time() {
 	if [[ "$(sudo systemsetup -getusingnetworktime)" == *': Off' ]]; then
-		actual_date_time_info="$(curl -m 5 -sfL 'http://worldtimeapi.org/api/ip.txt' 2> /dev/null)" # Always use "http" since this is to set the correct time when we know the date will be in the past and if the date is too far in the past then "https" will fail anyways while "http" never will.
+		actual_date_time_info="$(curl -m 5 -sfL 'http://api.freegeek.org/datetime' 2> /dev/null)" # Always use "http" since this is to set the correct time when we know the date will be in the past and if the date is too far in the past then "https" will fail anyways while "http" never will.
 		actual_timezone="$(echo "${actual_date_time_info}" | awk -F ': ' '($1 == "timezone") { print $NF; exit }')"
 		actual_date_time="$(echo "${actual_date_time_info}" | awk -F ': ' '($1 == "datetime") { print $NF; exit }')"
-		
+
 		actual_time=''
 		actual_time_int="$(date '+%H%M%S')" # Will fallback to checking current system time if failed to get actual time (even though this check already happened before this function was called).
 		if [[ -n "${actual_date_time}" ]]; then
@@ -96,7 +96,7 @@ manually_sync_time() {
 
 			systemsetup -settimezone "${actual_timezone}" &> /dev/null
 			systemsetup -settime "${1:0:2}:${1:2:2}:${1:4:2}" &> /dev/null
-			
+
 			touch "${SCRIPT_DIR}/.timeNotSynced" # Create this flag so that the time can get synced to the correct time next time this script runs.
 
 			write_to_log 'Blocked Manual Time Sync to Not Put Reset Snapshot in Future'
@@ -187,7 +187,7 @@ set_date_to_reset_snapshot_date() {
 		fi
 
 		systemsetup -setdate "${1:5:2}:${1:8:2}:${1:2:2}" &> /dev/null # Reset DATE to Snapshot DATE.
-		
+
 		write_to_log 'Set Date Back to Reset Snapshot Date'
 
 		return 0
@@ -206,7 +206,7 @@ secure_token_holder_exists_that_cannot_be_removed="$([[ -n "$(ioreg -rc AppleSEP
 
 if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/.fgResetSnapshotCreated' && "$(tmutil listlocalsnapshots / | grep 'com.apple.TimeMachine' | head -1)" == "$(head -1 '/Users/Shared/.fgResetSnapshotCreated')" && "$(fdesetup isactive)" == 'false' ]]; then
 	was_logged_in_at_launch="$(pgrep -qax 'Finder' && echo 'true' || echo 'false')"
-	
+
 	if ! attempt_to_mount_reset_snapshot; then
 		# If "Free Geek Snapshot Helper" has not been granted Full Disk Access yet (or could not mount the Snapshot very early on boot),
 		# fallback to using the date and time manipulation which will keep the system time within 24 hours of the reset Snapshot creation date,
@@ -215,13 +215,18 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 		# to mount the reset Snapshot, so it is pretty well tested and robust.
 
 		write_to_log 'Reset Snapshot IS NOT Mounted, May Need to Manipulate Date'
-		
+
+		if [[ ! -d "/Users/${DEMO_USERNAME}/Applications/Cleanup After QA Complete.app" ]]; then
+			# If QA Complete has been run (therefore Power Schedule has been set), cancel the Power Schedule so that the date/time change doesn't confuse it (will be reset after date/time change).
+			pmset repeat cancel
+		fi
+
 		actual_date="$(date '+%m:%d:%y')"
-		
+
 		reset_snapshot_name="$(head -1 '/Users/Shared/.fgResetSnapshotCreated')"
 		reset_snapshot_date="${reset_snapshot_name:22:10}"
 		reset_snapshot_time="${reset_snapshot_name:33:6}"
-		
+
 		did_set_date_back_to_reset_snapshot_date=false
 		time_needs_sync=false
 
@@ -243,7 +248,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 		if (( 10#$(date '+%H%M%S') < 10#${reset_snapshot_time} )); then # Casting to base 10 (10#) removes any leading zeros so the numbers are not interpreted as octal: https://mywiki.wooledge.org/ArithmeticExpression#Pitfall:_Base_prefix_with_signed_numbers & https://github.com/koalaman/shellcheck/wiki/SC2004#rationale
 			# If the reset Snapshot time is in the future, macOS would purge it if the "deleted" daemon runs.
 			# So, never allow the system time be less that the reset Snapshot time.
-			
+
 			if [[ "$(sudo systemsetup -getusingnetworktime)" == *': On' ]]; then
 				systemsetup -setusingnetworktime off &> /dev/null
 				write_to_log 'Turned Network Time Off'
@@ -254,7 +259,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 			systemsetup -settime "${reset_snapshot_time:0:2}:${reset_snapshot_time:2:2}:${reset_snapshot_time:4:2}" &> /dev/null
 
 			write_to_log 'Adjusted Time to Not Put Reset Snapshot in Future'
-			
+
 			# We can still manually_sync_time (if needed) after doing this since manually_sync_time will do this same check
 			# against the actual time and will not set an actual time that would put the reset Snapshot in the future.
 		fi
@@ -279,7 +284,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 		fi
 
 		if [[ ! -d "${SCRIPT_DIR}/mount/Users/Shared/fg-snapshot-reset" ]]; then
-			
+
 			# If waited for login and network time is on, make sure date hasn't been synced since waiting for login.
 			if $did_wait_for_login && [[ "$(sudo systemsetup -getusingnetworktime)" == *': On' ]] && set_date_to_reset_snapshot_date "${reset_snapshot_date}"; then
 				did_set_date_back_to_reset_snapshot_date=true # This will be used to reboot after the DATE has been set back to make sure StartCalendarInterval continues properly.
@@ -289,7 +294,12 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 			if $time_needs_sync; then
 				manually_sync_time "${reset_snapshot_time}"
 			fi
-			
+
+			if [[ ! -d "/Users/${DEMO_USERNAME}/Applications/Cleanup After QA Complete.app" ]]; then
+				# If QA Complete has been run, re-set the Power Schedule that was canceled before the date/time change.
+				pmset repeat poweron 'MTWRFSU' '9:45:00' shutdown 'MTWRFSU' '17:15:00'
+			fi
+
 			if $did_set_date_back_to_reset_snapshot_date; then
 
 				# REBOOT AFTER DATE IS SET BACK IN TIME (if could not mount reset Snapshot after login or is macOS 10.15 Catalina)
@@ -316,7 +326,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 				# This *should* only happen on boot, right after login, a day or more after installation on macOS 10.15 Catalina where the reset Snapshot will not be mounted.
 				# The reboot happens right after login since we'll wait for login to be sure we can't mount the reset Snapshot instead of having to reboot.
 				# Or this could happen at midnight if the computer is left on overnight on macOS 10.15 Catalina where the reset Snapshot will not be mounted.
-				
+
 				launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" launchctl reboot apps # This is a fast way to kill all running DEMO_USERNAME apps (https://eclecticlight.co/2019/08/27/kickstarting-and-tearing-down-with-launchctl/)
 				# so that the following prompt will be the only thing visible on screen before reboot.
 				afplay '/System/Library/Sounds/Purr.aiff' & # Continue to display dialog before this is done playing.
@@ -326,7 +336,7 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 				sleep 5 # Give the technician some time to see this alert to know the computer didn't reboot because of a hardware issue.
 
 				launchctl asuser "${DEMO_USER_UID}" sudo -u "${DEMO_USERNAME}" launchctl reboot apps # Kill all running DEMO_USERNAME apps AGAIN in case any were launched in the 5 seconds since the dialog was shown (so that the dialog will be visible just before reboot).
-				
+
 				nvram 'StartupMute=%01' # Disable chime for forced reboot.
 
 				write_to_log 'Rebooting Mac After Setting Date Back to Reset Snapshot Date'
@@ -334,6 +344,9 @@ if ! $secure_token_holder_exists_that_cannot_be_removed && [[ -f '/Users/Shared/
 
 				exit 0
 			fi
+		elif [[ ! -d "/Users/${DEMO_USERNAME}/Applications/Cleanup After QA Complete.app" ]]; then
+			# If QA Complete has been run, re-set the Power Schedule that was canceled before the attempting the date/time change.
+			pmset repeat poweron 'MTWRFSU' '9:45:00' shutdown 'MTWRFSU' '17:15:00'
 		fi
 	fi
 else
@@ -352,7 +365,7 @@ else
 		if [[ "${effective_loss_date_time}" == "${actual_loss_date_time}" ]]; then loss_date_time_display="${actual_loss_date_time}"; fi
 
 		write_to_log "Lost Reset Snapshot at ${loss_date_time_display}"
-		
+
 		if [[ -f '/Users/Shared/.fgResetSnapshotCreated' ]]; then
 			mv '/Users/Shared/.fgResetSnapshotCreated' '/Users/Shared/.fgResetSnapshotLost'
 
@@ -363,7 +376,7 @@ else
 			elif [[ "$(tmutil listlocalsnapshots / | grep 'com.apple.TimeMachine' | head -1)" != "$(head -1 '/Users/Shared/.fgResetSnapshotLost')" ]]; then
 				existing_snapshots="$(tmutil listlocalsnapshots / | grep 'com.apple.TimeMachine')"
 				existing_snapshots="${existing_snapshots//$'\n'/, }"
-				
+
 				echo "LOST REASON: macOS Deleted Reset Snapshot at ${loss_date_time_display} (EXISTING SNAPSHOTS: ${existing_snapshots:-NONE})" >> '/Users/Shared/.fgResetSnapshotLost'
 			else
 				echo 'LOST REASON: Unknown' >> '/Users/Shared/.fgResetSnapshotLost'

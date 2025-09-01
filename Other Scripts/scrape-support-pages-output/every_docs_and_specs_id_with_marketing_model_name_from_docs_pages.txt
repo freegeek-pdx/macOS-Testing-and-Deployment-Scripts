@@ -1,0 +1,762 @@
+Mac Desktop:mac/301085:122211:Mac Studio (2025):Mac Studio (2025):Mac Studio (2025):
+Mac Desktop:mac/301066:121557:iMac (24-inch, 2024, Four ports):iMac (24-inch, 2024, Four ports):iMac (24-inch, 2024, Four ports):
+Mac Desktop:mac/301065:121556:iMac (24-inch, 2024, Two ports):iMac (24-inch, 2024, Two ports):iMac (24-inch, 2024, Two ports):
+Mac Desktop:mac/301067:121555:Mac mini (2024):Mac mini (2024):Mac mini (2024):
+Mac Desktop:mac/301009:117734:iMac (24-inch, M3, 2023, Four ports):iMac (24-inch, M3, 2023, Four ports):iMac (24-inch, 2023, Four ports):
+Mac Desktop:mac/301008:117733:iMac (24-inch, M3, 2023, Two ports):iMac (24-inch, M3, 2023, Two ports):iMac (24-inch, 2023, Two ports):
+Mac Desktop:mac/300923:111837:Mac mini (2023) with M2:Mac mini (2023) with M2:Mac mini (2023):
+Mac Desktop:mac/300924:111837:Mac mini (2023) with M2 Pro:Mac mini (2023) with M2 Pro:Mac mini (2023):
+Mac Desktop:mac/300955:111343:Mac Pro (2023):Mac Pro (2023):Mac Pro (2023):
+Mac Desktop:mac/300956:111836:Mac Pro (Rack, 2023):Mac Pro (Rack, 2023):Mac Pro (Rack, 2023):
+Mac Desktop:mac/300953:111835:Mac Studio (2023):Mac Studio (2023):Mac Studio (2023):
+Mac Desktop:mac/300869:111900:Mac Studio (2022):Mac Studio (2022):Mac Studio (2022):
+Mac Desktop:mac/300352:111895:iMac (24-inch, M1, 2021):iMac (24-inch, M1, 2021):iMac (24-inch, M1, 2021):
+Mac Desktop:mac/300355:111895:iMac (24-inch, M1, 2021):iMac (24-inch, M1, 2021):iMac (24-inch, M1, 2021):
+Mac Desktop:mac/300198:111913:iMac (Retina 5K, 27-inch, 2020):iMac (Retina 5K, 27-inch, 2020):iMac (Retina 5K, 27-inch, 2020):
+Mac Desktop:mac/300268:111894:Mac mini (M1, 2020):Mac mini (M1, 2020):Mac mini (M1, 2020):
+Mac Desktop:mac/300150:111907:Mac Pro (Rack, 2019):Mac Pro (Rack, 2019):Mac Pro (Rack, 2019):
+Mac Desktop:mac/506666:111963:iMac (Retina 4K, 21.5-inch, 2019):iMac (Retina 4K, 21.5-inch, 2019):iMac (Retina 4K, 21.5-inch, 2019):
+Mac Desktop:mac/506651:111998:iMac (Retina 5K, 27-inch, 2019):iMac (Retina 5K, 27-inch, 2019):iMac (Retina 5K, 27-inch, 2019):
+Mac Desktop:mac/508176:118461:Mac Pro (2019):Mac Pro (2019):Mac Pro (2019):
+Mac Desktop:mac/505996:111912:Mac mini (2018):Mac mini (2018):Mac mini (2018):
+Mac Desktop:mac/508929:111912:Mac mini (2018):Mac mini (2018):Mac mini (2018):
+Mac Desktop:mac/503494:111921:iMac (21.5-inch, 2017):iMac (21.5-inch, 2017):iMac (21.5-inch, 2017):
+Mac Desktop:mac/503499:112026:iMac (Retina 4K, 21.5-inch, 2017):iMac (Retina 4K, 21.5-inch, 2017):iMac (Retina 4K, 21.5-inch, 2017):
+Mac Desktop:mac/503513:111969:iMac (Retina 5K, 27-inch, 2017):iMac (Retina 5K, 27-inch, 2017):iMac (Retina 5K, 27-inch, 2017):
+Mac Desktop:mac/504513:111995:iMac Pro (2017):iMac Pro (2017):iMac Pro (2017):
+Mac Desktop:mac/300009:unknown:iMac (21.5-inch, Late 2015):iMac (21.5-inch, Late 2015):UNKNOWN Marketing Model Name from Specs Page:
+Mac Desktop:mac/300010:112036:iMac (21.5-inch, Late 2015):iMac (21.5-inch, Late 2015):iMac (21.5-inch, Late 2015):
+Mac Desktop:mac/300012:112034:iMac (Retina 4K, 21.5-inch, Late 2015):iMac (Retina 4K, 21.5-inch, Late 2015):iMac (Retina 4K, 21.5-inch, Late 2015):
+Mac Desktop:mac/300011:112035:iMac (Retina 5K, 27-inch, Late 2015):iMac (Retina 5K, 27-inch, Late 2015):iMac (Retina 5K, 27-inch, Late 2015):
+Mac Desktop:mac/135391:112434:iMac (Retina 5K, 27-inch, Mid 2015):iMac (Retina 5K, 27-inch, Mid 2015):iMac (Retina 5K, 27-inch, Mid 2015):
+Mac Desktop:mac/134642:112031:iMac (21.5-inch, Mid 2014):iMac (21.5-inch, Mid 2014):iMac (21.5-inch, Mid 2014):
+Mac Desktop:mac/134281:111970:iMac (27-inch, Late 2013):iMac (27-inch, Late 2013):iMac (27-inch, Late 2013):
+Mac Desktop:mac/135121:112436:iMac (Retina 5K, 27-inch, Late 2014):iMac (Retina 5K, 27-inch, Late 2014):iMac (Retina 5K, 27-inch, Late 2014):
+Mac Desktop:mac/135120:111931:Mac mini (Late 2014):Mac mini (Late 2014):Mac mini (Late 2014):
+Mac Desktop:mac/133982:unknown:iMac (21.5-inch, Early 2013):iMac (21.5-inch, Early 2013):UNKNOWN Marketing Model Name from Specs Page:
+Mac Desktop:mac/132281:unknown:iMac (21.5-inch, Late 2013):iMac (21.5-inch, Late 2013):UNKNOWN Marketing Model Name from Specs Page:
+Mac Desktop:mac/134280:111967:iMac (21.5-inch, Late 2013):iMac (21.5-inch, Late 2013):iMac (21.5-inch, Late 2013):
+Mac Desktop:mac/134417:112025:Mac Pro (Late 2013):Mac Pro (Late 2013):Mac Pro (Late 2013):
+Mac Desktop:mac/133842:112435:iMac (21.5-inch, Late 2012):iMac (21.5-inch, Late 2012):iMac (21.5-inch, Late 2012):
+Mac Desktop:mac/133843:112433:iMac (27-inch, Late 2012):iMac (27-inch, Late 2012):iMac (27-inch, Late 2012):
+Mac Desktop:mac/133840:111926:Mac mini (Late 2012):Mac mini (Late 2012):Mac mini (Late 2012):
+Mac Desktop:mac/133844:112012:Mac mini Server (Late 2012):Mac mini Server (Late 2012):Mac mini Server (Late 2012):
+Mac Desktop:mac/133644:118464:Mac Pro (Mid 2012):Mac Pro (Mid 2012):Mac Pro (Mid 2012):
+Mac Desktop:mac/133435:112596:iMac (21.5-inch, Late 2011):iMac (21.5-inch, Late 2011):iMac (21.5-inch, Late 2011):
+Mac Desktop:mac/133282:111983:iMac (21.5-inch, Mid 2011):iMac (21.5-inch, Mid 2011):iMac (21.5-inch, Mid 2011):
+Mac Desktop:mac/133283:112569:iMac (27-inch, Mid 2011):iMac (27-inch, Mid 2011):iMac (27-inch, Mid 2011):
+Mac Desktop:mac/133334:112007:Mac mini (Mid 2011):Mac mini (Mid 2011):Mac mini (Mid 2011):
+Mac Desktop:mac/133335:112006:Mac mini Server (Mid 2011):Mac mini Server (Mid 2011):Mac mini Server (Mid 2011):
+Mac Desktop:mac/132941:112567:iMac (21.5-inch, Mid 2010):iMac (21.5-inch, Mid 2010):iMac (21.5-inch, Mid 2010):
+Mac Desktop:mac/132942:112566:iMac (27-inch, Mid 2010):iMac (27-inch, Mid 2010):iMac (27-inch, Mid 2010):
+Mac Desktop:mac/132914:112588:Mac mini (Mid 2010):Mac mini (Mid 2010):Mac mini (Mid 2010):
+Mac Desktop:mac/132915:112589:Mac mini Server (Mid 2010):Mac mini Server (Mid 2010):Mac mini Server (Mid 2010):
+Mac Desktop:mac/132966:112578:Mac Pro (Mid 2010):Mac Pro (Mid 2010):Mac Pro (Mid 2010):
+Mac Desktop:mac/132294:112427:iMac (20-inch, Early 2009):iMac (20-inch, Early 2009):iMac (Early 2009):
+Mac Desktop:mac/132468:112423:iMac (20-inch, Mid 2009):iMac (20-inch, Mid 2009):iMac (20-inch, Mid 2009):
+Mac Desktop:mac/132699:112565:iMac (21.5-inch, Late 2009):iMac (21.5-inch, Late 2009):iMac (21.5-inch, Late 2009):
+Mac Desktop:mac/132300:112427:iMac (24-inch, Early 2009):iMac (24-inch, Early 2009):iMac (Early 2009):
+Mac Desktop:mac/132686:112564:iMac (27-inch, Late 2009):iMac (27-inch, Late 2009):iMac (27-inch, Late 2009):
+Mac Desktop:mac/132299:111345:Mac mini (Early 2009):Mac mini (Early 2009):Mac mini (Early 2009):
+Mac Desktop:mac/132705:112482:Mac mini (Late 2009):Mac mini (Late 2009):Mac mini (Late 2009):
+Mac Desktop:mac/132392:112590:Mac Pro (Early 2009):Mac Pro (Early 2009):Mac Pro (Early 2009):
+Mac Desktop:mac/131986:112494:iMac (20-inch, Early 2008):iMac (20-inch, Early 2008):iMac (Early 2008):
+Mac Desktop:mac/131987:112494:iMac (24-inch, Early 2008):iMac (24-inch, Early 2008):iMac (Early 2008):
+Mac Desktop:mac/131819:112308:Mac Pro (Early 2008):Mac Pro (Early 2008):Mac Pro (Early 2008):
+Mac Desktop:mac/131599:112553:iMac (20-inch, Mid 2007):iMac (20-inch, Mid 2007):iMac (Mid 2007):
+Mac Desktop:mac/131607:112553:iMac (24-inch, Mid 2007):iMac (24-inch, Mid 2007):iMac (Mid 2007):
+Mac Desktop:mac/131598:112504:Mac mini (Mid 2007):Mac mini (Mid 2007):Mac mini (Mid 2007):
+Mac Desktop:mac/130826:112469:iMac (17-inch, Early 2006):iMac (17-inch, Early 2006):iMac (Early 2006):
+Mac Desktop:mac/131114:112523:iMac (17-inch, Late 2006 CD):iMac (17-inch, Late 2006 CD):iMac (Late 2006):
+Mac Desktop:mac/131116:112523:iMac (17-inch, Late 2006):iMac (17-inch, Late 2006):iMac (Late 2006):
+Mac Desktop:mac/131051:unknown:iMac (17-inch, Mid 2006):iMac (17-inch, Mid 2006):UNKNOWN Marketing Model Name from Specs Page:
+Mac Desktop:mac/130825:112469:iMac (20-inch, Early 2006):iMac (20-inch, Early 2006):iMac (Early 2006):
+Mac Desktop:mac/131125:112523:iMac (20-inch, Late 2006):iMac (20-inch, Late 2006):iMac (Late 2006):
+Mac Desktop:mac/131132:112523:iMac (24-inch, Late 2006):iMac (24-inch, Late 2006):iMac (Late 2006):
+Mac Desktop:mac/130881:112456:Mac mini (Early 2006):Mac mini (Early 2006):Mac mini (Early 2006):
+Mac Desktop:mac/131126:112468:Mac mini (Late 2006):Mac mini (Late 2006):Mac mini (Late 2006):
+Mac Desktop:mac/131077:112520:Mac Pro:Mac Pro:Mac Pro:
+Mac Desktop:mac/130469:112521:eMac (2005):eMac (2005):eMac (2005):
+Mac Desktop:mac/130698:112492:iMac G5 (17-Inch iSight):iMac G5 (17-Inch iSight):iMac G5 (iSight):
+Mac Desktop:mac/130699:112492:iMac G5 (20-Inch iSight):iMac G5 (20-Inch iSight):iMac G5 (iSight):
+Mac Desktop:mac/130498:112556:iMac G5 ALS (17-Inch):iMac G5 ALS (17-Inch):iMac G5 (Ambient Light Sensor):
+Mac Desktop:mac/130497:112556:iMac G5 ALS (20-Inch):iMac G5 ALS (20-Inch):iMac G5 (Ambient Light Sensor):
+Mac Desktop:mac/130299:112579:Mac mini:Mac mini:Mac mini (original):
+Mac Desktop:mac/130673:unknown:Mac mini (Late 2005):Mac mini (Late 2005):UNKNOWN Marketing Model Name from Specs Page:
+Mac Desktop:mac/130458:112557:Power Mac G5 (Early 2005):Power Mac G5 (Early 2005):Power Mac G5 (Early 2005):
+Mac Desktop:mac/130750:112506:Power Mac G5 (Late 2005):Power Mac G5 (Late 2005):Power Mac G5 (Late 2005):
+Mac Desktop:mac/125005:112498:Power Mac G5 (June 2004):Power Mac G5 (June 2004):Power Mac G5 (June 2004):
+Mac Desktop:mac/130156:112312:Power Mac G5 (Late 2004):Power Mac G5 (Late 2004):Power Mac G5 (Late 2004):
+Mac Desktop:mac/119741:112531:Power Mac G4 (Mirrored Drive Door 2003):Power Mac G4 (Mirrored Drive Door 2003):Power Mac G4 (Mirrored Drive Doors 2003):
+Mac Desktop:mac/109132:112548:iMac (Early 2001):iMac (Early 2001):iMac (Early 2001):
+Mac Desktop:mac/110293:112502:iMac (Summer 2001):iMac (Summer 2001):iMac (Summer 2001):
+Mac Desktop:mac/8359:112527:iMac (Summer 2000):iMac (Summer 2000):iMac (Summer 2000):
+Mac Desktop:mac/pp210:unknown:Earlier Desktops:Earlier Desktops:UNKNOWN Marketing Model Name from Specs Page:
+Mac Desktop:mac/pp201:unknown:Earlier Power Mac:Earlier Power Mac:UNKNOWN Marketing Model Name from Specs Page:
+Mac Desktop:mac/112793:112513:eMac:eMac:eMac:
+Mac Desktop:mac/119225:112544:eMac (ATI Graphics):eMac (ATI Graphics):eMac (ATI Graphics):
+Mac Desktop:mac/124085:112451:eMac (USB 2.0):eMac (USB 2.0):eMac (USB 2.0):
+Mac Desktop:mac/6597:112281:iMac:iMac:iMac:
+Mac Desktop:mac/113574:112501:iMac (17 inch, Flat Panel):iMac (17 inch, Flat Panel):iMac (Flat Panel), iMac (17-inch Flat Panel):
+Mac Desktop:mac/117899:112516:iMac (17-inch 1GHz):iMac (17-inch 1GHz):iMac (17-inch 1Ghz):
+Mac Desktop:mac/6990:112288:iMac (266 MHz):iMac (266 MHz):iMac (266 MHz):
+Mac Desktop:mac/6991:112286:iMac (333 GHz):iMac (333 GHz):iMac (333 MHz):
+Mac Desktop:mac/111858:112501:iMac (Flat Panel):iMac (Flat Panel):iMac (Flat Panel), iMac (17-inch Flat Panel):
+Mac Desktop:mac/8001:112301:iMac (Slot Loading):iMac (Slot Loading):iMac (Slot Loading):
+Mac Desktop:mac/120619:112313:iMac (USB 2.0):iMac (USB 2.0):iMac (USB 2.0):
+Mac Desktop:mac/130076:112310:iMac G5 (17-Inch):iMac G5 (17-Inch):iMac G5:
+Mac Desktop:mac/130077:112310:iMac G5 (20-inch):iMac G5 (20-inch):iMac G5:
+Mac Desktop:mac/pp129:112626:Mac mini (Mac OS X Server):Mac mini (Mac OS X Server):Mac mini (Mac OS X Server, Late 2009):
+Mac Desktop:mac/pp187:112293:Power Mac G3 (Blue and White):Power Mac G3 (Blue and White):Power Macintosh G3 (Blue or White):
+Mac Desktop:mac/6561:112283:Power Mac G3 All-In-One:Power Mac G3 All-In-One:Power Macintosh G3 All-In-One:
+Mac Desktop:mac/6097:112279:Power Mac G3 Desktop:Power Mac G3 Desktop:Power Macintosh G3 Desktop:
+Mac Desktop:mac/7956:112294:Power Mac G4 (AGP Graphics):Power Mac G4 (AGP Graphics):Power Mac G4 (AGP Graphics):
+Mac Desktop:mac/8367:112466:Power Mac G4 (Cube):Power Mac G4 (Cube):Power Mac G4 (Cube):
+Mac Desktop:mac/108892:112549:Power Mac G4 (Digital Audio):Power Mac G4 (Digital Audio):Power Mac G4 (Digital Audio):
+Mac Desktop:mac/117646:112558:Power Mac G4 (FW 800):Power Mac G4 (FW 800):Power Mac G4 (FW800):
+Mac Desktop:mac/8355:112518:Power Mac G4 (Gigabit Ethernet):Power Mac G4 (Gigabit Ethernet):Power Mac G4 (Gigabit Ethernet):
+Mac Desktop:mac/113853:112510:Power Mac G4 (Mirrored Drive Doors):Power Mac G4 (Mirrored Drive Doors):Power Mac G4 (Mirrored Drive Doors):
+Mac Desktop:mac/7955:112296:Power Mac G4 (PCI Graphics):Power Mac G4 (PCI Graphics):Power Mac G4 (PCI Graphics):
+Mac Desktop:mac/111993:112450:Power Mac G4 (QuickSilver 2002):Power Mac G4 (QuickSilver 2002):Power Mac G4 (Quicksilver 2002):
+Mac Desktop:mac/114053:112450:Power Mac G4 (QuickSilver 2002ED):Power Mac G4 (QuickSilver 2002ED):Power Mac G4 (Quicksilver 2002):
+Mac Desktop:mac/110334:112546:Power Mac G4 (QuickSilver):Power Mac G4 (QuickSilver):Power Mac G4 (Quicksilver):
+Mac Desktop:mac/119767:112316:Power Mac G5:Power Mac G5:Power Mac G5:
+Mac Laptop:mac/301086:122209:MacBook Air (13-inch, M4, 2025):MacBook Air (13-inch, M4, 2025):MacBook Air (13-inch, M4, 2025):
+Mac Laptop:mac/301087:122210:MacBook Air (15-inch, M4, 2025):MacBook Air (15-inch, M4, 2025):MacBook Air (15-inch, M4, 2025):
+Mac Laptop:mac/301019:118551:MacBook Air (13-inch, M3, 2024):MacBook Air (13-inch, M3, 2024):MacBook Air (13-inch, M3, 2024):
+Mac Laptop:mac/301020:118552:MacBook Air (15-inch, M3, 2024):MacBook Air (15-inch, M3, 2024):MacBook Air (15-inch, M3, 2024):
+Mac Laptop:mac/301069:121553:MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):
+Mac Laptop:mac/301068:121552:MacBook Pro (14-inch, M4, 2024):MacBook Pro (14-inch, M4, 2024):MacBook Pro (14-inch, M4, 2024):
+Mac Laptop:mac/301070:121554:MacBook Pro (16-inch, 2024):MacBook Pro (16-inch, 2024):MacBook Pro (16-inch, 2024):
+Mac Laptop:mac/300954:111346:MacBook Air (15-inch, M2, 2023):MacBook Air (15-inch, M2, 2023):MacBook Air (15-inch, M2, 2023):
+Mac Laptop:mac/300925:111340:MacBook Pro (14-inch, 2023):MacBook Pro (14-inch, 2023):MacBook Pro (14-inch, 2023):
+Mac Laptop:mac/301011:117736:MacBook Pro (14-inch, M3 Pro or M3 Max, Nov 2023):MacBook Pro (14-inch, M3 Pro or M3 Max, Nov 2023):MacBook Pro (14-inch, M3 Pro or M3 Max, Nov 2023):
+Mac Laptop:mac/301010:117735:MacBook Pro (14-inch, M3, Nov 2023):MacBook Pro (14-inch, M3, Nov 2023):MacBook Pro (14-inch, M3, Nov 2023):
+Mac Laptop:mac/300926:111838:MacBook Pro (16-inch, 2023):MacBook Pro (16-inch, 2023):MacBook Pro (16-inch, 2023):
+Mac Laptop:mac/301012:117737:MacBook Pro (16-inch, Nov 2023):MacBook Pro (16-inch, Nov 2023):MacBook Pro (16-inch, Nov 2023):
+Mac Laptop:mac/300872:111867:MacBook Air (M2, 2022):MacBook Air (M2, 2022):MacBook Air (M2, 2022):
+Mac Laptop:mac/300873:111869:MacBook Pro (13-inch, M2, 2022):MacBook Pro (13-inch, M2, 2022):MacBook Pro (13-inch, M2, 2022):
+Mac Laptop:mac/300451:111902:MacBook Pro (14-inch, 2021):MacBook Pro (14-inch, 2021):MacBook Pro (14-inch, 2021):
+Mac Laptop:mac/300452:111901:MacBook Pro (16-inch, 2021):MacBook Pro (16-inch, 2021):MacBook Pro (16-inch, 2021):
+Mac Laptop:mac/300267:111883:MacBook Air (M1, 2020):MacBook Air (M1, 2020):MacBook Air (M1, 2020):
+Mac Laptop:mac/508935:111991:MacBook Air (Retina, 13-inch, 2020):MacBook Air (Retina, 13-inch, 2020):MacBook Air (Retina, 13-inch, 2020):
+Mac Laptop:mac/300177:111339:MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):
+Mac Laptop:mac/300178:111981:MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):
+Mac Laptop:mac/300266:111893:MacBook Pro (13-inch, M1, 2020):MacBook Pro (13-inch, M1, 2020):MacBook Pro (13-inch, M1, 2020):
+Mac Laptop:mac/507509:111948:MacBook Air (Retina, 13-inch, 2019):MacBook Air (Retina, 13-inch, 2019):MacBook Air (Retina, 13-inch, 2019):
+Mac Laptop:mac/507158:111997:MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):
+Mac Laptop:mac/507496:111945:MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):
+Mac Laptop:mac/507170:111941:MacBook Pro (15-inch, 2019):MacBook Pro (15-inch, 2019):MacBook Pro (15-inch, 2019):
+Mac Laptop:mac/508192:111932:MacBook Pro (16-inch, 2019):MacBook Pro (16-inch, 2019):MacBook Pro (16-inch, 2019):
+Mac Laptop:mac/506006:111933:MacBook Air (Retina, 13-inch, 2018):MacBook Air (Retina, 13-inch, 2018):MacBook Air (Retina, 13-inch, 2018):
+Mac Laptop:mac/505469:111925:MacBook Pro (13-inch, 2018, Four Thunderbolt 3 Ports):MacBook Pro (13-inch, 2018, Four Thunderbolt 3 Ports):MacBook Pro (13-inch, 2018, Four Thunderbolt 3 ports):
+Mac Laptop:mac/505479:111949:MacBook Pro (15-inch, 2018):MacBook Pro (15-inch, 2018):MacBook Pro (15-inch, 2018):
+Mac Laptop:mac/503580:111986:MacBook (Retina, 12-inch, 2017):MacBook (Retina, 12-inch, 2017):MacBook (Retina, 12-inch, 2017):
+Mac Laptop:mac/503576:111924:MacBook Air (13-inch, 2017):MacBook Air (13-inch, 2017):MacBook Air (13-inch, 2017):
+Mac Laptop:mac/503556:111972:MacBook Pro (13-inch, 2017, Four Thunderbolt 3 Ports):MacBook Pro (13-inch, 2017, Four Thunderbolt 3 Ports):MacBook Pro (13-inch, 2017, Four Thunderbolt 3 ports):
+Mac Laptop:mac/503565:111951:MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):
+Mac Laptop:mac/503543:111947:MacBook Pro (15-inch, 2017):MacBook Pro (15-inch, 2017):MacBook Pro (15-inch, 2017):
+Mac Laptop:mac/501504:112033:MacBook (Retina, 12-inch, Early 2016):MacBook (Retina, 12-inch, Early 2016):MacBook (Retina, 12-inch, Early 2016):
+Mac Laptop:mac/502599:112003:MacBook Pro (13-inch, 2016, Four Thunderbolt 3 Ports):MacBook Pro (13-inch, 2016, Four Thunderbolt 3 Ports):MacBook Pro (13-inch, 2016, Four Thunderbolt 3 ports):
+Mac Laptop:mac/502621:111999:MacBook Pro (13-inch, 2016, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2016, Two Thunderbolt 3 ports):MacBook Pro (13-inch, 2016, Two Thunderbolt 3 ports):
+Mac Laptop:mac/502608:111975:MacBook Pro (15-inch, 2016):MacBook Pro (15-inch, 2016):MacBook Pro (15-inch, 2016):
+Mac Laptop:mac/135274:112442:MacBook (Retina, 12-inch, Early 2015):MacBook (Retina, 12-inch, Early 2015):MacBook (Retina, 12-inch, Early 2015):
+Mac Laptop:mac/135270:112441:MacBook Air (11-inch, Early 2015):MacBook Air (11-inch, Early 2015):MacBook Air (11-inch, Early 2015):
+Mac Laptop:mac/135271:111956:MacBook Air (13-inch, Early 2015):MacBook Air (13-inch, Early 2015):MacBook Air (13-inch, Early 2015):
+Mac Laptop:mac/135275:111959:MacBook Pro (Retina, 13-inch, Early 2015):MacBook Pro (Retina, 13-inch, Early 2015):MacBook Pro (Retina, 13-inch, Early 2015):
+Mac Laptop:mac/135276:111955:MacBook Pro (Retina, 15-inch, Mid 2015):MacBook Pro (Retina, 15-inch, Mid 2015):MacBook Pro (Retina, 15-inch, Mid 2015):
+Mac Laptop:mac/134557:112032:MacBook Air (11-inch, Early 2014):MacBook Air (11-inch, Early 2014):MacBook Air (11-inch, Early 2014):
+Mac Laptop:mac/134558:111944:MacBook Air (13-inch, Early 2014):MacBook Air (13-inch, Early 2014):MacBook Air (13-inch, Early 2014):
+Mac Laptop:mac/pp469:unknown:MacBook Air (13-inch, Early 2014):MacBook Air (13-inch, Early 2014):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/134681:111942:MacBook Pro (Retina, 13-inch, Mid 2014):MacBook Pro (Retina, 13-inch, Mid 2014):MacBook Pro (Retina, 13-inch, Mid 2014):
+Mac Laptop:mac/134682:111935:MacBook Pro (Retina, 15-inch, Mid 2014):MacBook Pro (Retina, 15-inch, Mid 2014):MacBook Pro (Retina, 15-inch, Mid 2014):
+Mac Laptop:mac/134026:112437:MacBook Air (11-inch, Mid 2013):MacBook Air (11-inch, Mid 2013):MacBook Air (11-inch, Mid 2013):
+Mac Laptop:mac/134027:111938:MacBook Air (13-inch, Mid 2013):MacBook Air (13-inch, Mid 2013):MacBook Air (13-inch, Mid 2013):
+Mac Laptop:mac/133953:118466:MacBook Pro (Retina, 13-inch, Early 2013):MacBook Pro (Retina, 13-inch, Early 2013):MacBook Pro (Retina, 13-inch, Early 2013):
+Mac Laptop:mac/134325:111946:MacBook Pro (Retina, 13-inch, Late 2013):MacBook Pro (Retina, 13-inch, Late 2013):MacBook Pro (Retina, 13-inch, Late 2013):
+Mac Laptop:mac/133954:118465:MacBook Pro (Retina, 15-inch, Early 2013):MacBook Pro (Retina, 15-inch, Early 2013):MacBook Pro (Retina, 15-inch, Early 2013):
+Mac Laptop:mac/134326:111971:MacBook Pro (Retina, 15-inch, Late 2013):MacBook Pro (Retina, 15-inch, Late 2013):MacBook Pro (Retina, 15-inch, Late 2013):
+Mac Laptop:mac/133641:112008:MacBook Air (11-inch, Mid 2012):MacBook Air (11-inch, Mid 2012):MacBook Air (11-inch, Mid 2012):
+Mac Laptop:mac/133642:111966:MacBook Air (13-inch, Mid 2012):MacBook Air (13-inch, Mid 2012):MacBook Air (13-inch, Mid 2012):
+Mac Laptop:mac/pp419:unknown:MacBook Air (Mid 2012):MacBook Air (Mid 2012):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/133640:111958:MacBook Pro (13-inch, Mid 2012):MacBook Pro (13-inch, Mid 2012):MacBook Pro (13-inch, Mid 2012):
+Mac Laptop:mac/133639:112568:MacBook Pro (15-inch, Mid 2012):MacBook Pro (15-inch, Mid 2012):MacBook Pro (15-inch, Mid 2012):
+Mac Laptop:mac/pp420:unknown:MacBook Pro (Mid 2012):MacBook Pro (Mid 2012):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/133841:118463:MacBook Pro (Retina, 13-inch, Late 2012):MacBook Pro (Retina, 13-inch, Late 2012):MacBook Pro (Retina, 13-inch, Late 2012):
+Mac Laptop:mac/133643:112576:MacBook Pro (Retina, Mid 2012):MacBook Pro (Retina, Mid 2012):MacBook Pro (Retina, 15-inch, Mid 2012):
+Mac Laptop:mac/133337:112439:MacBook Air (11-inch, Mid 2011):MacBook Air (11-inch, Mid 2011):MacBook Air (11-inch, Mid 2011):
+Mac Laptop:mac/133336:112038:MacBook Air (13-inch, Mid 2011):MacBook Air (13-inch, Mid 2011):MacBook Air (13-inch, Mid 2011):
+Mac Laptop:mac/pp337:unknown:MacBook Air (Mid 2011):MacBook Air (Mid 2011):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/133185:112600:MacBook Pro (13-inch, Early 2011):MacBook Pro (13-inch, Early 2011):MacBook Pro (13-inch, Early 2011):
+Mac Laptop:mac/133515:111341:MacBook Pro (13-inch, Late 2011):MacBook Pro (13-inch, Late 2011):MacBook Pro (13-inch, Late 2011):
+Mac Laptop:mac/133186:112599:MacBook Pro (15-inch, Early 2011):MacBook Pro (15-inch, Early 2011):MacBook Pro (15-inch, Early 2011):
+Mac Laptop:mac/133516:112586:MacBook Pro (15-inch, Late 2011):MacBook Pro (15-inch, Late 2011):MacBook Pro (15-inch, Late 2011):
+Mac Laptop:mac/133187:112598:MacBook Pro (17-inch, Early 2011):MacBook Pro (17-inch, Early 2011):MacBook Pro (17-inch, Early 2011):
+Mac Laptop:mac/133517:112418:MacBook Pro (17-inch, Late 2011):MacBook Pro (17-inch, Late 2011):MacBook Pro (17-inch, Late 2011):
+Mac Laptop:mac/132896:112581:MacBook (13-inch, Mid 2010):MacBook (13-inch, Mid 2010):MacBook (13-inch, Mid 2010):
+Mac Laptop:mac/133091:112580:MacBook Air (11-inch, Late 2010):MacBook Air (11-inch, Late 2010):MacBook Air (11-inch, Late 2010):
+Mac Laptop:mac/133090:112585:MacBook Air (13-inch, Late 2010):MacBook Air (13-inch, Late 2010):MacBook Air (13-inch, Late 2010):
+Mac Laptop:mac/pp190:unknown:MacBook Air (Late 2010):MacBook Air (Late 2010):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/132826:112604:MacBook Pro (13-inch, Mid 2010):MacBook Pro (13-inch, Mid 2010):MacBook Pro (13-inch, Mid 2010):
+Mac Laptop:mac/132832:112605:MacBook Pro (15-inch, Mid 2010):MacBook Pro (15-inch, Mid 2010):MacBook Pro (15-inch, Mid 2010):
+Mac Laptop:mac/132820:112606:MacBook Pro (17-inch, Mid 2010):MacBook Pro (17-inch, Mid 2010):MacBook Pro (17-inch, Mid 2010):
+Mac Laptop:mac/132252:111344:MacBook (13-inch, Early 2009):MacBook (13-inch, Early 2009):MacBook (13-inch, Early 2009):
+Mac Laptop:mac/132689:112623:MacBook (13-inch, Late 2009):MacBook (13-inch, Late 2009):MacBook (13-inch, Late 2009):
+Mac Laptop:mac/132475:112459:MacBook (13-inch, Mid 2009):MacBook (13-inch, Mid 2009):MacBook (13-inch, Mid 2009):
+Mac Laptop:mac/132494:112660:MacBook Air (Mid 2009):MacBook Air (Mid 2009):MacBook Air (Mid 2009):
+Mac Laptop:mac/132499:112474:MacBook Pro (13-inch, Mid 2009):MacBook Pro (13-inch, Mid 2009):MacBook Pro (13-inch, Mid 2009):
+Mac Laptop:mac/132487:112624:MacBook Pro (15-inch, 2.53GHz, Mid 2009):MacBook Pro (15-inch, 2.53GHz, Mid 2009):MacBook Pro (15-inch, Mid 2009) or (15-inch, 2.53 GHz, Mid 2009):
+Mac Laptop:mac/132511:112624:MacBook Pro (15-inch, Mid 2009):MacBook Pro (15-inch, Mid 2009):MacBook Pro (15-inch, Mid 2009) or (15-inch, 2.53 GHz, Mid 2009):
+Mac Laptop:mac/132239:112526:MacBook Pro (17-inch, Early 2009):MacBook Pro (17-inch, Early 2009):MacBook Pro (17-inch, Early 2009):
+Mac Laptop:mac/132505:112473:MacBook Pro (17-inch, Mid 2009):MacBook Pro (17-inch, Mid 2009):MacBook Pro (17-inch, Mid 2009):
+Mac Laptop:mac/132132:112512:MacBook (13-inch, Aluminum, Late 2008):MacBook (13-inch, Aluminum, Late 2008):MacBook (13-inch, Aluminum, Late 2008):
+Mac Laptop:mac/131916:112467:MacBook (13-inch, Early 2008):MacBook (13-inch, Early 2008):MacBook (Early 2008 or Late 2008):
+Mac Laptop:mac/132149:112467:MacBook (13-inch, Late 2008):MacBook (13-inch, Late 2008):MacBook (Early 2008 or Late 2008):
+Mac Laptop:mac/132154:112447:MacBook Air (Late 2008):MacBook Air (Late 2008):MacBook Air (Late 2008):
+Mac Laptop:mac/131826:112533:MacBook Air (Original):MacBook Air (Original):MacBook Air:
+Mac Laptop:mac/131896:unknown:MacBook Pro (15-inch Early 2008):MacBook Pro (15-inch Early 2008):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/132121:112526:MacBook Pro (15-inch, Late 2008):MacBook Pro (15-inch, Late 2008):MacBook Pro (17-inch, Early 2009):
+Mac Laptop:mac/131884:unknown:MacBook Pro (17-inch, Early 2008):MacBook Pro (17-inch, Early 2008):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/132142:unknown:MacBook Pro (17-inch, Late 2008):MacBook Pro (17-inch, Late 2008):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/131712:112488:MacBook (13-inch Late 2007):MacBook (13-inch Late 2007):MacBook (13-inch, Late 2007):
+Mac Laptop:mac/131429:112554:MacBook (13-inch Mid 2007):MacBook (13-inch Mid 2007):MacBook (Mid 2007):
+Mac Laptop:mac/131484:unknown:MacBook Pro (15-inch, 2.4 2.2GHz):MacBook Pro (15-inch, 2.4 2.2GHz):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/pp213:112519:MacBook Pro (15-inch, Late 2007):MacBook Pro (15-inch, Late 2007):MacBook Pro (Late 2007, 2.4/2.2GHz):
+Mac Laptop:mac/pp214:112453:MacBook Pro (15-inch, Mid 2007):MacBook Pro (15-inch, Mid 2007):MacBook Pro (Mid 2007, 2.4/2.2GHz):
+Mac Laptop:mac/131485:unknown:MacBook Pro (17-inch, 2.4GHZ):MacBook Pro (17-inch, 2.4GHZ):UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/pp215:112519:MacBook Pro (17-inch, Late 2007):MacBook Pro (17-inch, Late 2007):MacBook Pro (Late 2007, 2.4/2.2GHz):
+Mac Laptop:mac/pp216:112453:MacBook Pro (17-inch, Mid 2007):MacBook Pro (17-inch, Mid 2007):MacBook Pro (Mid 2007, 2.4/2.2GHz):
+Mac Laptop:mac/131259:112522:MacBook (13-inch Late 2006):MacBook (13-inch Late 2006):MacBook (13-inch, Late 2006):
+Mac Laptop:mac/130972:112511:MacBook (13-inch):MacBook (13-inch):MacBook:
+Mac Laptop:mac/131206:112489:MacBook Pro (15-inch Core 2 Duo):MacBook Pro (15-inch Core 2 Duo):MacBook Pro (Late 2006):
+Mac Laptop:mac/130988:112535:MacBook Pro (15-inch Glossy):MacBook Pro (15-inch Glossy):MacBook Pro (15-inch Glossy):
+Mac Laptop:mac/131220:112489:MacBook Pro (17-inch Core 2 Duo):MacBook Pro (17-inch Core 2 Duo):MacBook Pro (Late 2006):
+Mac Laptop:mac/130944:112536:MacBook Pro (17-inch):MacBook Pro (17-inch):MacBook Pro (17-inch):
+Mac Laptop:mac/130844:112481:MacBook Pro (original):MacBook Pro (original):MacBook Pro (original):
+Mac Laptop:mac/130622:112480:iBook G4 (12-inch Mid 2005):iBook G4 (12-inch Mid 2005):iBook G4 (Mid 2005):
+Mac Laptop:mac/130623:112480:iBook G4 (14-inch Mid 2005):iBook G4 (14-inch Mid 2005):iBook G4 (Mid 2005):
+Mac Laptop:mac/130323:112537:PowerBook G4 (12-inch 1.5GHZ):PowerBook G4 (12-inch 1.5GHZ):PowerBook G4 (12-inch 1.5 GHz, 15-inch 1.67/1.5GHz, 17-inch 1.67 GHz):
+Mac Laptop:mac/130325:112537:PowerBook G4 (15-inch 1.67/1.5GHZ):PowerBook G4 (15-inch 1.67/1.5GHZ):PowerBook G4 (12-inch 1.5 GHz, 15-inch 1.67/1.5GHz, 17-inch 1.67 GHz):
+Mac Laptop:mac/130722:112490:PowerBook G4 (15-Inch Double-Layer SD):PowerBook G4 (15-Inch Double-Layer SD):PowerBook G4 (12-inch, 15-inch, 17-inch Double-Layer SD):
+Mac Laptop:mac/130324:112537:PowerBook G4 (17-inch 1.67GHZ):PowerBook G4 (17-inch 1.67GHZ):PowerBook G4 (12-inch 1.5 GHz, 15-inch 1.67/1.5GHz, 17-inch 1.67 GHz):
+Mac Laptop:mac/130723:112490:PowerBook G4 (17-inch Double-Layer SD):PowerBook G4 (17-inch Double-Layer SD):PowerBook G4 (12-inch, 15-inch, 17-inch Double-Layer SD):
+Mac Laptop:mac/130159:112448:iBook G4 (12-inch Late 2004):iBook G4 (12-inch Late 2004):iBook G4 (Late 2004):
+Mac Laptop:mac/130167:112448:iBook G4 (14-inch Late 2004):iBook G4 (14-inch Late 2004):iBook G4 (Late 2004):
+Mac Laptop:mac/124181:112311:iBook G4 (Early 2004):iBook G4 (Early 2004):iBook G4 (Early 2004):
+Mac Laptop:mac/111275:112545:iBook (Late 2001):iBook (Late 2001):iBook (Late 2001):
+Mac Laptop:mac/pp212:112179:Earlier PowerBooks:Earlier PowerBooks:PowerBook Duo Dock II:
+Mac Laptop:mac/7142:112297:iBook:iBook:iBook:
+Mac Laptop:mac/112973:112540:iBook (14.1 LCD 16 VRAM):iBook (14.1 LCD 16 VRAM):iBook (16 VRAM), iBook (14.1 LCD 16 VRAM):
+Mac Laptop:mac/116219:112538:iBook (14.1 LCD 32 VRAM):iBook (14.1 LCD 32 VRAM):iBook (Opaque 16 VRAM), (32 VRAM), (14.1 LCD 32 VRAM):
+Mac Laptop:mac/118921:112475:iBook (14.1 LCD 900 MHZ 32 VRAM):iBook (14.1 LCD 900 MHZ 32 VRAM):iBook (800 MHz 32 VRAM), iBook (900 MHz 32 VRAM), iBook (14.1 LCD 900 MHz 32 VRAM):
+Mac Laptop:mac/111795:112485:iBook (14.1 LCD):iBook (14.1 LCD):iBook (14.1 LCD):
+Mac Laptop:mac/112974:112540:iBook (16 VRAM):iBook (16 VRAM):iBook (16 VRAM), iBook (14.1 LCD 16 VRAM):
+Mac Laptop:mac/116220:112538:iBook (32 VRAM):iBook (32 VRAM):iBook (Opaque 16 VRAM), (32 VRAM), (14.1 LCD 32 VRAM):
+Mac Laptop:mac/118919:112475:iBook (800 MHZ 32 VRAM):iBook (800 MHZ 32 VRAM):iBook (800 MHz 32 VRAM), iBook (900 MHz 32 VRAM), iBook (14.1 LCD 900 MHz 32 VRAM):
+Mac Laptop:mac/118920:112475:iBook (900 MHZ 32 VRAM):iBook (900 MHZ 32 VRAM):iBook (800 MHz 32 VRAM), iBook (900 MHz 32 VRAM), iBook (14.1 LCD 900 MHz 32 VRAM):
+Mac Laptop:mac/109592:112547:iBook (Dual USB):iBook (Dual USB):iBook (Dual USB):
+Mac Laptop:mac/8439:112550:iBook (Firewire):iBook (Firewire):iBook (FireWire):
+Mac Laptop:mac/116221:112538:iBook (Opaque 16VRAM):iBook (Opaque 16VRAM):iBook (Opaque 16 VRAM), (32 VRAM), (14.1 LCD 32 VRAM):
+Mac Laptop:mac/121579:112464:iBook G4:iBook G4:iBook G4:
+Mac Laptop:mac/121580:112464:iBook G4 (14-inch):iBook G4 (14-inch):iBook G4:
+Mac Laptop:mac/pl105:unknown:PowerBook:PowerBook:UNKNOWN Marketing Model Name from Specs Page:
+Mac Laptop:mac/8248:112178:PowerBook (FireWire):PowerBook (FireWire):PowerBook (FireWire):
+Mac Laptop:mac/6092:112176:PowerBook G3:PowerBook G3:PowerBook G3:
+Mac Laptop:mac/6935:112180:PowerBook G3 Series (Bronze Keyboard):PowerBook G3 Series (Bronze Keyboard):PowerBook G3 Series (Bronze Keyboard):
+Mac Laptop:mac/108912:112452:PowerBook G4:PowerBook G4:PowerBook G4:
+Mac Laptop:mac/124176:112514:PowerBook G4 (12-inch 1.33GHZ):PowerBook G4 (12-inch 1.33GHZ):PowerBook G4 (12-inch 1.33GHz):
+Mac Laptop:mac/120852:112529:PowerBook G4 (12-inch DVI):PowerBook G4 (12-inch DVI):PowerBook G4 (12-inch DVI):
+Mac Laptop:mac/117207:112559:PowerBook G4 (12-inch):PowerBook G4 (12-inch):PowerBook G4 (12-inch):
+Mac Laptop:mac/124169:112499:PowerBook G4 (15-inch 1.5/1.33GHZ):PowerBook G4 (15-inch 1.5/1.33GHZ):PowerBook G4 (15-inch 1.5/1.33GHz):
+Mac Laptop:mac/120844:112542:PowerBook G4 (15-inch FW800):PowerBook G4 (15-inch FW800):PowerBook G4 (15-inch FW800):
+Mac Laptop:mac/120840:112543:PowerBook G4 (17-inch 1.33GHZ):PowerBook G4 (17-inch 1.33GHZ):PowerBook G4 (17-inch 1.33GHz):
+Mac Laptop:mac/124165:112500:PowerBook G4 (17-inch 1.5GHZ):PowerBook G4 (17-inch 1.5GHZ):PowerBook G4 (17-inch 1.5GHz):
+Mac Laptop:mac/117217:112457:PowerBook G4 (17-inch):PowerBook G4 (17-inch):PowerBook G4 (17-inch):
+Mac Laptop:mac/116222:112471:PowerBook G4 (1GHZ/867MHZ):PowerBook G4 (1GHZ/867MHZ):PowerBook G4 (1GHz/867MHz):
+Mac Laptop:mac/112775:112483:PowerBook G4 (DVI):PowerBook G4 (DVI):PowerBook G4 (DVI):
+Mac Laptop:mac/111274:112487:PowerBook G4 (Gigabit Ethernet):PowerBook G4 (Gigabit Ethernet):PowerBook G4 (Gigabit Ethernet):
+macOS:mac/301044:unknown:macOS Sequoia:macOS Sequoia:UNKNOWN Marketing Model Name from Specs Page:
+macOS:mac/300966:unknown:macOS Sonoma:macOS Sonoma:UNKNOWN Marketing Model Name from Specs Page:
+macOS:mac/300897:unknown:macOS Ventura:macOS Ventura:UNKNOWN Marketing Model Name from Specs Page:
+macOS:mac/300431:unknown:macOS Monterey:macOS Monterey:UNKNOWN Marketing Model Name from Specs Page:
+macOS:mac/300247:111980:macOS Big Sur:macOS Big Sur:macOS Big Sur:
+macOS:mac/pp145:118458:macOS Catalina:macOS Catalina:macOS Catalina:
+macOS:mac/pp91:111930:macOS Mojave:macOS Mojave:macOS Mojave:
+macOS:mac/pp6:111934:macOS High Sierra:macOS High Sierra:macOS High Sierra:
+macOS:mac/pl124:111988:macOS Sierra:macOS Sierra:macOS Sierra:
+macOS:mac/135555:111989:OS X El Capitan:OS X El Capitan:OS X El Capitan:
+macOS:mac/135122:112417:OS X Yosemite:OS X Yosemite:OS X Yosemite:
+macOS:mac/134327:112560:OS X Mavericks:OS X Mavericks:OS X Mavericks:
+macOS:mac/133741:112587:OS X Mountain Lion:OS X Mountain Lion:OS X Mountain Lion:
+macOS:mac/133333:112027:OS X Lion:OS X Lion:OS X Lion:
+macOS:mac/132617:112591:Mac OS X 10.6:Mac OS X 10.6:Mac OS X v10.6 Snow Leopard:
+macOS:mac/pp409:unknown:AirPort Utility 6.x:AirPort Utility 6.x:UNKNOWN Marketing Model Name from Specs Page:
+macOS:mac/pp38:unknown:Boot Camp:Boot Camp:UNKNOWN Marketing Model Name from Specs Page:
+macOS:mac/pl601:unknown:Mac OS Printing Fax (any version):Mac OS Printing Fax (any version):UNKNOWN Marketing Model Name from Specs Page:
+macOS:mac/pl120:112593:Mac OS X (early):Mac OS X (early):Mac OS X 10.5:
+iPad:ipad/301079:122240:iPad (A16) Wi-Fi:iPad (A16) Wi-Fi:iPad (A16):
+iPad:ipad/301080:122240:iPad (A16) Wi-Fi + Cellular:iPad (A16) Wi-Fi + Cellular:iPad (A16):
+iPad:ipad/301081:122241:iPad Air 11-inch (M3) Wi-Fi:iPad Air 11-inch (M3) Wi-Fi:iPad Air 11-inch (M3):
+iPad:ipad/301082:122241:iPad Air 11-inch (M3) Wi-Fi + Cellular:iPad Air 11-inch (M3) Wi-Fi + Cellular:iPad Air 11-inch (M3):
+iPad:ipad/301083:122242:iPad Air 13-inch (M3) Wi-Fi:iPad Air 13-inch (M3) Wi-Fi:iPad Air 13-inch (M3):
+iPad:ipad/301084:122242:iPad Air 13-inch (M3) Wi-Fi + Cellular:iPad Air 13-inch (M3) Wi-Fi + Cellular:iPad Air 13-inch (M3):
+iPad:ipad/301027:119894:iPad Air 11-inch (M2) Wi-Fi:iPad Air 11-inch (M2) Wi-Fi:iPad Air 11-inch (M2):
+iPad:ipad/301028:119894:iPad Air 11-inch (M2) Wi-Fi + Cellular:iPad Air 11-inch (M2) Wi-Fi + Cellular:iPad Air 11-inch (M2):
+iPad:ipad/301029:119893:iPad Air 13-inch (M2) Wi-Fi:iPad Air 13-inch (M2) Wi-Fi:iPad Air 13-inch (M2):
+iPad:ipad/301030:119893:iPad Air 13-inch (M2) Wi-Fi + Cellular:iPad Air 13-inch (M2) Wi-Fi + Cellular:iPad Air 13-inch (M2):
+iPad:ipad/301063:121456:iPad mini (A17 Pro) Wi-Fi:iPad mini (A17 Pro) Wi-Fi:iPad mini (A17 Pro):
+iPad:ipad/301064:121456:iPad mini (A17 Pro) Wi-Fi + Cellular:iPad mini (A17 Pro) Wi-Fi + Cellular:iPad mini (A17 Pro):
+iPad:ipad/301031:119892:iPad Pro 11-inch (M4) Wi-Fi:iPad Pro 11-inch (M4) Wi-Fi:iPad Pro 11-inch (M4):
+iPad:ipad/301032:119892:iPad Pro 11-inch (M4) Wi-Fi + Cellular:iPad Pro 11-inch (M4) Wi-Fi + Cellular:iPad Pro 11-inch (M4):
+iPad:ipad/301033:119891:iPad Pro 13-inch (M4) Wi-Fi:iPad Pro 13-inch (M4) Wi-Fi:iPad Pro 13-inch (M4):
+iPad:ipad/301034:119891:iPad Pro 13-inch (M4) Wi-Fi + Cellular:iPad Pro 13-inch (M4) Wi-Fi + Cellular:iPad Pro 13-inch (M4):
+iPad:ipad/300902:111840:iPad (10th generation):iPad (10th generation):iPad (10th generation):
+iPad:ipad/300904:111840:iPad (10th generation) Wi-Fi + Cellular:iPad (10th generation) Wi-Fi + Cellular:iPad (10th generation):
+iPad:ipad/300866:111887:iPad Air (5th generation):iPad Air (5th generation):iPad Air (5th generation):
+iPad:ipad/300867:111887:iPad Air (5th generation) Wi-Fi + Cellular:iPad Air (5th generation) Wi-Fi + Cellular:iPad Air (5th generation):
+iPad:ipad/300905:111842:iPad Pro 11-inch (4th generation):iPad Pro 11-inch (4th generation):iPad Pro 11-inch (4th generation):
+iPad:ipad/300907:111842:iPad Pro 11-inch (4th generation) Wi-Fi + Cellular 5G:iPad Pro 11-inch (4th generation) Wi-Fi + Cellular 5G:iPad Pro 11-inch (4th generation):
+iPad:ipad/300906:111842:iPad Pro 11-inch (4th generation) Wi-Fi + Cellular mmW:iPad Pro 11-inch (4th generation) Wi-Fi + Cellular mmW:iPad Pro 11-inch (4th generation):
+iPad:ipad/300908:111841:iPad Pro 12.9-inch (6th generation):iPad Pro 12.9-inch (6th generation):iPad Pro 12.9-inch (6th generation):
+iPad:ipad/300910:111841:iPad Pro 12.9-inch (6th generation) Wi-Fi + Cellular 5G:iPad Pro 12.9-inch (6th generation) Wi-Fi + Cellular 5G:iPad Pro 12.9-inch (6th generation):
+iPad:ipad/300909:111841:iPad Pro 12.9-inch (6th generation) Wi-Fi + Cellular mmW:iPad Pro 12.9-inch (6th generation) Wi-Fi + Cellular mmW:iPad Pro 12.9-inch (6th generation):
+iPad:ipad/300423:111898:iPad (9th generation):iPad (9th generation):iPad (9th generation):
+iPad:ipad/300424:unknown:iPad (9th generation) Wi-Fi + Cellular:iPad (9th generation) Wi-Fi + Cellular:UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/300425:111886:iPad mini (6th generation):iPad mini (6th generation):iPad mini (6th generation):
+iPad:ipad/300427:111886:iPad mini (6th generation) Wi-Fi + Cellular:iPad mini (6th generation) Wi-Fi + Cellular:iPad mini (6th generation):
+iPad:ipad/300346:111897:iPad Pro, 11-inch (3rd generation):iPad Pro, 11-inch (3rd generation):iPad Pro, 11-inch (3rd generation):
+iPad:ipad/300348:unknown:iPad Pro, 11-inch (3rd generation) Cellular sub6:iPad Pro, 11-inch (3rd generation) Cellular sub6:UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/300347:unknown:iPad Pro, 11-inch (3rd generation) Cellular sub6/mmW:iPad Pro, 11-inch (3rd generation) Cellular sub6/mmW:UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/300349:111896:iPad Pro, 12.9-inch (5th generation):iPad Pro, 12.9-inch (5th generation):iPad Pro, 12.9-inch (5th generation):
+iPad:ipad/300351:unknown:iPad Pro, 12.9-inch (5th generation) Cellular sub6:iPad Pro, 12.9-inch (5th generation) Cellular sub6:UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/300350:unknown:iPad Pro, 12.9-inch (5th generation) Cellular sub6/mmW:iPad Pro, 12.9-inch (5th generation) Cellular sub6/mmW:UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/300200:118451:iPad (8th generation):iPad (8th generation):iPad (8th generation):
+iPad:ipad/300201:unknown:iPad (8th generation) Wi-Fi + Cellular:iPad (8th generation) Wi-Fi + Cellular:UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/300202:111905:iPad Air (4th generation):iPad Air (4th generation):iPad Air (4th generation):
+iPad:ipad/300203:unknown:iPad Air (4th generation) Wi-Fi + Cellular:iPad Air (4th generation) Wi-Fi + Cellular:UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/509181:118452:iPad Pro 11-inch (2nd generation) Wi-Fi:iPad Pro 11-inch (2nd generation) Wi-Fi:iPad Pro 11-inch (2nd generation):
+iPad:ipad/509203:118452:iPad Pro 11-inch (2nd generation) Wi-Fi + Cellular:iPad Pro 11-inch (2nd generation) Wi-Fi + Cellular:iPad Pro 11-inch (2nd generation):
+iPad:ipad/509192:111977:iPad Pro 12.9-inch (4th Generation) Wi-Fi:iPad Pro 12.9-inch (4th Generation) Wi-Fi:iPad Pro 12.9-inch (4th generation):
+iPad:ipad/509228:111977:iPad Pro 12.9-inch (4th Generation) Wi-Fi + Cellular:iPad Pro 12.9-inch (4th Generation) Wi-Fi + Cellular:iPad Pro 12.9-inch (4th generation):
+iPad:ipad/507974:111911:iPad (7th generation):iPad (7th generation):iPad (7th generation):
+iPad:ipad/507984:111911:iPad (7th generation) Wi-Fi + Cellular:iPad (7th generation) Wi-Fi + Cellular:iPad (7th generation):
+iPad:ipad/506739:111939:iPad Air (3rd generation):iPad Air (3rd generation):iPad Air (3rd generation):
+iPad:ipad/506749:111939:iPad Air (3rd generation) Wi-Fi + Cellular:iPad Air (3rd generation) Wi-Fi + Cellular:iPad Air (3rd generation):
+iPad:ipad/506704:111904:iPad mini (5th generation):iPad mini (5th generation):iPad mini (5th generation):
+iPad:ipad/506714:111904:iPad mini (5th generation) Wi-Fi + Cellular:iPad mini (5th generation) Wi-Fi + Cellular:iPad mini (5th generation):
+iPad:ipad/504852:111957:iPad (6th generation):iPad (6th generation):iPad (6th generation):
+iPad:ipad/504856:111957:iPad (6th generation) Wi-Fi + Cellular:iPad (6th generation) Wi-Fi + Cellular:iPad (6th generation):
+iPad:ipad/506083:111974:iPad Pro 11-inch Wi-Fi:iPad Pro 11-inch Wi-Fi:iPad Pro 11-inch (1st generation):
+iPad:ipad/506094:111974:iPad Pro 11-inch Wi-Fi + Cellular:iPad Pro 11-inch Wi-Fi + Cellular:iPad Pro 11-inch (1st generation):
+iPad:ipad/506047:111979:iPad Pro 12.9-inch (3rd generation) Wi-Fi:iPad Pro 12.9-inch (3rd generation) Wi-Fi:iPad Pro 12.9-inch (3rd generation):
+iPad:ipad/506058:111979:iPad Pro 12.9-inch (3rd generation) Wi-Fi + Cellular:iPad Pro 12.9-inch (3rd generation) Wi-Fi + Cellular:iPad Pro 12.9-inch (3rd generation):
+iPad:ipad/503187:111960:iPad (5th generation):iPad (5th generation):iPad (5th generation):
+iPad:ipad/503198:111960:iPad (5th generation) Wi-Fi + Cellular:iPad (5th generation) Wi-Fi + Cellular:iPad (5th generation):
+iPad:ipad/503659:111927:iPad Pro (10.5-inch) Wi-Fi + Cellular:iPad Pro (10.5-inch) Wi-Fi + Cellular:iPad Pro (10.5-inch):
+iPad:ipad/503642:111927:iPad Pro (10.5-inch) Wi-Fi:iPad Pro (10.5-inch) Wi-Fi:iPad Pro (10.5-inch):
+iPad:ipad/503605:111964:iPad Pro (12.9-inch) (2nd generation) Wi-Fi:iPad Pro (12.9-inch) (2nd generation) Wi-Fi:iPad Pro (12.9-inch) (2nd generation):
+iPad:ipad/503620:111964:iPad Pro (12.9-inch) (2nd generation) Wi-Fi + Cellular:iPad Pro (12.9-inch) (2nd generation) Wi-Fi + Cellular:iPad Pro (12.9-inch) (2nd generation):
+iPad:ipad/501360:111965:iPad Pro (9.7-inch):iPad Pro (9.7-inch):iPad Pro (9.7-inch):
+iPad:ipad/501377:111965:iPad Pro (9.7-inch, Wi-Fi + Cellular):iPad Pro (9.7-inch, Wi-Fi + Cellular):iPad Pro (9.7-inch):
+iPad:ipad/500106:112002:iPad mini 4:iPad mini 4:iPad mini 4:
+iPad:ipad/500116:112002:iPad mini 4 Wi-Fi + Cellular:iPad mini 4 Wi-Fi + Cellular:iPad mini 4:
+iPad:ipad/500278:112024:iPad Pro 12.9-inch (1st generation) Wi-Fi:iPad Pro 12.9-inch (1st generation) Wi-Fi:iPad Pro (12.9-inch):
+iPad:ipad/500285:112024:iPad Pro 12.9-inch (1st generation) Wi-Fi + Cellular:iPad Pro 12.9-inch (1st generation) Wi-Fi + Cellular:iPad Pro (12.9-inch):
+iPad:ipad/135088:112017:iPad Air 2:iPad Air 2:iPad Air 2:
+iPad:ipad/135089:112017:iPad Air 2 Wi-Fi + Cellular:iPad Air 2 Wi-Fi + Cellular:iPad Air 2:
+iPad:ipad/135090:112018:iPad mini 3:iPad mini 3:iPad mini 3:
+iPad:ipad/135091:112018:iPad mini 3 Wi-Fi + Cellular:iPad mini 3 Wi-Fi + Cellular:iPad mini 3:
+iPad:ipad/135092:unknown:iPad mini 3 Wi-Fi Cellular (China Mainland):iPad mini 3 Wi-Fi Cellular (China Mainland):UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/134322:112020:iPad Air:iPad Air:iPad Air:
+iPad:ipad/134321:112020:iPad Air WiFi + Cellular:iPad Air WiFi + Cellular:iPad Air:
+iPad:ipad/134323:112019:iPad mini 2:iPad mini 2:iPad mini 2 with Retina display:
+iPad:ipad/134324:112019:iPad mini 2 WiFi + Cellular:iPad mini 2 WiFi + Cellular:iPad mini 2 with Retina display:
+iPad:ipad/134338:unknown:iPad mini Wi-Fi:iPad mini Wi-Fi:UNKNOWN Marketing Model Name from Specs Page:
+iPad:ipad/133608:111992:iPad (3rd generation):iPad (3rd generation):iPad (3rd generation):
+iPad:ipad/133610:111992:iPad (3rd generation) Wi-Fi + Cellular:iPad (3rd generation) Wi-Fi + Cellular:iPad (3rd generation):
+iPad:ipad/133609:111992:iPad (3rd Generation) Wi-Fi + Cellular (Verizon):iPad (3rd Generation) Wi-Fi + Cellular (Verizon):iPad (3rd generation):
+iPad:ipad/133846:111993:iPad (4th generation):iPad (4th generation):iPad (4th generation):
+iPad:ipad/133847:111993:iPad (4th generation) Wi-Fi + Cellular:iPad (4th generation) Wi-Fi + Cellular:iPad (4th generation):
+iPad:ipad/133848:111993:iPad (4th generation) Wi-Fi + Cellular (MM):iPad (4th generation) Wi-Fi + Cellular (MM):iPad (4th generation):
+iPad:ipad/133849:111978:iPad mini:iPad mini:iPad mini:
+iPad:ipad/133850:111978:iPad mini Wi-Fi + Cellular:iPad mini Wi-Fi + Cellular:iPad mini:
+iPad:ipad/133851:111978:iPad mini Wi-Fi + Cellular (MM):iPad mini Wi-Fi + Cellular (MM):iPad mini:
+iPad:ipad/133215:111990:iPad 2:iPad 2:iPad 2:
+iPad:ipad/133216:111990:iPad 2 Wi-Fi + 3G:iPad 2 Wi-Fi + 3G:iPad 2:
+iPad:ipad/133217:111990:iPad 2 Wi-Fi + 3G (Verizon):iPad 2 Wi-Fi + 3G (Verizon):iPad 2:
+iPad:ipad/132814:112438:iPad:iPad:iPad:
+iPad:ipad/132844:112438:iPad Wi-Fi + 3G:iPad Wi-Fi + 3G:iPad:
+iPad:ipad/pl220:unknown:iPad:iPad:UNKNOWN Marketing Model Name from Specs Page:
+iPad Accessory:ipad/301077:122272:Magic Keyboard for iPad Air 11-inch (M3):Magic Keyboard for iPad Air 11-inch (M3):Magic Keyboard for iPad Air 11-inch (M3):
+iPad Accessory:ipad/301078:122273:Magic Keyboard for iPad Air 13-inch (M3):Magic Keyboard for iPad Air 13-inch (M3):Magic Keyboard for iPad Air 13-inch (M3):
+iPad Accessory:ipad/pp731:122274:Smart Folio for iPad (A16):Smart Folio for iPad (A16):Smart Folio for iPad (A16):
+iPad Accessory:ipad/301035:120123:Apple Pencil Pro:Apple Pencil Pro:Apple Pencil Pro:
+iPad Accessory:ipad/301036:120125:Magic Keyboard for iPad Pro 11-inch (M4):Magic Keyboard for iPad Pro 11-inch (M4):Magic Keyboard for iPad Pro 11-inch (M4):
+iPad Accessory:ipad/301037:120136:Magic Keyboard for iPad Pro 13-inch (M4):Magic Keyboard for iPad Pro 13-inch (M4):Magic Keyboard for iPad Pro 13-inch (M4):
+iPad Accessory:ipad/301007:121318:Apple Pencil (USB-C):Apple Pencil (USB-C):Apple Pencil (USB-C):
+iPad Accessory:ipad/300900:111845:Magic Keyboard Folio for iPad (10th generation):Magic Keyboard Folio for iPad (10th generation):Magic Keyboard Folio for iPad (10th generation):
+iPad Accessory:ipad/300345:111910:Magic Keyboard for iPad 11-inch:Magic Keyboard for iPad 11-inch:Magic Keyboard for iPad 11-inch:
+iPad Accessory:ipad/300344:111937:Magic Keyboard for iPad Pro 12.9-inch (2021):Magic Keyboard for iPad Pro 12.9-inch (2021):Magic Keyboard for iPad Pro 12.9-inch (2021):
+iPad Accessory:ipad/300173:111910:Magic Keyboard for iPad Pro 11-inch (2nd generation):Magic Keyboard for iPad Pro 11-inch (2nd generation):Magic Keyboard for iPad 11-inch:
+iPad Accessory:ipad/300174:111936:Magic Keyboard for iPad Pro 12.9-inch (4th Generation):Magic Keyboard for iPad Pro 12.9-inch (4th Generation):Magic Keyboard for iPad Pro 12.9-inch (4th generation):
+iPad Accessory:ipad/300014:111920:Apple Pencil:Apple Pencil:Apple Pencil (1st generation):
+iPad Accessory:ipad/300015:unknown:Smart Keyboard:Smart Keyboard:UNKNOWN Marketing Model Name from Specs Page:
+iPad Accessory:ipad/pp125:111889:Apple Pencil (2nd generation):Apple Pencil (2nd generation):Apple Pencil (2nd generation):
+iPad Accessory:ipad/pl221:unknown:iPad Accessories:iPad Accessories:UNKNOWN Marketing Model Name from Specs Page:
+iPad Accessory:ipad/pp627:120121:Smart Folio for iPad Air 11-inch (M2):Smart Folio for iPad Air 11-inch (M2):Smart Folio for iPad Air 11-inch (M2):
+iPad Accessory:ipad/pp629:121572:Smart Folio for iPad mini (A17 Pro):Smart Folio for iPad mini (A17 Pro):Smart Folio for iPad mini (A17 Pro):
+iPad Accessory:ipad/pp626:120128:Smart Folio for iPad Pro 13-inch (M4):Smart Folio for iPad Pro 13-inch (M4):Smart Folio for iPad Pro 13-inch (M4):
+iPadOS:ipad/pp172:unknown:iPadOS 18:iPadOS 18:UNKNOWN Marketing Model Name from Specs Page:
+iPadOS:ipad/pp167:unknown:iPadOS 17:iPadOS 17:UNKNOWN Marketing Model Name from Specs Page:
+iPadOS:ipad/pp243:unknown:iPadOS 16:iPadOS 16:UNKNOWN Marketing Model Name from Specs Page:
+iPadOS:ipad/pp220:unknown:iPadOS 15:iPadOS 15:UNKNOWN Marketing Model Name from Specs Page:
+iPadOS:ipad/pp532:unknown:iPadOS 14:iPadOS 14:UNKNOWN Marketing Model Name from Specs Page:
+iPadOS:ipad/pp531:unknown:iPadOS 13:iPadOS 13:UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/301076:122208:iPhone 16e:iPhone 16e:iPhone 16e:
+iPhone:iphone/301045:121029:iPhone 16:iPhone 16:iPhone 16:
+iPhone:iphone/301046:121030:iPhone 16 Plus:iPhone 16 Plus:iPhone 16 Plus:
+iPhone:iphone/301047:121031:iPhone 16 Pro:iPhone 16 Pro:iPhone 16 Pro:
+iPhone:iphone/301048:121032:iPhone 16 Pro Max:iPhone 16 Pro Max:iPhone 16 Pro Max:
+iPhone:iphone/300991:111831:iPhone 15:iPhone 15:iPhone 15:
+iPhone:iphone/301004:111830:iPhone 15 Plus:iPhone 15 Plus:iPhone 15 Plus:
+iPhone:iphone/300993:111829:iPhone 15 Pro:iPhone 15 Pro:iPhone 15 Pro:
+iPhone:iphone/301003:111828:iPhone 15 Pro Max:iPhone 15 Pro Max:iPhone 15 Pro Max:
+iPhone:iphone/300878:111850:iPhone 14:iPhone 14:iPhone 14:
+iPhone:iphone/300879:111854:iPhone 14 Plus:iPhone 14 Plus:iPhone 14 Plus:
+iPhone:iphone/300880:111849:iPhone 14 Pro:iPhone 14 Pro:iPhone 14 Pro:
+iPhone:iphone/300881:111846:iPhone 14 Pro Max:iPhone 14 Pro Max:iPhone 14 Pro Max:
+iPhone:iphone/300865:111866:iPhone SE (3rd generation):iPhone SE (3rd generation):iPhone SE (3rd generation):
+iPhone:iphone/300428:111872:iPhone 13:iPhone 13:iPhone 13:
+iPhone:iphone/300426:111873:iPhone 13 mini:iPhone 13 mini:iPhone 13 mini:
+iPhone:iphone/300429:111871:iPhone 13 Pro:iPhone 13 Pro:iPhone 13 Pro:
+iPhone:iphone/300430:111870:iPhone 13 Pro Max:iPhone 13 Pro Max:iPhone 13 Pro Max:
+iPhone:iphone/300241:111876:iPhone 12:iPhone 12:iPhone 12:
+iPhone:iphone/300239:111877:iPhone 12 mini:iPhone 12 mini:iPhone 12 mini:
+iPhone:iphone/300242:111875:iPhone 12 Pro:iPhone 12 Pro:iPhone 12 Pro:
+iPhone:iphone/300240:111874:iPhone 12 Pro Max:iPhone 12 Pro Max:iPhone 12 Pro Max:
+iPhone:iphone/509370:111882:iPhone SE (2nd generation):iPhone SE (2nd generation):iPhone SE (2nd generation):
+iPhone:iphone/507882:111865:iPhone 11:iPhone 11:iPhone 11:
+iPhone:iphone/507808:111879:iPhone 11 Pro:iPhone 11 Pro:iPhone 11 Pro:
+iPhone:iphone/507845:111878:iPhone 11 Pro Max:iPhone 11 Pro Max:iPhone 11 Pro Max:
+iPhone:iphone/505602:111868:iPhone XR:iPhone XR:iPhone XR:
+iPhone:iphone/505753:111881:iPhone XS:iPhone XS:iPhone XS:
+iPhone:iphone/505716:111880:iPhone XS Max:iPhone XS Max:iPhone XS Max:
+iPhone:iphone/504266:111976:iPhone 8:iPhone 8:iPhone 8:
+iPhone:iphone/504267:111950:iPhone 8 Plus:iPhone 8 Plus:iPhone 8 Plus:
+iPhone:iphone/504268:111864:iPhone X:iPhone X:iPhone X:
+iPhone:iphone/502272:111943:iPhone 7:iPhone 7:iPhone 7:
+iPhone:iphone/502287:111953:iPhone 7 Plus:iPhone 7 Plus:iPhone 7 Plus:
+iPhone:iphone/501343:112005:iPhone SE (1st generation):iPhone SE (1st generation):iPhone SE:
+iPhone:iphone/500016:111952:iPhone 6s:iPhone 6s:iPhone 6s:
+iPhone:iphone/500040:111996:iPhone 6s Plus:iPhone 6s Plus:iPhone 6s Plus:
+iPhone:iphone/134505:unknown:iPhone 5c (8GB):iPhone 5c (8GB):UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/134711:111954:iPhone 6:iPhone 6:iPhone 6:
+iPhone:iphone/134710:111940:iPhone 6 Plus:iPhone 6 Plus:iPhone 6 Plus:
+iPhone:iphone/134093:unknown:iPhone 4s (8GB):iPhone 4s (8GB):UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/134094:111917:iPhone 5c:iPhone 5c:iPhone 5c:
+iPhone:iphone/134095:unknown:iPhone 5c:iPhone 5c:UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/134096:111973:iPhone 5s:iPhone 5s:iPhone 5s:
+iPhone:iphone/134097:111973:iPhone 5s:iPhone 5s:iPhone 5s:
+iPhone:iphone/133778:112016:iPhone 5:iPhone 5:iPhone 5:
+iPhone:iphone/133779:unknown:iPhone 5 (GSM, CDMA):iPhone 5 (GSM, CDMA):UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/133477:unknown:iPhone 4 (8GB):iPhone 4 (8GB):UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/133177:112562:iPhone 4 (CDMA):iPhone 4 (CDMA):iPhone 4:
+iPhone:iphone/133466:unknown:iPhone 4 CDMA (8GB):iPhone 4 CDMA (8GB):UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/133476:112004:iPhone 4S:iPhone 4S:iPhone 4S:
+iPhone:iphone/132932:unknown:iPhone 3GS (8GB):iPhone 3GS (8GB):UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/132927:112562:iPhone 4:iPhone 4:iPhone 4:
+iPhone:iphone/132537:112307:iPhone 3GS:iPhone 3GS:iPhone 3GS:
+iPhone:iphone/132740:unknown:iPhone 3GS (China Mainland):iPhone 3GS (China Mainland):UNKNOWN Marketing Model Name from Specs Page:
+iPhone:iphone/132035:112496:iPhone 3G:iPhone 3G:iPhone 3G:
+iPhone:iphone/131510:112445:iPhone (original):iPhone (original):iPhone:
+iPhone:iphone/pl133:unknown:iPhone:iPhone:UNKNOWN Marketing Model Name from Specs Page:
+iPhone Accessory:iphone/300414:111857:MagSafe Battery Pack:MagSafe Battery Pack:MagSafe Battery Pack:
+iPhone Accessory:iphone/300149:unknown:iPhone 11 Pro Max Smart Battery Case:iPhone 11 Pro Max Smart Battery Case:UNKNOWN Marketing Model Name from Specs Page:
+iPhone Accessory:iphone/300148:unknown:iPhone 11 Pro Smart Battery Case:iPhone 11 Pro Smart Battery Case:UNKNOWN Marketing Model Name from Specs Page:
+iPhone Accessory:iphone/300147:unknown:iPhone 11 Smart Battery Case:iPhone 11 Smart Battery Case:UNKNOWN Marketing Model Name from Specs Page:
+iPhone Accessory:iphone/pl134:unknown:iPhone Accessories:iPhone Accessories:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp171:unknown:iOS 18:iOS 18:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp166:unknown:iOS 17:iOS 17:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp242:unknown:iOS 16:iOS 16:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp209:unknown:iOS 15:iOS 15:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp530:unknown:iOS 14:iOS 14:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp144:unknown:iOS 13:iOS 13:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp120:unknown:iOS 12:iOS 12:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp524:unknown:iOS 11:iOS 11:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp523:unknown:iOS 10:iOS 10:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp520:unknown:iOS 9:iOS 9:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp481:unknown:iOS 8:iOS 8:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp465:unknown:iOS 7:iOS 7:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp464:unknown:iOS 6:iOS 6:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp463:unknown:iOS 5:iOS 5:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp152:unknown:Shortcuts:Shortcuts:UNKNOWN Marketing Model Name from Specs Page:
+Apple Watch:watch/pl213:121202:Apple Watch Series 10:Apple Watch Series 10:Apple Watch Series 10:
+Apple Watch:watch/pl207:111833:Apple Watch Series 9:Apple Watch Series 9:Apple Watch Series 9:
+Apple Watch:watch/301002:111832:Apple Watch Ultra 2:Apple Watch Ultra 2:Apple Watch Ultra 2:
+Apple Watch:watch/pl292:111853:Apple Watch SE (2nd generation):Apple Watch SE (2nd generation):Apple Watch SE (2nd generation):
+Apple Watch:watch/pl293:111848:Apple Watch Series 8:Apple Watch Series 8:Apple Watch Series 8:
+Apple Watch:watch/300895:111852:Apple Watch Ultra:Apple Watch Ultra:Apple Watch Ultra:
+Apple Watch:watch/pl194:111909:Apple Watch Series 7:Apple Watch Series 7:Apple Watch Series 7:
+Apple Watch:watch/pl290:111862:Apple Watch SE (1st generation):Apple Watch SE (1st generation):Apple Watch SE (1st generation):
+Apple Watch:watch/pl291:111918:Apple Watch Series 6:Apple Watch Series 6:Apple Watch Series 6:
+Apple Watch:watch/pl206:118453:Apple Watch Series 5:Apple Watch Series 5:Apple Watch Series 5:
+Apple Watch:watch/pl176:111984:Apple Watch Series 4 (4th gen):Apple Watch Series 4 (4th gen):Apple Watch Series 4:
+Apple Watch:watch/pl138:111891:Apple Watch Series 3 (3rd gen):Apple Watch Series 3 (3rd gen):Apple Watch Series 3:
+Apple Watch:watch/pl285:111985:Apple Watch Series 1:Apple Watch Series 1:Apple Watch Series 1:
+Apple Watch:watch/pl286:112022:Apple Watch Series 2:Apple Watch Series 2:Apple Watch Series 2:
+Apple Watch:watch/pl283:112011:Apple Watch Edition (1st gen):Apple Watch Edition (1st gen):Apple Watch Edition (1st generation):
+Apple Watch:watch/pl284:unknown:Apple Watch Hermès (1st gen):Apple Watch Hermès (1st gen):UNKNOWN Marketing Model Name from Specs Page:
+Apple Watch:watch/pl282:112010:Apple Watch Sport (1st gen):Apple Watch Sport (1st gen):Apple Watch Sport (1st generation):
+Apple Watch:watch/pl281:unknown:Apple Watch Standard (1st gen):Apple Watch Standard (1st gen):UNKNOWN Marketing Model Name from Specs Page:
+watchOS:watch/pp173:unknown:watchOS 11:watchOS 11:UNKNOWN Marketing Model Name from Specs Page:
+watchOS:watch/pp168:unknown:watchOS 10:watchOS 10:UNKNOWN Marketing Model Name from Specs Page:
+watchOS:watch/pp244:unknown:watchOS 9:watchOS 9:UNKNOWN Marketing Model Name from Specs Page:
+watchOS:watch/pp219:unknown:watchOS 8:watchOS 8:UNKNOWN Marketing Model Name from Specs Page:
+watchOS:watch/pp536:unknown:watchOS 7:watchOS 7:UNKNOWN Marketing Model Name from Specs Page:
+watchOS:watch/pp535:unknown:watchOS 6:watchOS 6:UNKNOWN Marketing Model Name from Specs Page:
+watchOS:watch/pl183:unknown:watchOS:watchOS:UNKNOWN Marketing Model Name from Specs Page:
+Apple Vision:vision/301017:117810:Apple Vision Pro:Apple Vision Pro:Apple Vision Pro:
+Apple Vision:vision/pp174:unknown:visionOS 2:visionOS 2:UNKNOWN Marketing Model Name from Specs Page:
+AirPods:airpods/301050:121203:AirPods 4:AirPods 4:AirPods 4:
+AirPods:airpods/301051:121204:AirPods 4 with Active Noise Cancellation:AirPods 4 with Active Noise Cancellation:AirPods 4 with Active Noise Cancellation:
+AirPods:airpods/301049:121205:AirPods Max with USB-C:AirPods Max with USB-C:AirPods Max with USB-C:
+AirPods:airpods/300992:111834:AirPods Pro (2nd generation) with MagSafe Charging Case (USB-C):AirPods Pro (2nd generation) with MagSafe Charging Case (USB-C):AirPods Pro 2 with MagSafe Charging Case (USB-C):
+AirPods:airpods/300896:111863:AirPods (3rd generation) with Lightning Charging:AirPods (3rd generation) with Lightning Charging:AirPods 3:
+AirPods:airpods/300882:111851:AirPods Pro (2nd generation) with MagSafe Charging Case (Lightning):AirPods Pro (2nd generation) with MagSafe Charging Case (Lightning):AirPods Pro 2:
+AirPods:airpods/300453:111863:AirPods (3rd generation):AirPods (3rd generation):AirPods 3:
+AirPods:airpods/300454:111859:AirPods Pro (1st generation) with MagSafe Charging Case:AirPods Pro (1st generation) with MagSafe Charging Case:AirPods Pro 1 with MagSafe Charging Case:
+AirPods:airpods/300273:111858:AirPods Max:AirPods Max:AirPods Max:
+AirPods:airpods/300121:111856:AirPods (2nd generation):AirPods (2nd generation):AirPods 2:
+AirPods:airpods/300122:111856:AirPods (2nd generation) with Wireless Charging Case:AirPods (2nd generation) with Wireless Charging Case:AirPods 2:
+AirPods:airpods/300145:111861:AirPods Pro (1st generation) with Wireless Charging Case:AirPods Pro (1st generation) with Wireless Charging Case:AirPods Pro 1 with Wireless Charging Case:
+AirPods:airpods/300040:111855:AirPods (1st generation):AirPods (1st generation):AirPods 1:
+AirPods:airpods/pp525:111860:AirPods Wireless Charging Case:AirPods Wireless Charging Case:AirPods (2 or earlier) Wireless Charging Case:
+AirPods:airpods/pp241:unknown:MagSafe Charging Case Lightning (AirPods Pro 2nd generation):MagSafe Charging Case Lightning (AirPods Pro 2nd generation):UNKNOWN Marketing Model Name from Specs Page:
+AirPods:airpods/pp170:111834:MagSafe Charging Case USB-C (AirPods Pro 2nd generation):MagSafe Charging Case USB-C (AirPods Pro 2nd generation):AirPods Pro 2 with MagSafe Charging Case (USB-C):
+Apple TV:apple-tv/300901:111839:Apple TV 4K (3rd generation):Apple TV 4K (3rd generation):Apple TV 4K (3rd generation):
+Apple TV:apple-tv/300903:111839:Apple TV 4K (3rd generation) Wi-Fi + Ethernet:Apple TV 4K (3rd generation) Wi-Fi + Ethernet:Apple TV 4K (3rd generation):
+Apple TV:apple-tv/300353:111922:Apple TV 4K (2nd generation):Apple TV 4K (2nd generation):Apple TV 4K (2nd generation):
+Apple TV:apple-tv/504270:111929:Apple TV 4K (1st generation):Apple TV 4K (1st generation):Apple TV 4K (1st generation):
+Apple TV:apple-tv/300013:111928:Apple TV HD:Apple TV HD:Apple TV HD:
+Apple TV:apple-tv/133607:112429:Apple TV (3rd generation):Apple TV (3rd generation):Apple TV (3rd generation):
+Apple TV:apple-tv/133077:112428:Apple TV (2nd generation):Apple TV (2nd generation):Apple TV (2nd generation):
+Apple TV:apple-tv/131333:112555:Apple TV (1st generation):Apple TV (1st generation):Apple TV (1st generation):
+Apple TV:apple-tv/pp164:111919:Siri Remote (2nd generation):Siri Remote (2nd generation):Siri Remote (2nd generation):
+Apple TV:apple-tv/pp245:111844:Siri Remote (USB-C) (3rd generation):Siri Remote (USB-C) (3rd generation):Siri Remote (3rd generation):
+HomePod:homepod/300927:111843:HomePod (2nd generation):HomePod (2nd generation):HomePod (2nd generation):
+HomePod:homepod/300245:111914:HomePod mini:HomePod mini:HomePod mini:
+HomePod:homepod/300078:111994:HomePod (1st generation):HomePod (1st generation):HomePod (1st generation):
+iPod:ipod/507223:111961:iPod touch (7th generation):iPod touch (7th generation):iPod touch (7th generation):
+iPod:ipod/135428:112023:iPod touch (6th generation):iPod touch (6th generation):iPod touch (6th generation):
+iPod:ipod/134023:118467:iPod touch 16 GB (5th generation, Mid 2013):iPod touch 16 GB (5th generation, Mid 2013):iPod touch 16GB (5th generation, Mid 2013):
+iPod:ipod/133772:112039:iPod nano (7th generation):iPod nano (7th generation):iPod nano (7th generation):
+iPod:ipod/133776:unknown:iPod shuffle (4th generation, Late 2012):iPod shuffle (4th generation, Late 2012):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/133777:112021:iPod touch (5th generation):iPod touch (5th generation):iPod touch (5th generation):
+iPod:ipod/133467:unknown:iPod touch (4th generation):iPod touch (4th generation):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/133018:112432:iPod nano (6th generation):iPod nano (6th generation):iPod nano (6th generation):
+iPod:ipod/133017:112422:iPod shuffle (4th generation):iPod shuffle (4th generation):iPod shuffle (4th generation):
+iPod:ipod/133019:112431:iPod touch (4th generation):iPod touch (4th generation):iPod touch (4th generation):
+iPod:ipod/132673:112601:iPod classic 160GB (Late 2009):iPod classic 160GB (Late 2009):iPod classic 160GB (Late 2009):
+iPod:ipod/132643:112495:iPod nano (5th generation):iPod nano (5th generation):iPod nano (5th generation):
+iPod:ipod/132661:112497:iPod shuffle (3rd generation Late 2009):iPod shuffle (3rd generation Late 2009):iPod shuffle (3rd generation):
+iPod:ipod/132681:112497:iPod shuffle (3rd generation Late 2009, Stainless Steel):iPod shuffle (3rd generation Late 2009, Stainless Steel):iPod shuffle (3rd generation):
+iPod:ipod/132404:112497:iPod shuffle (3rd generation):iPod shuffle (3rd generation):iPod shuffle (3rd generation):
+iPod:ipod/132670:112461:iPod touch 32GB 64GB (3rd generation):iPod touch 32GB 64GB (3rd generation):iPod touch (3rd generation):
+iPod:ipod/132641:112319:iPod touch 8GB (2nd Generation):iPod touch 8GB (2nd Generation):iPod touch (2nd generation):
+iPod:ipod/132055:112321:iPod classic (120 GB):iPod classic (120 GB):iPod classic (120GB):
+iPod:ipod/132053:112320:iPod nano (4th generation):iPod nano (4th generation):iPod nano (4th generation):
+iPod:ipod/132054:112319:iPod touch (2nd generation):iPod touch (2nd generation):iPod touch (2nd generation):
+iPod:ipod/131639:112478:iPod classic:iPod classic:iPod classic:
+iPod:ipod/131645:112552:iPod nano (3rd generation):iPod nano (3rd generation):iPod nano (3rd generation):
+iPod:ipod/131660:112532:iPod touch (1st Generation):iPod touch (1st Generation):iPod touch:
+iPod:ipod/131146:112454:iPod (5th generation Late 2006):iPod (5th generation Late 2006):Fifth Generation iPod (Late 2006):
+iPod:ipod/131013:unknown:iPod (5th generation U2):iPod (5th generation U2):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/130879:unknown:iPod Hi-Fi:iPod Hi-Fi:UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/131155:112309:iPod nano (2nd generation):iPod nano (2nd generation):iPod nano (Second Generation):
+iPod:ipod/131239:112455:iPod shuffle (2nd generation):iPod shuffle (2nd generation):iPod shuffle (2nd generation):
+iPod:ipod/130710:111923:iPod (5th generation):iPod (5th generation):Fifth Generation iPod (iPod with video) 30 GB, 60 GB:
+iPod:ipod/130659:112507:iPod nano (1st Generation):iPod nano (1st Generation):iPod nano:
+iPod:ipod/130300:112493:iPod shuffle (1st Generation):iPod shuffle (1st Generation):iPod shuffle:
+iPod:ipod/130602:112539:iPod with color display:iPod with color display:iPod with color display 20 GB, 30 GB, or 60 GB:
+iPod:ipod/130668:unknown:iPod with color display Harry Potter (20GB):iPod with color display Harry Potter (20GB):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/112378:112530:iPod (10 GB Scroll Wheel Personalized):iPod (10 GB Scroll Wheel Personalized):iPod with scroll wheel (5 or 10 GB):
+iPod:ipod/112376:112530:iPod (10 GB Scroll Wheel):iPod (10 GB Scroll Wheel):iPod with scroll wheel (5 or 10 GB):
+iPod:ipod/113636:112462:iPod (10 GB Touchwheel, Win, Personalized):iPod (10 GB Touchwheel, Win, Personalized):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/113633:112462:iPod (10 GB Touchwheel):iPod (10 GB Touchwheel):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/113634:112462:iPod (10 GB Touchwheel, Personalized):iPod (10 GB Touchwheel, Personalized):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/113635:112462:iPod (10 GB Touchwheel, Win):iPod (10 GB Touchwheel, Win):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/119099:112515:iPod (10 GB, With Dock Connector):iPod (10 GB, With Dock Connector):iPod with dock connector (10 GB, 15 GB, 20 GB, 30 GB, 40 GB):
+iPod:ipod/119102:unknown:iPod (10 GB, With Dock Connector, Personalized):iPod (10 GB, With Dock Connector, Personalized):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/119100:112515:iPod (15 GB, With Dock Connector):iPod (15 GB, With Dock Connector):iPod with dock connector (10 GB, 15 GB, 20 GB, 30 GB, 40 GB):
+iPod:ipod/119103:unknown:iPod (15 GB, With Dock Connector, Personalized):iPod (15 GB, With Dock Connector, Personalized):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/113639:112462:iPod (20 GB Touchwheel, Win, Personalized):iPod (20 GB Touchwheel, Win, Personalized):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/113642:112462:iPod (20 GB Touchwheel):iPod (20 GB Touchwheel):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/113641:112462:iPod (20 GB Touchwheel, Personalized):iPod (20 GB Touchwheel, Personalized):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/113640:112462:iPod (20 GB Touchwheel, Win):iPod (20 GB Touchwheel, Win):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/120699:112515:iPod (20 GB with Dock Connector):iPod (20 GB with Dock Connector):iPod with dock connector (10 GB, 15 GB, 20 GB, 30 GB, 40 GB):
+iPod:ipod/120701:unknown:iPod (20 GB with Dock Connector, Personalized):iPod (20 GB with Dock Connector, Personalized):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/119101:112515:iPod (30 GB, With Dock Connector):iPod (30 GB, With Dock Connector):iPod with dock connector (10 GB, 15 GB, 20 GB, 30 GB, 40 GB):
+iPod:ipod/119104:unknown:iPod (30 GB, With Dock Connector, Personalized):iPod (30 GB, With Dock Connector, Personalized):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/120700:112515:iPod (40 GB with Dock Connector):iPod (40 GB with Dock Connector):iPod with dock connector (10 GB, 15 GB, 20 GB, 30 GB, 40 GB):
+iPod:ipod/120702:unknown:iPod (40 GB with Dock Connector, Personalized):iPod (40 GB with Dock Connector, Personalized):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/112374:112530:iPod (5 GB Scroll Wheel Personalized):iPod (5 GB Scroll Wheel Personalized):iPod with scroll wheel (5 or 10 GB):
+iPod:ipod/111393:112530:iPod (5 GB Scroll Wheel):iPod (5 GB Scroll Wheel):iPod with scroll wheel (5 or 10 GB):
+iPod:ipod/113644:112462:iPod (5 GB Touchwheel, Win):iPod (5 GB Touchwheel, Win):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/113643:112462:iPod (5 GB Touchwheel, Win, Personalized):iPod (5 GB Touchwheel, Win, Personalized):iPod with touch wheel (5 GB, 10 GB, or 20 GB):
+iPod:ipod/130003:112541:iPod (Click Wheel):iPod (Click Wheel):iPod with Click Wheel (20 GB, 40 GB including U2 Special Edition):
+iPod:ipod/pl114:unknown:iPod Accessories:iPod Accessories:UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/122741:112317:iPod mini:iPod mini:iPod mini or iPod mini (Second Generation):
+iPod:ipod/130181:112449:iPod photo:iPod photo:iPod photo (40 GB, 60 GB):
+iPod:ipod/pl113:unknown:iPod touch:iPod touch:UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/pp115:unknown:iPod touch (3rd generation):iPod touch (3rd generation):UNKNOWN Marketing Model Name from Specs Page:
+iPod:ipod/130186:unknown:iPod U2 Special Edition (20 GB):iPod U2 Special Edition (20 GB):UNKNOWN Marketing Model Name from Specs Page:
+Display:displays/300868:111890:Studio Display:Studio Display:Studio Display:
+Display:displays/508209:111892:Pro Display XDR:Pro Display XDR:Pro Display XDR:
+Display:displays/133350:112597:Apple Thunderbolt Display (27-inch):Apple Thunderbolt Display (27-inch):Apple Thunderbolt Display:
+Display:displays/132965:112620:LED Cinema Display (27-inch):LED Cinema Display (27-inch):LED Cinema Display (27-inch):
+Display:displays/132160:112472:LED Cinema Display (24-inch, Late 2008):LED Cinema Display (24-inch, Late 2008):LED Cinema Display:
+Display:displays/130759:112528:Apple Cinema Display (20-inch DVI Late 2005):Apple Cinema Display (20-inch DVI Late 2005):Apple Cinema Display (20-, 23-, or 30-inch DVI):
+Display:displays/130765:112528:Apple Cinema Display (23-inch DVI Late 2005):Apple Cinema Display (23-inch DVI Late 2005):Apple Cinema Display (20-, 23-, or 30-inch DVI):
+Display:displays/130763:112528:Apple Cinema Display (30-inch DVI Late 2005):Apple Cinema Display (30-inch DVI Late 2005):Apple Cinema Display (20-, 23-, or 30-inch DVI):
+Display:displays/8167:112295:Apple Cinema Display:Apple Cinema Display:Apple Cinema Display:
+Display:displays/125346:112528:Apple Cinema Display (20-inch DVI):Apple Cinema Display (20-inch DVI):Apple Cinema Display (20-, 23-, or 30-inch DVI):
+Display:displays/117639:112508:Apple Cinema Display (20-inch):Apple Cinema Display (20-inch):Apple Cinema Display (20-inch):
+Display:displays/125347:112528:Apple Cinema Display (23-inch DVI):Apple Cinema Display (23-inch DVI):Apple Cinema Display (20-, 23-, or 30-inch DVI):
+Display:displays/125348:112528:Apple Cinema Display (30-inch DVI):Apple Cinema Display (30-inch DVI):Apple Cinema Display (20-, 23-, or 30-inch DVI):
+Display:displays/8398:112458:Apple Cinema Display ADC:Apple Cinema Display ADC:Apple Cinema Display ADC:
+Display:displays/112473:112463:Apple Cinema HD Disp 23:Apple Cinema HD Disp 23:Apple Cinema HD Display (23"):
+Display:displays/pl208:unknown:Apple Multiple Scan Displays:Apple Multiple Scan Displays:UNKNOWN Marketing Model Name from Specs Page:
+Display:displays/8401:112470:Apple Studio Display 15 inch ADC:Apple Studio Display 15 inch ADC:Apple Studio Display LCD (ADC) (15"):
+Display:displays/6753:112284:Apple Studio Display 15-inch Rev B:Apple Studio Display 15-inch Rev B:Apple Studio Display 15-inch LCD (rev.B):
+Display:displays/8400:112524:Apple Studio Display 17 inch ADC:Apple Studio Display 17 inch ADC:Apple Studio Display 17 (ADC):
+Display:displays/6756:112292:Apple Studio Display 17 inch CRT:Apple Studio Display 17 inch CRT:Studio Display (17" CRT, 16" VIS):
+Display:displays/109732:112517:Apple Studio Display 17 inch LCD:Apple Studio Display 17 inch LCD:Apple Studio Display (17-inch, LCD):
+Display:displays/6769:112289:Apple Studio Display 21 inch CRT:Apple Studio Display 21 inch CRT:Apple Studio Display 21:
+Display:displays/6529:112287:Apple Studio Display LCD (15 inch):Apple Studio Display LCD (15 inch):Apple Studio Display:
+Display:displays/pl266:unknown:Apple Thunderbolt Displays:Apple Thunderbolt Displays:UNKNOWN Marketing Model Name from Specs Page:
+Display:displays/237:112266:AppleVision 1710 Display:AppleVision 1710 Display:AppleVision 1710 Display:
+Display:displays/238:112267:AppleVision 1710AV Display:AppleVision 1710AV Display:AppleVision 1710AV Display:
+Display:displays/5920:112273:AppleVision 750:AppleVision 750:Apple ColorSync/AppleVision 750 Display:
+Display:displays/5921:112285:AppleVision 750AV:AppleVision 750AV:Apple ColorSync AV/AppleVision 750AV Display:
+Display:displays/pl209:unknown:Earlier Displays:Earlier Displays:UNKNOWN Marketing Model Name from Specs Page:
+Display:displays/pp154:unknown:Pro Display XDR Calibrator:Pro Display XDR Calibrator:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/301042:unknown:Beats Pill:Beats Pill:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp729:121955:Magic Keyboard (USB-C):Magic Keyboard (USB-C):Magic Keyboard (USB-C):
+Accessory:accessories/pp204:121953:Magic Keyboard with Touch ID and Numeric Keypad for Mac models with Apple silicon (USB-C):Magic Keyboard with Touch ID and Numeric Keypad for Mac models with Apple silicon (USB-C):Magic Keyboard with Touch ID or Numeric Keypad for Mac models with Apple silicon (USB-C):
+Accessory:accessories/pp205:121954:Magic Keyboard with Touch ID for Mac models with Apple silicon (USB-C):Magic Keyboard with Touch ID for Mac models with Apple silicon (USB-C):Magic Keyboard with Touch ID for Mac models with Apple silicon (USB-C):
+Accessory:accessories/pp195:121931:Magic Mouse (USB-C):Magic Mouse (USB-C):Magic Mouse (USB-C):
+Accessory:accessories/pp196:121932:Magic Trackpad (USB-C):Magic Trackpad (USB-C):Magic Trackpad (USB-C):
+Accessory:accessories/300356:111847:AirTag:AirTag:AirTag:
+Accessory:accessories/300357:unknown:AirTag Hermès:AirTag Hermès:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp179:112443:Magic Keyboard:Magic Keyboard:Magic Keyboard:
+Accessory:accessories/134029:112419:AirPort Extreme 802.11ac:AirPort Extreme 802.11ac:AirPort Extreme 802.11ac:
+Accessory:accessories/134028:112420:AirPort Time Capsule 802.11ac:AirPort Time Capsule 802.11ac:AirPort Time Capsule 802.11ac:
+Accessory:accessories/133637:112421:AirPort Express 802.11n (2nd Generation):AirPort Express 802.11n (2nd Generation):AirPort Express 802.11n (2nd Generation):
+Accessory:accessories/133324:112440:AirPort Extreme 802.11n (5th Generation):AirPort Extreme 802.11n (5th Generation):AirPort Extreme 802.11n (5th Generation):
+Accessory:accessories/133323:112571:AirPort Time Capsule 802.11n (4th Generation):AirPort Time Capsule 802.11n (4th Generation):AirPort Time Capsule 802.11n (4th Generation):
+Accessory:accessories/132374:112460:AirPort Extreme 802.11n (3rd Generation):AirPort Extreme 802.11n (3rd Generation):AirPort Extreme 802.11n (3rd Generation):
+Accessory:accessories/132713:112575:AirPort Extreme 802.11n (4th Generation):AirPort Extreme 802.11n (4th Generation):AirPort Extreme 802.11n (4th Generation):
+Accessory:accessories/132380:112572:AirPort Time Capsule 802.11n (2nd Generation):AirPort Time Capsule 802.11n (2nd Generation):AirPort Time Capsule 802.11n (2nd Generation):
+Accessory:accessories/132719:112563:AirPort Time Capsule 802.11n (3rd Generation):AirPort Time Capsule 802.11n (3rd Generation):AirPort Time Capsule 802.11n (3rd Generation):
+Accessory:accessories/pp127:unknown:Apple Wireless Keyboard (2009):Apple Wireless Keyboard (2009):UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/131955:112477:AirPort Express 802.11n (1st Generation):AirPort Express 802.11n (1st Generation):AirPort Express 802.11n (1st Generation):
+Accessory:accessories/131841:112505:AirPort Time Capsule 802.11n (1st Generation):AirPort Time Capsule 802.11n (1st Generation):AirPort Time Capsule 802.11n (1st Generation):
+Accessory:accessories/131340:112479:AirPort Extreme 802.11n (1st Generation):AirPort Extreme 802.11n (1st Generation):AirPort Extreme 802.11n (1st Generation):
+Accessory:accessories/131620:112446:AirPort Extreme 802.11n (2nd Generation):AirPort Extreme 802.11n (2nd Generation):AirPort Extreme 802.11n (2nd Generation):
+Accessory:accessories/i132116:unknown:AirPort Extreme Base Station (Early 2003):AirPort Extreme Base Station (Early 2003):UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pl265:unknown:Adapters and Cables:Adapters and Cables:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pl128:unknown:AirPort:AirPort:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/111495:112245:AirPort Base Station (Dual Ethernet):AirPort Base Station (Dual Ethernet):AirPort Base Station (Dual Ethernet):
+Accessory:accessories/8022:112290:AirPort Base Station (original):AirPort Base Station (original):AirPort Base Station (Graphite):
+Accessory:accessories/8023:unknown:AirPort Card:AirPort Card:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/124986:112484:AirPort Express Base Station:AirPort Express Base Station:AirPort Express:
+Accessory:accessories/117240:unknown:AirPort Extr Base Station:AirPort Extr Base Station:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/117241:112525:AirPort Extreme Base Station:AirPort Extreme Base Station:AirPort Extreme Base Station (no modem):
+Accessory:accessories/124285:112509:AirPort Extreme Base Station POE/UL2043:AirPort Extreme Base Station POE/UL2043:AirPort Extreme Base Station (Modem or PoE/UL2043 models):
+Accessory:accessories/117253:unknown:AirPort Extreme Card:AirPort Extreme Card:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp37:unknown:AirPort for Windows:AirPort for Windows:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp128:unknown:Apple Magic Mouse:Apple Magic Mouse:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pl191:unknown:Bluetooth:Bluetooth:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pl161:unknown:Keyboards:Keyboards:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp206:unknown:LaserWriter Printers:LaserWriter Printers:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp156:unknown:Magic Keyboard with Lock Key:Magic Keyboard with Lock Key:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp217:112037:Magic Keyboard with Numeric Keypad:Magic Keyboard with Numeric Keypad:Magic Keyboard with Numeric Keypad:
+Accessory:accessories/pp155:unknown:Magic Keyboard with Touch ID:Magic Keyboard with Touch ID:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp157:unknown:Magic Keyboard with Touch ID and Numeric Keypad:Magic Keyboard with Touch ID and Numeric Keypad:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp178:111885:Magic Mouse 2:Magic Mouse 2:Magic Mouse:
+Accessory:accessories/pp180:unknown:Magic Trackpad:Magic Trackpad:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp177:111884:Magic Trackpad 2:Magic Trackpad 2:Magic Trackpad:
+Accessory:accessories/pl160:unknown:Mice and Trackpad:Mice and Trackpad:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp126:unknown:Mighty Mouse:Mighty Mouse:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp81:unknown:Mini DisplayPort to VGA Adapter:Mini DisplayPort to VGA Adapter:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp208:unknown:Other Printers:Other Printers:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp207:unknown:StyleWriter Printers:StyleWriter Printers:UNKNOWN Marketing Model Name from Specs Page:
+Accessory:accessories/pp421:unknown:Thunderbolt to Gigabit Ethernet Adapter:Thunderbolt to Gigabit Ethernet Adapter:UNKNOWN Marketing Model Name from Specs Page:
+Beats:accessories/301042:unknown:Beats Pill:Beats Pill:UNKNOWN Marketing Model Name from Specs Page:
+AirTag:accessories/300356:111847:AirTag:AirTag:AirTag:
+AirTag:accessories/300357:unknown:AirTag Hermès:AirTag Hermès:UNKNOWN Marketing Model Name from Specs Page:
+AirPort:accessories/134029:112419:AirPort Extreme 802.11ac:AirPort Extreme 802.11ac:AirPort Extreme 802.11ac:
+AirPort:accessories/134028:112420:AirPort Time Capsule 802.11ac:AirPort Time Capsule 802.11ac:AirPort Time Capsule 802.11ac:
+AirPort:accessories/133637:112421:AirPort Express 802.11n (2nd Generation):AirPort Express 802.11n (2nd Generation):AirPort Express 802.11n (2nd Generation):
+AirPort:accessories/133324:112440:AirPort Extreme 802.11n (5th Generation):AirPort Extreme 802.11n (5th Generation):AirPort Extreme 802.11n (5th Generation):
+AirPort:accessories/133323:112571:AirPort Time Capsule 802.11n (4th Generation):AirPort Time Capsule 802.11n (4th Generation):AirPort Time Capsule 802.11n (4th Generation):
+AirPort:accessories/132374:112460:AirPort Extreme 802.11n (3rd Generation):AirPort Extreme 802.11n (3rd Generation):AirPort Extreme 802.11n (3rd Generation):
+AirPort:accessories/132713:112575:AirPort Extreme 802.11n (4th Generation):AirPort Extreme 802.11n (4th Generation):AirPort Extreme 802.11n (4th Generation):
+AirPort:accessories/132380:112572:AirPort Time Capsule 802.11n (2nd Generation):AirPort Time Capsule 802.11n (2nd Generation):AirPort Time Capsule 802.11n (2nd Generation):
+AirPort:accessories/132719:112563:AirPort Time Capsule 802.11n (3rd Generation):AirPort Time Capsule 802.11n (3rd Generation):AirPort Time Capsule 802.11n (3rd Generation):
+AirPort:accessories/131955:112477:AirPort Express 802.11n (1st Generation):AirPort Express 802.11n (1st Generation):AirPort Express 802.11n (1st Generation):
+AirPort:accessories/131841:112505:AirPort Time Capsule 802.11n (1st Generation):AirPort Time Capsule 802.11n (1st Generation):AirPort Time Capsule 802.11n (1st Generation):
+AirPort:accessories/131340:112479:AirPort Extreme 802.11n (1st Generation):AirPort Extreme 802.11n (1st Generation):AirPort Extreme 802.11n (1st Generation):
+AirPort:accessories/131620:112446:AirPort Extreme 802.11n (2nd Generation):AirPort Extreme 802.11n (2nd Generation):AirPort Extreme 802.11n (2nd Generation):
+AirPort:accessories/i132116:unknown:AirPort Extreme Base Station (Early 2003):AirPort Extreme Base Station (Early 2003):UNKNOWN Marketing Model Name from Specs Page:
+AirPort:accessories/pl128:unknown:AirPort:AirPort:UNKNOWN Marketing Model Name from Specs Page:
+AirPort:accessories/111495:112245:AirPort Base Station (Dual Ethernet):AirPort Base Station (Dual Ethernet):AirPort Base Station (Dual Ethernet):
+AirPort:accessories/8022:112290:AirPort Base Station (original):AirPort Base Station (original):AirPort Base Station (Graphite):
+AirPort:accessories/8023:unknown:AirPort Card:AirPort Card:UNKNOWN Marketing Model Name from Specs Page:
+AirPort:accessories/124986:112484:AirPort Express Base Station:AirPort Express Base Station:AirPort Express:
+AirPort:accessories/117240:unknown:AirPort Extr Base Station:AirPort Extr Base Station:UNKNOWN Marketing Model Name from Specs Page:
+AirPort:accessories/117241:112525:AirPort Extreme Base Station:AirPort Extreme Base Station:AirPort Extreme Base Station (no modem):
+AirPort:accessories/124285:112509:AirPort Extreme Base Station POE/UL2043:AirPort Extreme Base Station POE/UL2043:AirPort Extreme Base Station (Modem or PoE/UL2043 models):
+AirPort:accessories/117253:unknown:AirPort Extreme Card:AirPort Extreme Card:UNKNOWN Marketing Model Name from Specs Page:
+AirPort:accessories/pp37:unknown:AirPort for Windows:AirPort for Windows:UNKNOWN Marketing Model Name from Specs Page:
+Keyboards:accessories/pp729:121955:Magic Keyboard (USB-C):Magic Keyboard (USB-C):Magic Keyboard (USB-C):
+Keyboards:accessories/pp204:121953:Magic Keyboard with Touch ID and Numeric Keypad for Mac models with Apple silicon (USB-C):Magic Keyboard with Touch ID and Numeric Keypad for Mac models with Apple silicon (USB-C):Magic Keyboard with Touch ID or Numeric Keypad for Mac models with Apple silicon (USB-C):
+Keyboards:accessories/pp205:121954:Magic Keyboard with Touch ID for Mac models with Apple silicon (USB-C):Magic Keyboard with Touch ID for Mac models with Apple silicon (USB-C):Magic Keyboard with Touch ID for Mac models with Apple silicon (USB-C):
+Keyboards:accessories/pp179:112443:Magic Keyboard:Magic Keyboard:Magic Keyboard:
+Keyboards:accessories/pp127:unknown:Apple Wireless Keyboard (2009):Apple Wireless Keyboard (2009):UNKNOWN Marketing Model Name from Specs Page:
+Keyboards:accessories/pl161:unknown:Keyboards:Keyboards:UNKNOWN Marketing Model Name from Specs Page:
+Keyboards:accessories/pp156:unknown:Magic Keyboard with Lock Key:Magic Keyboard with Lock Key:UNKNOWN Marketing Model Name from Specs Page:
+Keyboards:accessories/pp217:112037:Magic Keyboard with Numeric Keypad:Magic Keyboard with Numeric Keypad:Magic Keyboard with Numeric Keypad:
+Keyboards:accessories/pp155:unknown:Magic Keyboard with Touch ID:Magic Keyboard with Touch ID:UNKNOWN Marketing Model Name from Specs Page:
+Keyboards:accessories/pp157:unknown:Magic Keyboard with Touch ID and Numeric Keypad:Magic Keyboard with Touch ID and Numeric Keypad:UNKNOWN Marketing Model Name from Specs Page:
+Mice and Trackpad:accessories/pp195:121931:Magic Mouse (USB-C):Magic Mouse (USB-C):Magic Mouse (USB-C):
+Mice and Trackpad:accessories/pp196:121932:Magic Trackpad (USB-C):Magic Trackpad (USB-C):Magic Trackpad (USB-C):
+Mice and Trackpad:accessories/pp128:unknown:Apple Magic Mouse:Apple Magic Mouse:UNKNOWN Marketing Model Name from Specs Page:
+Mice and Trackpad:accessories/pp178:111885:Magic Mouse 2:Magic Mouse 2:Magic Mouse:
+Mice and Trackpad:accessories/pp180:unknown:Magic Trackpad:Magic Trackpad:UNKNOWN Marketing Model Name from Specs Page:
+Mice and Trackpad:accessories/pp177:111884:Magic Trackpad 2:Magic Trackpad 2:Magic Trackpad:
+Mice and Trackpad:accessories/pl160:unknown:Mice and Trackpad:Mice and Trackpad:UNKNOWN Marketing Model Name from Specs Page:
+Mice and Trackpad:accessories/pp126:unknown:Mighty Mouse:Mighty Mouse:UNKNOWN Marketing Model Name from Specs Page:
+Adaptors and Cables:accessories/pl265:unknown:Adapters and Cables:Adapters and Cables:UNKNOWN Marketing Model Name from Specs Page:
+Adaptors and Cables:accessories/pp421:unknown:Thunderbolt to Gigabit Ethernet Adapter:Thunderbolt to Gigabit Ethernet Adapter:UNKNOWN Marketing Model Name from Specs Page:
+Creativity:software/pl296:112029:iTunes for Windows:iTunes for Windows:iTunes 12 for Windows:
+Creativity:software/pl145:unknown:iPhoto:iPhoto:UNKNOWN Marketing Model Name from Specs Page:
+Creativity:software/pl295:112028:iTunes for Mac:iTunes for Mac:iTunes 12 for macOS:
+Creativity:software/pl143:unknown:GarageBand:GarageBand:UNKNOWN Marketing Model Name from Specs Page:
+Creativity:software/pl147:unknown:iMovie:iMovie:UNKNOWN Marketing Model Name from Specs Page:
+Creativity:software/pl171:112444:QuickTime for Mac:QuickTime for Mac:QuickTime Pro 7:
+Creativity:software/pl170:unknown:QuickTime for Windows:QuickTime for Windows:UNKNOWN Marketing Model Name from Specs Page:
+Productivity:software/pl152:unknown:Keynote:Keynote:UNKNOWN Marketing Model Name from Specs Page:
+Productivity:software/pl146:unknown:Numbers:Numbers:UNKNOWN Marketing Model Name from Specs Page:
+Productivity:software/pl149:unknown:Pages:Pages:UNKNOWN Marketing Model Name from Specs Page:
+Pro Apps:software/134082:111899:Logic Pro:Logic Pro:Logic Pro:
+Pro Apps:software/133281:111915:Motion:Motion:Motion 5:
+Pro Apps:software/pl157:112030:Aperture:Aperture:Aperture 3:
+Pro Apps:software/pl158:unknown:Color:Color:UNKNOWN Marketing Model Name from Specs Page:
+Pro Apps:software/pl155:111916:Compressor:Compressor:Compressor 4:
+Pro Apps:software/pl186:unknown:DVD Studio Pro:DVD Studio Pro:UNKNOWN Marketing Model Name from Specs Page:
+Pro Apps:software/pl187:112645:Final Cut Express:Final Cut Express:Final Cut Express 4:
+Pro Apps:software/pl197:111903:Final Cut Pro:Final Cut Pro:Final Cut Pro:
+Pro Apps:software/pl199:unknown:Final Cut Studio:Final Cut Studio:UNKNOWN Marketing Model Name from Specs Page:
+Pro Apps:software/134085:112561:MainStage:MainStage:MainStage 2:
+Pro Apps:software/pl154:112627:Soundtrack Pro:Soundtrack Pro:Logic Studio: Soundtrack Pro 2.0:

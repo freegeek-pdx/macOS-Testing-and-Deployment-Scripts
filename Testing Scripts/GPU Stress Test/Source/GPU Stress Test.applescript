@@ -16,9 +16,9 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.7.7-3
+-- Version: 2024.11.11-1
 
--- App Icon is “Donut” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
+-- App Icon is “Donut” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 use AppleScript version "2.7"
@@ -141,12 +141,17 @@ end if
 
 
 try
-	(("/Applications/GpuTest_OSX_x64_0.7.0/GpuTest.app" as POSIX file) as alias)
+	(("/Applications/GpuTest_OSX_x64_0.7.0" as POSIX file) as alias)
+	do shell script "mv -f '/Applications/GpuTest_OSX_x64_0.7.0' '/Applications/GpuTest_OSX_x64'" user name adminUsername password adminPassword with administrator privileges
+end try
+
+try
+	(("/Applications/GpuTest_OSX_x64/GpuTest.app" as POSIX file) as alias)
 on error
 	try
 		activate
 	end try
-	display alert "“" & (name of me) & "” requires “GpuTest”" message "“GpuTest_OSX_x64_0.7.0” folder must be installed in the “Applications” folder." buttons {"Quit", "Download “GpuTest”"} cancel button 1 default button 2 as critical
+	display alert "“" & (name of me) & "” requires “GpuTest”" message "“GpuTest_OSX_x64” folder must be installed in the “Applications” folder." buttons {"Quit", "Download “GpuTest”"} cancel button 1 default button 2 as critical
 	open location "https://www.geeks3d.com/gputest/"
 	quit
 	delay 10
@@ -816,7 +821,7 @@ if (shouldRunGPUStressTest) then
 							
 							set testName to "fur"
 							if (modelIdentifier is equal to "iMac7,1") then set testName to "gi" -- iMac7,1's are too slow to handle FurMark, they always freeze. But they can run GiMark successfully.
-							do shell script "open -a '/Applications/GpuTest_OSX_x64_0.7.0/GpuTest.app' --args '/test=" & testName & " /msaa=" & msaaArgument & " /width=" & ((item 3 of screenBounds) - (item 1 of screenBounds)) & " /height=" & ((item 4 of screenBounds) - (item 2 of screenBounds) - menuBarHeight) & "'"
+							do shell script "open -a '/Applications/GpuTest_OSX_x64/GpuTest.app' --args '/test=" & testName & " /msaa=" & msaaArgument & " /width=" & ((item 3 of screenBounds) - (item 1 of screenBounds)) & " /height=" & ((item 4 of screenBounds) - (item 2 of screenBounds) - menuBarHeight) & "'"
 							
 							repeat 10 times
 								try

@@ -1,0 +1,183 @@
+/*
+* By: Pico Mitchell
+* For: MacLand @ Free Geek
+* Last Updated: June 17th, 2024
+*
+* MIT License
+*
+* Copyright (c) 2021 Free Geek
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
+* to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+* and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+* WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*
+*/
+
+body {
+	background-color: white !important;
+	overflow: hidden;
+	display: none;
+}
+
+ins, iframe, img, .google-auto-placed { /* Hide All Ads */
+	display: none !important;
+}
+
+.kbmain {
+	max-width: 100% !important;
+}
+
+#logo {
+	margin-top: 15px;
+	text-align: center;
+}
+
+#logo a, #logo a:hover, #logo a:visited {
+	text-decoration: none;
+	color:#0d2693;
+	font-size: 23px;
+}
+
+#resetbutton {
+	padding: 0px !important;
+}
+
+#testarea {
+	font-size: 16px;
+	font-family: Arial, sans-serif;
+	resize: none;
+	display: block;
+	margin: 0px auto;
+	padding: 5px;
+	width: 1130px;
+	height: 123px;
+}
+
+#testarea::placeholder {
+	text-align: center;
+	font-weight: bold;
+	font-size: 15px;
+}
+
+#hidden_text_before {
+	width: 1px;
+	height: 1px;
+	border: 0px;
+}
+
+.kbblock {
+	margin: 0px !important;
+	padding: 0px !important;
+}
+
+.kbblock:nth-of-type(1), .kbblock:nth-of-type(3), #soundArea, input[name="reset"], #select_layout, #key92, #key224, #key224b, .label, #notes {
+	display: none;
+}
+
+#keyboard {
+	padding-bottom: 100px; /* Push Ad Banner Down Below Window Height */
+	background-color: white;
+}
+
+table {
+	margin: 0px auto !important;
+}
+
+td {
+	vertical-align: bottom !important;
+	padding: 0px !important;
+}
+
+td.key_small {
+	vertical-align: top !important;
+}
+
+.key_block td, .key_row div { /* All Keys */
+	font-size: 16px;
+	font-family: Arial, sans-serif !important;
+	border-radius: 6px;
+	padding: 6px 8px !important;
+	min-width: 22px;
+	text-align: center;
+	background-color: white;
+}
+
+.key_highlight {
+	background-color: #FFC864 !important;
+}
+
+.key_pressed, .key_pressed_m {
+	border-color: green !important;
+	background-color: #2CB32C !important;
+	color: white;
+}
+
+.key_small div { /* Function Keys */
+	font-size: 12px;
+	min-width: 29px;
+}
+
+#key8, #key9 { /* Backspace, Tab */
+	min-width: 63px;
+}
+
+#key20 { /* Caps */
+	min-width: 68px;
+}
+
+#key13 { /* Enter */
+	min-width: 67px;
+}
+
+#key16 { /* Left Shift */
+	min-width: 92px;
+}
+
+#key16b { /* Right Shift */
+	min-width: 93px;
+}
+
+#key32 { /* Spacebar */
+	min-width: 377px;
+}
+
+#key44 /* Print Screen */, #key145 /* Scroll Lock */, #key19 /* Pause */, #key45 /* Insert */, #key36 /* Home */, #key33 /* Page Up */, #key46 /* Delete */, #key35 /* End */, #key34 /* Page Down */ {
+	min-width: 40px;
+}
+
+
+table.key_block { /* Arrow Keys, Num Pad */
+	margin: -4px !important;
+}
+
+.key_block td { /* Arrow Keys, Num Pad */
+	vertical-align: middle !important;
+}
+
+#key38, #key40 { /* Up Arrow, Down Arrow */
+	padding: 8px !important;
+}
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+	#testarea {
+		padding: 10px;
+		width: 1120px;
+		height: 105px;
+	}
+
+	#key32 { /* Spacebar */
+		min-width: 377.5px;
+	}
+}
+
+@media screen and (min-width: 1200px) {
+	.key_block tr td, .key_row div {
+		font-size: inherit !important; /* Need to UNDO the "font-size: larger" setting for larger window widths. */
+	}
+}

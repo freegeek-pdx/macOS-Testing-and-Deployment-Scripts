@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.9.11-1
+-- Version: 2025.8.28-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -265,7 +265,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			-- The MTB version is NOT stored in a user accessable location so that it cannot be super easily manually edited.
 			set currentMTBversion to doShellScriptAsAdmin("cat '/private/var/root/.mtbVersion'") -- If the file doesn't exist, it's older than 20220726 which was the first version to include this file (version 20220705 stored the file at "/Users/Shared/.mtbVersion" and no MTB version file existed before that).
 			
-			set validMTBversions to {"20230707"}
+			set validMTBversions to {"20250820"}
 			if (validMTBversions does not contain currentMTBversion) then error "OUTDATED"
 		on error
 			set serialNumber to ""
@@ -275,7 +275,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			if ((startupDiskCapacity > 3.3E+10) or (serialNumber is not equal to "C02R49Y5G8WP")) then -- Never delete anything on Source drive no matter what.
 				try
 					doShellScriptAsAdmin("
-rm -rf '/Applications/Audio Test.app' '/Applications/Blackmagic Disk Speed Test.app' '/Applications/Breakaway.app' '/Applications/Camera Test.app' '/Applications/coconutBattery.app' '/Applications/coconutID.app' '/Applications/CPU Stress Test.app' '/Applications/CPUTest.app' '/Applications/DriveDx.app' '/Applications/FingerMgmt.app' '/Applications/Firmware Checker.app' '/Applications/Free Geek Updater.app' '/Applications/GPU Stress Test.app' '/Applications/GpuTest_OSX_x64_0.7.0' '/Applications/Internet Test.app' '/Applications/Keyboard Test.app' '/Applications/KeyboardCleanTool.app' '/Applications/Mac Scope.app' '/Applications/Mactracker.app' '/Applications/Microphone Test.app' '/Applications/PiXel Check.app' '/Applications/Restore OS.app' '/Applications/Screen Test.app' '/Applications/SilentKnight.app' '/Applications/Startup Picker.app' '/Applications/Test CD.app' '/Applications/Test DVD.app' '/Applications/Trackpad Test.app' '/Applications/XRG.app' '/Users/Tester/Applications' '/Users/Shared/OS Updates' '/Users/Shared/Restore OS Images'
+rm -rf '/Applications/AmorphousDiskMark.app' '/Applications/Audio Test.app' '/Applications/Blackmagic Disk Speed Test.app' '/Applications/Breakaway.app' '/Applications/Camera Test.app' '/Applications/coconutBattery.app' '/Applications/coconutID.app' '/Applications/CPU Stress Test.app' '/Applications/CPUTest.app' '/Applications/DriveDx.app' '/Applications/FingerMgmt.app' '/Applications/Firmware Checker.app' '/Applications/Free Geek Updater.app' '/Applications/Geekbench 5.app' '/Applications/GPU Stress Test.app' '/Applications/GpuTest_OSX_x64_0.7.0' '/Applications/GpuTest_OSX_x64' '/Applications/Internet Test.app' '/Applications/Keyboard Test.app' '/Applications/KeyboardCleanTool.app' '/Applications/Mac Scope.app' '/Applications/Mactracker.app' '/Applications/Microphone Test.app' '/Applications/PiXel Check.app' '/Applications/Restore OS.app' '/Applications/Screen Test.app' '/Applications/SilentKnight.app' '/Applications/Startup Picker.app' '/Applications/Test CD.app' '/Applications/Test DVD.app' '/Applications/Trackpad Test.app' '/Applications/XRG.app' '/Users/Tester/Applications' '/Users/Shared/OS Updates' '/Users/Shared/Restore OS Images'
 if [ -d '/Volumes/fgMIB' ]; then
 	rm -rf '/Volumes/fgMIB/install-packages' '/Volumes/fgMIB/customization-resources'
 	echo '#!/bin/bash
@@ -388,7 +388,7 @@ Setup will continue in 5 seconds…" buttons {"Skip Setup", "Continue with Setup
 		end try
 	end try
 	
-	-- NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
+	-- NOTE: The following LaunchAgent is setup to run a signed script which launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
 	-- BUT, this is just done for consistency with other code since this particular script will never run on macOS 13 Ventura, but the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
 	set testBootSetupUserLaunchAgentPlistContents to (do shell script "
 echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to create an empty plist with root type of dictionary. This is effectively same as starting with 'plutil -create xml1 -' (which can be verified by comparing the output to 'echo '<dict/>' | plutil -convert xml1 -o - -') but the 'plutil -create' option is only available on macOS 12 Monterey and newer.
@@ -470,6 +470,7 @@ echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to
 			do shell script "defaults delete eficheck"
 		end try
 		try
+			((("/usr/libexec/firmwarecheckers/eficheck/eficheck") as POSIX file) as alias) -- "eficheck" binary has been removed on macOS 14 Sonoma.
 			set efiCheckPID to doShellScriptAsAdmin("/usr/libexec/firmwarecheckers/eficheck/eficheck --integrity-check > /dev/null 2>&1 & echo $!")
 			delay 1
 			set efiCheckIsRunning to ((do shell script ("ps -p " & efiCheckPID & " > /dev/null 2>&1; echo $?")) as number)
@@ -716,7 +717,7 @@ killall ControlStrip
 			set currentMactrackerMultipleFindMyMac to (do shell script "defaults read 'com.mactrackerapp.Mactracker' 'MultipleFindMyMac'")
 		end try
 		
-		if ((currentMactrackerWindowLocations does not contain "LastSelection = 2;") or (currentHIToolboxAppleDictationAutoEnable is not equal to "0")) then
+		if ((currentMactrackerWindowLocations does not contain "LastSelection = 2;") or (currentMactrackerMultipleFindMyMac is not equal to "0")) then
 			do shell script "
 defaults write 'com.mactrackerapp.Mactracker' 'WindowLocations' -dict 'MainWindow' \"$(echo '<dict/>' | plutil -insert 'LastSelection' -integer '2' -o - -)\"
 defaults write 'com.mactrackerapp.Mactracker' 'MultipleFindMyMac' -bool false
@@ -811,12 +812,17 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 								set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 								if (getWiFiNetworkColonOffset > 0) then
 									set (end of preferredWirelessNetworks) to (tab & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
+								else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
+									set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
+									if (connectedWiFiNetworkName is not equal to "") then
+										set (end of preferredWirelessNetworks) to (tab & connectedWiFiNetworkName)
+									end if
 								end if
 							end try
 							repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
 								if (thisPreferredWirelessNetwork starts with tab) then
 									set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
-									if ((thisPreferredWirelessNetwork is not equal to "FG Reuse") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
+									if ((thisPreferredWirelessNetwork is not equal to "FG Staff") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
 										try
 											do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
 										end try
@@ -833,7 +839,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 						end try
 						try
 							-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-							tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Reuse' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
+							tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
 						end try
 					end if
 				end repeat

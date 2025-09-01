@@ -23,7 +23,7 @@
 # NOTICE: This script will only exist on boot to be able to run via LaunchDaemon when booting after restoring from the reset Snapshot.
 # ALSO: fg-prepare-os will have created AppleSetupDone to not show Setup Assistant BEFORE creating the reset Snapshot so that Setup Assistant would also not show during Snapshot reset.
 
-readonly SCRIPT_VERSION='2023.6.16-1'
+readonly SCRIPT_VERSION='2023.9.25-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -44,7 +44,7 @@ launch_login_progress_app() {
 
 		login_progress_launch_agent_path='/Library/LaunchAgents/org.freegeek.Free-Geek-Login-Progress.plist'
 
-		# NOTE: The following LaunchAgent is setup to run a signed script with launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
+		# NOTE: The following LaunchAgent is setup to run a signed script which launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
 		# BUT, this is just done for consistency with other code since this particular script will never run when a user is logged in to even be able to see that list in macOS 13 Ventura.
 		# On macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
 		PlistBuddy \

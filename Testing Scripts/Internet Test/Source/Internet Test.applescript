@@ -16,9 +16,9 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.7.7-3
+-- Version: 2024.11.11-1
 
--- App Icon is “Satellite Antenna” from Twemoji (https://twemoji.twitter.com/) by Twitter (https://twitter.com)
+-- App Icon is “Satellite Antenna” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 use AppleScript version "2.7"
@@ -356,6 +356,11 @@ repeat
 						if (getWiFiNetworkColonOffset > 0) then
 							set connectedWiFiNetworkName to (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput)
 							exit repeat
+						else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
+							set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
+							if (connectedWiFiNetworkName is not equal to "") then
+								exit repeat
+							end if
 						end if
 					end try
 				end repeat
@@ -364,7 +369,7 @@ repeat
 					repeat with thisWiFiNetworkDeviceID in wiFiNetworkDeviceIDs
 						try
 							-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-							doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiNetworkDeviceID & " 'Free Geek'")
+							doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
 							exit repeat
 						end try
 					end repeat
@@ -377,6 +382,11 @@ repeat
 							if (getWiFiNetworkColonOffset > 0) then
 								set connectedWiFiNetworkName to (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput)
 								exit repeat
+							else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
+								set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
+								if (connectedWiFiNetworkName is not equal to "") then
+									exit repeat
+								end if
 							end if
 						end try
 					end repeat
@@ -690,50 +700,52 @@ Would you like to launch “Audio Test”?" buttons {"No", "Yes"} cancel button 
 end try
 
 on openTestSitesInSafari()
-	tell application id "com.apple.Safari"
-		try
-			activate
-		end try
-		close every window without saving
-	end tell
-	
-	tell application id "com.apple.systemevents" to keystroke "n" using {shift down, command down} -- Open New Private Window
-	
-	repeat 10 times
-		delay 1
+	try
 		tell application id "com.apple.Safari"
-			if ((count of windows) ≥ 1) then exit repeat -- Make sure New Private Window is Open
+			try
+				activate
+			end try
+			close every window without saving
 		end tell
-	end repeat
-	
-	tell application id "com.apple.systemevents" to keystroke tab -- Tab to take focus out of address field
-	
-	tell application id "com.apple.Safari"
-		if (application id "com.apple.Safari" is not running) then
-			open location "https://google.com"
-			try
-				activate
-			end try
-		else
-			try
-				activate
-			end try
-			try
-				set URL of front document to "https://google.com"
-			on error
+		
+		tell application id "com.apple.systemevents" to keystroke "n" using {shift down, command down} -- Open New Private Window
+		
+		repeat 10 times
+			delay 1
+			tell application id "com.apple.Safari"
+				if ((count of windows) ≥ 1) then exit repeat -- Make sure New Private Window is Open
+			end tell
+		end repeat
+		
+		tell application id "com.apple.systemevents" to keystroke tab -- Tab to take focus out of address field
+		
+		tell application id "com.apple.Safari"
+			if (application id "com.apple.Safari" is not running) then
 				open location "https://google.com"
+				try
+					activate
+				end try
+			else
+				try
+					activate
+				end try
+				try
+					set URL of front document to "https://google.com"
+				on error
+					open location "https://google.com"
+				end try
+			end if
+			try
+				activate
 			end try
-		end if
-		try
-			activate
-		end try
-		delay 2
-		open location "https://apple.com"
-		try
-			activate
-		end try
-		delay 3
-	end tell
+			delay 2
+			open location "https://apple.com"
+			try
+				activate
+			end try
+			delay 3
+		end tell
+	end try
 end openTestSitesInSafari
 
 on doShellScriptAsAdmin(command)

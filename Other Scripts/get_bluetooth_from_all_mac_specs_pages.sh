@@ -21,14 +21,14 @@
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
-declare -a all_mac_identification_pages=() # All Mac identification pages are listed on https://support.apple.com/HT213325 as well as in the "On the product or its packaging" section of https://support.apple.com/HT201581
-all_mac_identification_pages+=( 'HT201300' ) # MacBook Pro
-all_mac_identification_pages+=( 'HT201862' ) # MacBook Air
-all_mac_identification_pages+=( 'HT201608' ) # MacBook
-all_mac_identification_pages+=( 'HT201634' ) # iMac
-all_mac_identification_pages+=( 'HT201894' ) # Mac mini
-all_mac_identification_pages+=( 'HT213073' ) # Mac Studio
-all_mac_identification_pages+=( 'HT202888' ) # Mac Pro
+declare -a all_mac_identification_pages=() # All Mac identification pages are listed on https://support.apple.com/102604 as well as in the "Product or packaging" section of https://support.apple.com/102767
+all_mac_identification_pages+=( '108052' ) # MacBook Pro
+all_mac_identification_pages+=( '102869' ) # MacBook Air
+all_mac_identification_pages+=( '103257' ) # MacBook
+all_mac_identification_pages+=( '108054' ) # iMac
+all_mac_identification_pages+=( '102852' ) # Mac mini
+all_mac_identification_pages+=( '102231' ) # Mac Studio
+all_mac_identification_pages+=( '102887' ) # Mac Pro
 
 every_bluetooth_version=''
 
@@ -36,7 +36,7 @@ every_bluetooth_5dot3_model=''
 every_bluetooth_5_model=''
 every_bluetooth_4dot2_model=''
 every_bluetooth_4_model='Macmini5,3+' # Mid 2011 Mac mini Server (Macmini5,3) is not listed in the Specs pages.
-every_bluetooth_2dot1plusEDR_model=''
+every_bluetooth_2dot1plusEDR_model='MacBookPro4,1+MacBookPro5,1+'
 every_bluetooth_other_version_model=''
 every_error_model=''
 
@@ -48,10 +48,10 @@ for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
 		if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
 			echo " (${this_model_id_or_specs_url}):"
 			specs_page_source="$(curl -m 5 -sfL "${this_model_id_or_specs_url}")"
-			bluetooth_element_from_page="$(echo "${specs_page_source}" | xmllint --html --xpath '//li[contains(text(),"Bluetooth")]/text()' - 2> /dev/null)"
+			bluetooth_element_from_page="$(echo "${specs_page_source}" | xmllint --html --xpath '(//li[contains(text(),"Bluetooth") and contains(text(),".")]/text())[last()]' - 2> /dev/null)"
 
 			if [[ -z "${bluetooth_element_from_page}" ]]; then
-				bluetooth_element_from_page="$(echo "${specs_page_source}" | xmllint --html --xpath '//p[contains(text(),"Bluetooth")]/text()' - 2> /dev/null)"
+				bluetooth_element_from_page="$(echo "${specs_page_source}" | xmllint --html --xpath '(//p[contains(text(),"Bluetooth") and contains(text(),".")]/text())[last()]' - 2> /dev/null)"
 			fi
 
 			if [[ -z "${bluetooth_element_from_page}" ]]; then
@@ -93,11 +93,11 @@ for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
 
 				echo "Bluetooth ${bluetooth_version}"
 			fi
-		else
+		elif [[ "${this_model_id_or_specs_url}" == *','* ]]; then
 			this_model_identifier="${this_model_id_or_specs_url}"
-			echo -en "\n${this_model_identifier}"
+			echo -en "\n\n${this_model_identifier}"
 		fi
-	done < <(echo "${this_mac_idenification_page_source}" | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("<br>", "", $NF); print ""; print $NF } /Tech Specs:/ { print "https:" $4 }')
+	done < <(echo "${this_mac_idenification_page_source}" | sed s'/<\/p><p/<\/p>\n<p/g' | awk -F ':|"' '/Model Identifier:/ { gsub("&nbsp;", " ", $NF); gsub(", ", "+", $NF); gsub("; ", "+", $NF); gsub(" ", "", $NF); gsub("</b>", "", $NF); gsub("</p>", "", $NF); print ""; print $NF } /Tech Specs/ { for (f = 1; f <= NF; f ++) { if (($f ~ /support.apple.com/) && !($f ~ /\/specs$/)) { print "https:" $f; break } else if (($f ~ /^\//) && !($f ~ /\./)) { print "https://support.apple.com" $f; break } } }')
 	# echo "${this_mac_idenification_page_source}" | xmllint --html --xpath '//a[contains(@href,"/kb/SP")]/@href' - 2> /dev/null | tr '"' '\n' | grep '/kb/SP' | sort -ur
 done
 
@@ -134,7 +134,7 @@ echo "\"${every_error_model//$'\n'/", "}\""
 
 echo ''
 
-# Example output from 2/1/23:
+# Example output from 5/15/25:
 
 # Every Bluetooth Verison
 # 5.3
@@ -144,10 +144,10 @@ echo ''
 # 2.1 + EDR
 
 # Bluetooth 5.3
-# "Mac14,3", "Mac14,5", "Mac14,6", "Mac14,9", "Mac14,10", "Mac14,12"
+# "Mac14,2", "Mac14,3", "Mac14,5", "Mac14,6", "Mac14,8", "Mac14,9", "Mac14,10", "Mac14,12", "Mac14,13", "Mac14,14", "Mac14,15", "Mac15,3", "Mac15,4", "Mac15,5", "Mac15,6", "Mac15,7", "Mac15,8", "Mac15,9", "Mac15,10", "Mac15,11", "Mac15,12", "Mac15,13", "Mac15,14", "Mac16,1", "Mac16,2", "Mac16,3", "Mac16,5", "Mac16,6", "Mac16,7", "Mac16,8", "Mac16,9", "Mac16,10", "Mac16,11", "Mac16,12", "Mac16,13"
 
 # Bluetooth 5.0
-# "Mac13,1", "Mac13,2", "Mac14,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"
+# "Mac13,1", "Mac13,2", "Mac14,7", "MacBookAir9,1", "MacBookAir10,1", "MacBookPro15,1", "MacBookPro15,2", "MacBookPro15,3", "MacBookPro15,4", "MacBookPro16,1", "MacBookPro16,2", "MacBookPro16,3", "MacBookPro16,4", "MacBookPro17,1", "MacBookPro18,1", "MacBookPro18,2", "MacBookPro18,3", "MacBookPro18,4", "MacPro7,1", "Macmini8,1", "Macmini9,1", "iMac20,1", "iMac20,2", "iMac21,1", "iMac21,2", "iMacPro1,1"
 
 # Bluetooth 4.2
 # "MacBook10,1", "MacBookAir8,1", "MacBookAir8,2", "MacBookPro11,4", "MacBookPro11,5", "MacBookPro13,1", "MacBookPro13,2", "MacBookPro13,3", "MacBookPro14,1", "MacBookPro14,2", "MacBookPro14,3", "iMac18,1", "iMac18,2", "iMac18,3", "iMac19,1", "iMac19,2"

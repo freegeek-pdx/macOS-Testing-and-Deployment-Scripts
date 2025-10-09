@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2024.11.11-1
+-- Version: 2025.9.25-1
 
 -- App Icon is “Satellite Antenna” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -145,6 +145,7 @@ end if
 set systemVersion to (system version of (system info))
 considering numeric strings
 	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
+	set is15dot6OrNewer to (systemVersion ≥ "15.6")
 end considering
 
 
@@ -305,13 +306,13 @@ repeat
 				repeat
 					repeat with thisWiFiNetworkDeviceID in wiFiNetworkDeviceIDs
 						try
-							set wiFiIsOff to ((do shell script "networksetup -getairportpower " & thisWiFiNetworkDeviceID) ends with "): Off")
+							set wiFiIsOff to ((do shell script "networksetup -getairportpower " & (quoted form of thisWiFiNetworkDeviceID)) ends with "): Off")
 						end try
 						
 						if (wiFiIsOff) then
 							try
-								do shell script "networksetup -setairportpower " & thisWiFiNetworkDeviceID & " on"
-								set wiFiIsOff to ((do shell script "networksetup -getairportpower " & thisWiFiNetworkDeviceID) ends with "): Off")
+								do shell script "networksetup -setairportpower " & (quoted form of thisWiFiNetworkDeviceID) & " on"
+								set wiFiIsOff to ((do shell script "networksetup -getairportpower " & (quoted form of thisWiFiNetworkDeviceID)) ends with "): Off")
 							end try
 						end if
 						
@@ -351,15 +352,37 @@ repeat
 				
 				repeat with thisWiFiNetworkDeviceID in wiFiNetworkDeviceIDs
 					try
-						set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & thisWiFiNetworkDeviceID)
+						set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & (quoted form of thisWiFiNetworkDeviceID))
 						set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 						if (getWiFiNetworkColonOffset > 0) then
 							set connectedWiFiNetworkName to (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput)
 							exit repeat
-						else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
-							set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
-							if (connectedWiFiNetworkName is not equal to "") then
-								exit repeat
+						else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then
+							-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
+							-- So, fallback to using "ipconfig getsummary" instead.
+							
+							if (is15dot6OrNewer) then
+								-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
+								-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
+								
+								try
+									tell me to doShellScriptAsAdmin("ipconfig setverbose 1")
+								end try
+							end if
+							
+							try
+								set connectedWiFiNetworkName to (do shell script "ipconfig getsummary " & (quoted form of thisWiFiNetworkDeviceID) & " | awk -F ' SSID : ' '/ SSID : / { print $2; exit }'")
+								if ((connectedWiFiNetworkName is not equal to "") and (connectedWiFiNetworkName is not equal to "<redacted>")) then -- Should never be "<redacted>", but still check just in case.
+									exit repeat
+								end if
+							end try
+							
+							if (is15dot6OrNewer) then
+								-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
+								
+								try
+									tell me to doShellScriptAsAdmin("ipconfig setverbose 0")
+								end try
 							end if
 						end if
 					end try
@@ -369,7 +392,7 @@ repeat
 					repeat with thisWiFiNetworkDeviceID in wiFiNetworkDeviceIDs
 						try
 							-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-							doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
+							doShellScriptAsAdmin("networksetup -setairportnetwork " & (quoted form of thisWiFiNetworkDeviceID) & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
 							exit repeat
 						end try
 					end repeat
@@ -377,15 +400,37 @@ repeat
 					set AppleScript's text item delimiters to ": "
 					repeat with thisWiFiNetworkDeviceID in wiFiNetworkDeviceIDs
 						try
-							set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & thisWiFiNetworkDeviceID)
+							set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & (quoted form of thisWiFiNetworkDeviceID))
 							set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 							if (getWiFiNetworkColonOffset > 0) then
 								set connectedWiFiNetworkName to (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput)
 								exit repeat
-							else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
-								set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
-								if (connectedWiFiNetworkName is not equal to "") then
-									exit repeat
+							else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then
+								-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
+								-- So, fallback to using "ipconfig getsummary" instead.
+								
+								if (is15dot6OrNewer) then
+									-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
+									-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
+									
+									try
+										tell me to doShellScriptAsAdmin("ipconfig setverbose 1")
+									end try
+								end if
+								
+								try
+									set connectedWiFiNetworkName to (do shell script "ipconfig getsummary " & (quoted form of thisWiFiNetworkDeviceID) & " | awk -F ' SSID : ' '/ SSID : / { print $2; exit }'")
+									if ((connectedWiFiNetworkName is not equal to "") and (connectedWiFiNetworkName is not equal to "<redacted>")) then -- Should never be "<redacted>", but still check just in case.
+										exit repeat
+									end if
+								end try
+								
+								if (is15dot6OrNewer) then
+									-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
+									
+									try
+										tell me to doShellScriptAsAdmin("ipconfig setverbose 0")
+									end try
 								end if
 							end if
 						end try
@@ -396,7 +441,7 @@ repeat
 						repeat 5 times
 							repeat with thisWiFiNetworkDeviceID in wiFiNetworkDeviceIDs
 								try
-									if ((do shell script "ipconfig getifaddr " & thisWiFiNetworkDeviceID) is equal to "") then
+									if ((do shell script "ipconfig getifaddr " & (quoted form of thisWiFiNetworkDeviceID)) is equal to "") then
 										delay 2 -- Wait for Wi-Fi to connect
 									else
 										set gotWiFiIP to true
@@ -414,10 +459,10 @@ repeat
 					repeat 5 times
 						repeat with thisWiFiNetworkDeviceID in wiFiNetworkDeviceIDs
 							try
-								set connectedToAppleViaWiFi to ((do shell script "ping -b " & thisWiFiNetworkDeviceID & " -t 2 -c 1 www.apple.com") contains "1 packets transmitted, 1 ")
+								set connectedToAppleViaWiFi to ((do shell script "ping -b " & (quoted form of thisWiFiNetworkDeviceID) & " -t 2 -c 1 www.apple.com") contains "1 packets transmitted, 1 ")
 							end try
 							try
-								set connectedToGoogleViaWiFi to ((do shell script "ping -b " & thisWiFiNetworkDeviceID & " -t 2 -c 1 www.google.com") contains "1 packets transmitted, 1 ")
+								set connectedToGoogleViaWiFi to ((do shell script "ping -b " & (quoted form of thisWiFiNetworkDeviceID) & " -t 2 -c 1 www.google.com") contains "1 packets transmitted, 1 ")
 							end try
 							if (connectedToAppleViaWiFi or connectedToGoogleViaWiFi) then
 								set wiFiTestPassed to true

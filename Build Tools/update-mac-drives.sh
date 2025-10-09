@@ -35,17 +35,29 @@ echo -e "\nUSB Device Tree:\n$(system_profiler SPUSBDataType)"
 external_disk_list="$(diskutil list external physical)"
 external_disk_count="$(echo "${external_disk_list}" | grep -c '^/dev/disk')"
 
+if [[ -z "${external_disk_count}" || "${external_disk_count}" == '0' ]]; then
+	>&2 echo 'ERROR: No Mac drives detected.'
+	afplay /System/Library/Sounds/Basso.aiff
+	exit 1
+fi
+
 echo -e "\n${external_disk_count} Connected External Drives:\n$(diskutil list external physical)"
 
 echo -en "\nDo any of the ${external_disk_count} Mac drives need to be formatted before being updated? [y/N] "
 read -r confirm_format_drives
 if [[ "${confirm_format_drives}" =~ ^[Yy] ]]; then
-	echo -en '\nEnter space-separated Disk IDs to Format and Partition for fgMIB + macOS Installers + Mac Test Boot: '
+	echo -en '\nEnter space-separated Disk IDs (or "ALL") to Format and Partition for fgMIB + macOS Installers + Mac Test Boot: '
 	read -r disk_ids
 
 	# Suppress ShellCheck warning to use double quotes to prevent word splitting, because intentionally WANT word splitting on spaces.
 	# shellcheck disable=SC2086
 	disk_ids="$(printf '%s\n' $disk_ids | tr '[:upper:]' '[:lower:]' | sort -un)"
+
+	if [[ " ${disk_ids} " == *' all '* ]]; then
+		disk_ids="$(echo "${external_disk_list}" | awk -F '/| ' '/^\/dev\/disk/ { print $3 }')"
+		echo -e "ALL listed Mac drives specified:\n${disk_ids}"
+	fi
+
 	for this_disk_id in $disk_ids; do
 		if [[ "${this_disk_id}" != 'disk'* ]]; then
 			this_disk_id="disk${this_disk_id}"
@@ -66,17 +78,21 @@ if [[ "${confirm_format_drives}" =~ ^[Yy] ]]; then
 			echo -e "\nNOTICE: Skipping non-USB drive \"${this_disk_id}\"."
 		else
 			echo -e "\nFormatting \"${this_disk_id}\"..."
-			# NOTE: For some reason (at least as of macOS 12.6.1 Monterey) each desired size need 0.13G added to it to result in the correct desired size. The sizes (plus 0.13G) being used for each installer are specified in the "Create macOS USB Installer Commands.txt" based on testing to find the minimum required size for each macOS version installer.
+
+			# NOTE: For some reason (at least as of macOS 26.0.1 Tahoe) each desired size need 0.13 GB added to it to result in the correct desired size.
+			# The sizes (plus 0.13 GB) being used for each installer are specified in the "Create macOS USB Installer Commands.txt" file based on testing to find the minimum required size for each macOS version installer.
+
 			diskutil_partition_disk_array=(
-				JHFS+ 'fgMIB'						2.13G
-				JHFS+ 'Install macOS Catalina'		8.53G
-				JHFS+ 'Install macOS Big Sur'		13.73G
-				JHFS+ 'Install macOS Monterey'		14.83G
-				JHFS+ 'Install macOS Ventura'		14.63G
-				JHFS+ 'Install macOS Sonoma'		16.03G
-				JHFS+ 'Install macOS Sequoia'		18.03G
-				JHFS+ 'Mac Test Boot'				0B
-			) # JHFS+ 'Install macOS Tahoe Beta'	20.13G
+				JHFS+ 'fgMIB'						1.33G		# 1.2 GB
+				JHFS+ 'Install macOS Catalina'		8.46G		# 8.33 GB
+				JHFS+ 'Install macOS Big Sur'		13.665G		# 13.535 GB
+				JHFS+ 'Install macOS Monterey'		14.735G		# 14.605 GB
+				JHFS+ 'Install macOS Ventura'		14.53G		# 14.4 GB
+				JHFS+ 'Install macOS Sonoma'		15.985G		# 15.855 GB
+				JHFS+ 'Install macOS Sequoia'		17.995G		# 17.865 GB
+				JHFS+ 'Install macOS Tahoe'			19.285G		# 19.155 GB
+				JHFS+ 'Mac Test Boot'				0B			# All Remaining Space
+			)
 
 			if ! diskutil partitionDisk "${this_disk_id}" "$(( ${#diskutil_partition_disk_array[@]} / 3 ))" GPT "${diskutil_partition_disk_array[@]}"; then
 				echo "ERROR: Formatting ${this_disk_id} failed (see error above)."
@@ -135,7 +151,7 @@ human_readable_duration_from_seconds() { # Based On: https://stackoverflow.com/a
 
 overall_start_timestamp="$(date '+%s')"
 
-declare -a installer_names_to_update=( 'Catalina' 'Big Sur' 'Monterey' 'Ventura' 'Sonoma' 'Sequoia' ) # 'Tahoe Beta'
+declare -a installer_names_to_update=( 'Catalina' 'Big Sur' 'Monterey' 'Ventura' 'Sonoma' 'Sequoia' 'Tahoe' )
 
 for this_installer_name_to_update in "${installer_names_to_update[@]}"; do
 	this_installer_start_timestamp="$(date '+%s')"

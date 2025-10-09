@@ -508,9 +508,8 @@ while IFS='' read -rd '' this_app_path; do
 						;;
 					'coconutBattery')
 						app_verification_args=( 'notarized' 'R5SC3K86L5' ) # Team ID of "Christoph Sinai"
-						coconutbattery_appcast_xml="$(curl -m 5 -sfL 'https://coconut-flavour.com/updates/coconutBattery.xml')"
-						download_url="$(echo "${coconutbattery_appcast_xml}" | xmllint --xpath 'string(//enclosure/@url)' -)"
-						latest_version="$(echo "${coconutbattery_appcast_xml}" | xmllint --xpath 'string(//*[name()="sparkle:shortVersionString"])' -)"
+						latest_version='3.9.18' # coconutBattery version 3.9.18 is the last version to support macOS 10.14 Mojave.
+						download_url='https://www.coconut-flavour.com/downloads/coconutBattery_3918.zip'
 						;;
 					'coconutID')
 						app_verification_args=( 'DO-NOT-VERIFY' )
@@ -605,7 +604,7 @@ while IFS='' read -rd '' this_app_path; do
 					else
 						echo "Downloading ${this_app_name} ${latest_version} from \"${download_url}\"..."
 
-						download_tmp_path="${TMPDIR}${this_app_name} ${app_version}.zip"
+						download_tmp_path="${TMPDIR}${this_app_name} ${latest_version}.zip"
 						rm -rf "${download_tmp_path}"
 
 						if curl --connect-timeout 5 --progress-bar -fL "${download_url}" -o "${download_tmp_path}" && [[ -f "${download_tmp_path}" ]]; then
@@ -756,14 +755,29 @@ rm -rf "${mtb_source_path}/usr/local/bin/" \
 
 find "${mtb_source_path}" -name '.DS_Store' -type f -print -delete 2> /dev/null
 
-echo -e "\n\nSetting Free Geek Volume Icon (for Device ID ${mtb_source_device_id})..."
-cp -f "${PROJECT_DIR}/Build Tools/MTB-VolumeIcon/MTB-VolumeIcon.icns" "${mtb_source_path}/.VolumeIcon.icns"
+desktop_picture_path="${PROJECT_DIR}/Testing Scripts/Test Boot Setup/Source/Test Boot Desktop Picture/MacTestBoot-DesktopPicture.png"
+if [[ -f "${desktop_picture_path}" ]]; then
+	echo -e "\n\nSetting Free Geek Mac Test Boot Desktop Picture (for Device ID ${mtb_source_device_id})..."
+	cp -f "${desktop_picture_path}" "${mtb_source_path}/Users/Staff/Public/Mac Test Boot Desktop Picture.png"
+fi
+
+user_picture_path="${PROJECT_DIR}/fgMIB Resources/Prepare OS Package/Package Resources/Global/Users/Free Geek User Picture.png"
+if [[ -f "${user_picture_path}" ]]; then
+	echo -e "\n\nSetting Free Geek User Picture (for Device ID ${mtb_source_device_id})..."
+	cp -f "${user_picture_path}" "${mtb_source_path}/Users/Staff/Public/Free Geek User Picture.png"
+fi
+
+volume_icon_path="${PROJECT_DIR}/Build Tools/MTB-VolumeIcon/MTB-VolumeIcon.icns"
+if [[ -f "${volume_icon_path}" ]]; then
+	echo -e "\n\nSetting Free Geek Volume Icon (for Device ID ${mtb_source_device_id})..."
+	cp -f "${volume_icon_path}" "${mtb_source_path}/.VolumeIcon.icns"
+fi
 
 echo -e "\n\nCreating MTB Disk Image (of Device ID ${mtb_source_device_id})..."
 date '+%Y%m%d' > "${mtb_source_path}/private/var/root/.mtbVersion"
 diskutil unmountDisk "${mtb_source_device_id}" || diskutil unmountDisk force "${mtb_source_device_id}"
 
-mtb_dmg_path="${PROJECT_DIR}/../../MacLand Images"
+mtb_dmg_path="$(realpath "${PROJECT_DIR}/../../MacLand Images")"
 if [[ ! -d "${mtb_dmg_path}" ]]; then
 	mkdir -p "${mtb_dmg_path}"
 fi

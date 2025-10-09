@@ -16,13 +16,15 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.8.28-1
+-- Version: 2025.9.25-1
 
 -- App Icon is “Broom” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
+
 use AppleScript version "2.7"
 use scripting additions
+use framework "AppKit"
 
 repeat -- dialogs timeout when screen is asleep or locked (just in case)
 	set isAwake to true
@@ -146,6 +148,8 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		set isCatalinaOrNewer to (systemVersion ≥ "10.15")
 		set isBigSurOrNewer to (systemVersion ≥ "11.0")
 		set isMontereyOrNewer to (systemVersion ≥ "12.0")
+		set is15dot6OrNewer to (systemVersion ≥ "15.6")
+		set isTahoeOrNewer to (systemVersion ≥ "16.0")
 	end considering
 	
 	set buildInfoPath to ((POSIX path of (path to shared documents folder)) & "Build Info/")
@@ -382,6 +386,50 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 		end if
 	end try
 	
+	if (isTahoeOrNewer) then
+		-- There is a bug in macOS 26 Tahoe where setting indeterminate progress at launch just displays 0 progress, EVEN IF manually running startAnimation on the NSProgressIndicator directly.
+		-- To workaround this, first set determinate progress, then delay 0.01s to make sure the UI updates (without a delay the progress bar occasionally still doesn't animate), then set indeterminate progress, and THEN STILL startAnimation on the NSProgressIndicator directly.
+		
+		set progress total steps to 1
+	else
+		set progress total steps to -1
+	end if
+	
+	set progress completed steps to 0
+	set progress description to "
+🔄	Cleaning Up After QA Complete"
+	set progress additional description to ""
+	
+	set progressWindowProgressBar to missing value
+	
+	try
+		repeat with thisWindow in (current application's NSApp's |windows|())
+			if (thisWindow's isVisible() is true) then
+				if (((thisWindow's title()) as text) is equal to (name of me)) then
+					repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
+						if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
+							set progressWindowProgressBar to thisProgressWindowSubView
+						else if (((thisProgressWindowSubView's className()) as text) is equal to "NSButton" and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
+							(thisProgressWindowSubView's setEnabled:false)
+						end if
+					end repeat
+				end if
+			end if
+		end repeat
+	end try
+	
+	if (isTahoeOrNewer) then -- See comments above about macOS 26 Tahoe bug when setting indeterminate progress at launch.
+		delay 0.01
+		
+		set progress total steps to -1
+		
+		try
+			if (progressWindowProgressBar is not equal to missing value) then
+				(progressWindowProgressBar's startAnimation:(missing value))
+			end if
+		end try
+	end if
+	
 	try -- Don't check Remote Management if "TESTING" flag folder exists on desktop
 		((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
 	on error
@@ -393,11 +441,19 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 		if (serialNumber is not equal to "") then
 			try
 				repeat
+					set progress description to "
+🔒	Checking for Remote Management"
+					delay 0.5
+					
 					repeat
 						try
 							do shell script "ping -t 5 -c 1 www.apple.com" -- Require that internet is connected DEP status to get checked.
 							exit repeat
 						on error
+							set progress description to "
+❌	UNABLE to Check for Remote Management"
+							delay 0.5
+							
 							try
 								display dialog "You must be connected to the internet to be able to check for Remote Management.
 
@@ -417,11 +473,6 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 							end try
 						end try
 					end repeat
-					
-					set progress total steps to -1
-					set progress description to "
-🔒	Checking for Remote Management"
-					delay 0.5
 					
 					set checkRemoteManagedMacsLogCommand to ("curl --connect-timeout 5 -sfL " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED CHECK REMOTE MANAGED MACS LOG URL]") & " --data-urlencode " & (quoted form of ("serial=" & serialNumber)))
 					set remoteManagedMacIsAlreadyLogged to false
@@ -729,10 +780,9 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 		end if
 	end try
 	
-	set progress total steps to -1
 	set progress description to "
 🔄	Cleaning Up After QA Complete"
-	set progress additional description to ""
+	delay 0.5
 	
 	-- QUIT ALL APPS
 	try -- Don't quit apps if "TESTING" flag folder exists on desktop
@@ -862,10 +912,10 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 	
 	-- MUTE VOLUME WHILE TRASH IS EMPTIED
 	try
-		set volume output volume 0 with output muted
+		tell current application to set volume output volume 0 with output muted -- Must "tell current application to set volume" when using AppKit framework to avoid a bug.
 	end try
 	try
-		set volume alert volume 0
+		tell current application to set volume alert volume 0
 	end try
 	
 	-- EMPTY THE TRASH (in case it's full)
@@ -873,7 +923,11 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 		tell application id "com.apple.finder"
 			set warns before emptying of trash to false
 			try
-				empty the trash
+				with timeout of 1 second -- On macOS 26 Tahoe, attempting to empty the trash when it is empty hangs, so only attempt to empty if full (and also give it a short timeout just in case).
+					if ((count of items of trash) is greater than 0) then
+						empty the trash
+					end if
+				end timeout
 			end try
 			set warns before emptying of trash to true
 		end tell
@@ -881,10 +935,10 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 	
 	-- RESET DEFAULT VOLUME
 	try
-		set volume output volume 50 without output muted
+		tell current application to set volume output volume 50 without output muted -- Must "tell current application to set volume" when using AppKit framework to avoid a bug.
 	end try
 	try
-		set volume alert volume 100
+		tell current application to set volume alert volume 100
 	end try
 	
 	-- RENAME HARD DRIVE
@@ -907,45 +961,72 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 				if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
 					set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as text)
 					try
-						set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & thisWiFiInterfaceID)))
+						set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & (quoted form of thisWiFiInterfaceID))))
+						
 						try
-							set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & thisWiFiInterfaceID)
+							set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & (quoted form of thisWiFiInterfaceID))
 							set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 							if (getWiFiNetworkColonOffset > 0) then
 								set (end of preferredWirelessNetworks) to (tab & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
-							else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
-								set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
-								if (connectedWiFiNetworkName is not equal to "") then
-									set (end of preferredWirelessNetworks) to (tab & connectedWiFiNetworkName)
+							else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then
+								-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
+								-- So, fallback to using "ipconfig getsummary" instead.
+								
+								if (is15dot6OrNewer) then
+									-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
+									-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
+									
+									try
+										tell me to doShellScriptAsAdmin("ipconfig setverbose 1")
+									end try
+								end if
+								
+								try
+									set connectedWiFiNetworkName to (do shell script "ipconfig getsummary " & (quoted form of thisWiFiInterfaceID) & " | awk -F ' SSID : ' '/ SSID : / { print $2; exit }'")
+									if ((connectedWiFiNetworkName is not equal to "") and (connectedWiFiNetworkName is not equal to "<redacted>")) then -- Should never be "<redacted>", but still check just in case.
+										set (end of preferredWirelessNetworks) to (tab & connectedWiFiNetworkName)
+									end if
+								end try
+								
+								if (is15dot6OrNewer) then
+									-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
+									
+									try
+										tell me to doShellScriptAsAdmin("ipconfig setverbose 0")
+									end try
 								end if
 							end if
 						end try
+						
 						repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
 							if (thisPreferredWirelessNetwork starts with tab) then
 								set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 								if ((thisPreferredWirelessNetwork is not equal to "FG Staff") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
 									try
-										do shell script "networksetup -setairportpower " & thisWiFiInterfaceID & " off"
+										do shell script ("networksetup -setairportpower " & (quoted form of thisWiFiInterfaceID) & " off")
 									end try
 									try
-										tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
+										tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & (quoted form of thisWiFiInterfaceID) & " " & (quoted form of thisPreferredWirelessNetwork))
 									end try
 									set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 								end if
 							end if
 						end repeat
 					end try
+					
 					try
-						do shell script "networksetup -setairportpower " & thisWiFiInterfaceID & " on"
+						do shell script ("networksetup -setairportpower " & (quoted form of thisWiFiInterfaceID) & " on")
 					end try
+					
 					try
 						-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-						tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
+						tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & (quoted form of thisWiFiInterfaceID) & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]") & " > /dev/null 2>&1 &")
 					end try
 				end if
 			end repeat
 		end tell
 	end try
+	
 	-- "networksetup -removepreferredwirelessnetwork" does not remove the saved passwords from the Keychain, so do that too.
 	repeat with thisWirelessNetworkPasswordsToDelete in wirelessNetworkPasswordsToDelete
 		try -- Run without Admin to delete from Login keychain
@@ -955,6 +1036,7 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 			doShellScriptAsAdmin("security delete-generic-password -s 'AirPort' -l " & (quoted form of thisWirelessNetworkPasswordsToDelete))
 		end try
 	end repeat
+	
 	try
 		doShellScriptAsAdmin("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport prefs RememberRecentNetworks=NO")
 	end try
@@ -975,7 +1057,6 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 	
 	set progress description to "
 ✅	Finished Cleaning Up After QA Complete"
-	
 	delay 0.5
 	
 	try
@@ -1009,7 +1090,7 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 	
 	set shutDownAfterCleanup to false
 	set rebootAfterCleanup to false
-	set launchDemoHelperAfterCleanup to true
+	set launchDemoHelperAfterCleanup to false
 	
 	try
 		activate

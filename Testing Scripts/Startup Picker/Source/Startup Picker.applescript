@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.8.20-1
+-- Version: 2025.10.3-1
 
 -- App Icon is “Green Apple” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -337,8 +337,7 @@ do shell script "rm -f " & (quoted form of modelInfoPath)
 
 set supportedOS to "OS X 10.11 El Capitan"
 if (supportsTahoe) then
-	set supportedOS to "macOS 15 Sequoia
-✅ WILL SUPPORT macOS 26 Tahoe"
+	set supportedOS to "macOS 26 Tahoe"
 else if (supportsSequoia) then
 	set supportedOS to "macOS 15 Sequoia"
 else if (supportsSonoma) then

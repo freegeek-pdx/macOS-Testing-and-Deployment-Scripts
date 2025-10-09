@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2024.11.11-1
+-- Version: 2025.9.11-1
 
 -- App Icon is “Counterclockwise Arrows” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -107,6 +107,7 @@ end try
 set systemVersion to (system version of (system info))
 considering numeric strings
 	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
+	set isTahoeOrNewer to (systemVersion ≥ "16.0")
 end considering
 
 
@@ -150,7 +151,15 @@ if (appVersion is not equal to "UNKNOWN") then
 	try
 		activate
 	end try
-	set progress total steps to -1
+	if (isTahoeOrNewer) then
+		-- There is a bug in macOS 26 Tahoe where setting indeterminate progress at launch just displays 0 progress, EVEN IF manually running startAnimation on the NSProgressIndicator directly.
+		-- To workaround this, first set determinate progress, then delay 0.01s to make sure the UI updates (without a delay the progress bar occasionally still doesn't animate), then set indeterminate progress, and THEN STILL startAnimation on the NSProgressIndicator directly.
+		
+		set progress total steps to 1
+	else
+		set progress total steps to -1
+	end if
+	
 	set progress completed steps to 0
 	set progress description to "🔄	" & (name of me) & " is " & taskName & "…"
 	set progress additional description to "
@@ -161,17 +170,29 @@ if (appVersion is not equal to "UNKNOWN") then
 			if (thisWindow's isVisible() is true) then
 				if (((thisWindow's title()) as text) is equal to (name of me)) then
 					repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-						if (((thisProgressWindowSubView's className()) as text) is equal to "NSButton" and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
+						if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
+							set progressWindowProgressBar to thisProgressWindowSubView
+						else if (((thisProgressWindowSubView's className()) as text) is equal to "NSButton" and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
 							(thisProgressWindowSubView's setTitle:"Skip")
 							(thisProgressWindowSubView's setEnabled:false)
-							
-							exit repeat
 						end if
 					end repeat
 				end if
 			end if
 		end repeat
 	end try
+	
+	if (isTahoeOrNewer) then -- See comments above about macOS 26 Tahoe bug when setting indeterminate progress at launch.
+		delay 0.01
+		
+		set progress total steps to -1
+		
+		try
+			if (progressWindowProgressBar is not equal to missing value) then
+				(progressWindowProgressBar's startAnimation:(missing value))
+			end if
+		end try
+	end if
 	
 	delay 0.5
 	

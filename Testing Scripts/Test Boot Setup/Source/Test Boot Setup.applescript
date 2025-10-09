@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.8.28-1
+-- Version: 2025.10.2-2
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -134,6 +134,7 @@ if ((currentUsername is equal to "Tester") and ((POSIX path of (path to me)) is 
 		set isMojaveOrNewer to (systemVersion ≥ "10.14")
 		set isCatalinaOrNewer to (systemVersion ≥ "10.15")
 		set isBigSurOrNewer to (systemVersion ≥ "11.0")
+		set is15dot6OrNewer to (systemVersion ≥ "15.6")
 	end considering
 	
 	if (isMojaveOrNewer) then
@@ -265,14 +266,14 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			-- The MTB version is NOT stored in a user accessable location so that it cannot be super easily manually edited.
 			set currentMTBversion to doShellScriptAsAdmin("cat '/private/var/root/.mtbVersion'") -- If the file doesn't exist, it's older than 20220726 which was the first version to include this file (version 20220705 stored the file at "/Users/Shared/.mtbVersion" and no MTB version file existed before that).
 			
-			set validMTBversions to {"20250820"}
+			set validMTBversions to {"20251001", "20251002"}
 			if (validMTBversions does not contain currentMTBversion) then error "OUTDATED"
 		on error
 			set serialNumber to ""
 			try
 				set serialNumber to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:IOPlatformSerialNumber' /dev/stdin <<< \"$(ioreg -arc IOPlatformExpertDevice -k IOPlatformSerialNumber -d 1)\"")))
 			end try
-			if ((startupDiskCapacity > 3.3E+10) or (serialNumber is not equal to "C02R49Y5G8WP")) then -- Never delete anything on Source drive no matter what.
+			if ((startupDiskCapacity > 3.3E+10) or (serialNumber is not equal to "C07WV2F8G1J2")) then -- Never delete anything on Source drive no matter what.
 				try
 					doShellScriptAsAdmin("
 rm -rf '/Applications/AmorphousDiskMark.app' '/Applications/Audio Test.app' '/Applications/Blackmagic Disk Speed Test.app' '/Applications/Breakaway.app' '/Applications/Camera Test.app' '/Applications/coconutBattery.app' '/Applications/coconutID.app' '/Applications/CPU Stress Test.app' '/Applications/CPUTest.app' '/Applications/DriveDx.app' '/Applications/FingerMgmt.app' '/Applications/Firmware Checker.app' '/Applications/Free Geek Updater.app' '/Applications/Geekbench 5.app' '/Applications/GPU Stress Test.app' '/Applications/GpuTest_OSX_x64_0.7.0' '/Applications/GpuTest_OSX_x64' '/Applications/Internet Test.app' '/Applications/Keyboard Test.app' '/Applications/KeyboardCleanTool.app' '/Applications/Mac Scope.app' '/Applications/Mactracker.app' '/Applications/Microphone Test.app' '/Applications/PiXel Check.app' '/Applications/Restore OS.app' '/Applications/Screen Test.app' '/Applications/SilentKnight.app' '/Applications/Startup Picker.app' '/Applications/Test CD.app' '/Applications/Test DVD.app' '/Applications/Trackpad Test.app' '/Applications/XRG.app' '/Users/Tester/Applications' '/Users/Shared/OS Updates' '/Users/Shared/Restore OS Images'
@@ -462,7 +463,7 @@ echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to
 		do shell script "rm -f " & (quoted form of hardwareInfoPath)
 	end try
 	
-	if ((startupDiskCapacity ≤ 3.3E+10) and (serialNumber is equal to "C02R49Y5G8WP")) then
+	if ((startupDiskCapacity ≤ 3.3E+10) and (serialNumber is equal to "C07WV2F8G1J2")) then
 		set serialNumber to "Source" -- Don't include any computer serial number for the source drive.
 		
 		-- Run EFIcheck if on source drive to keep the AllowList up-to-date.
@@ -806,40 +807,66 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 					if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
 						set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as text)
 						try
-							set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & thisWiFiInterfaceID)))
+							set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & (quoted form of thisWiFiInterfaceID))))
+							
 							try
-								set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & thisWiFiInterfaceID)
+								set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & (quoted form of thisWiFiInterfaceID))
 								set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 								if (getWiFiNetworkColonOffset > 0) then
 									set (end of preferredWirelessNetworks) to (tab & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
-								else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
-									set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
-									if (connectedWiFiNetworkName is not equal to "") then
-										set (end of preferredWirelessNetworks) to (tab & connectedWiFiNetworkName)
+								else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then
+									-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
+									-- So, fallback to using "ipconfig getsummary" instead.
+									
+									if (is15dot6OrNewer) then
+										-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
+										-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
+										
+										try
+											tell me to doShellScriptAsAdmin("ipconfig setverbose 1")
+										end try
+									end if
+									
+									try
+										set connectedWiFiNetworkName to (do shell script "ipconfig getsummary " & (quoted form of thisWiFiInterfaceID) & " | awk -F ' SSID : ' '/ SSID : / { print $2; exit }'")
+										if ((connectedWiFiNetworkName is not equal to "") and (connectedWiFiNetworkName is not equal to "<redacted>")) then -- Should never be "<redacted>", but still check just in case.
+											set (end of preferredWirelessNetworks) to (tab & connectedWiFiNetworkName)
+										end if
+									end try
+									
+									if (is15dot6OrNewer) then
+										-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
+										
+										try
+											tell me to doShellScriptAsAdmin("ipconfig setverbose 0")
+										end try
 									end if
 								end if
 							end try
+							
 							repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
 								if (thisPreferredWirelessNetwork starts with tab) then
 									set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 									if ((thisPreferredWirelessNetwork is not equal to "FG Staff") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
 										try
-											do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
+											do shell script ("networksetup -setairportpower " & (quoted form of thisWiFiInterfaceID) & " off")
 										end try
 										try
-											tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
+											tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & (quoted form of thisWiFiInterfaceID) & " " & (quoted form of thisPreferredWirelessNetwork))
 										end try
 										set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 									end if
 								end if
 							end repeat
 						end try
+						
 						try
-							do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " on")
+							do shell script ("networksetup -setairportpower " & (quoted form of thisWiFiInterfaceID) & " on")
 						end try
+						
 						try
 							-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-							tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
+							tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & (quoted form of thisWiFiInterfaceID) & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]") & " > /dev/null 2>&1 &")
 						end try
 					end if
 				end repeat
@@ -913,7 +940,11 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 		tell application id "com.apple.finder"
 			set warns before emptying of trash to false
 			try
-				empty the trash
+				with timeout of 1 second -- On macOS 26 Tahoe, attempting to empty the trash when it is empty hangs, so only attempt to empty if full (and also give it a short timeout just in case).
+					if ((count of items of trash) is greater than 0) then
+						empty the trash
+					end if
+				end timeout
 			end try
 			set warns before emptying of trash to true
 		end tell

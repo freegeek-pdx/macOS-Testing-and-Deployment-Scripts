@@ -2,22 +2,25 @@
 # THE FOLLOWING COMMANDS ARE INTENDED TO BE COPIED-AND-PASTED INTO TERMINAL WHEN NEEDED.
 # BUT, THIS *IS NOT NEEDED ANYMORE* SINCE "update-mac-drives.sh" CAN BE USED INSTEAD.
 
-# CREATE Sequoia INSTALLER USB (17.9 GB REQUIRED):
+# CREATE Tahoe INSTALLER USB (19.155 GB REQUIRED):
+sudo '/Volumes/Install macOS Tahoe/Install macOS Tahoe.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallTahoe --nointeraction
+
+# CREATE Sequoia INSTALLER USB (17.865 GB REQUIRED):
 sudo '/Volumes/Install macOS Sequoia/Install macOS Sequoia.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallSequoia --nointeraction
 
-# CREATE Sonoma INSTALLER USB (15.9 GB REQUIRED):
+# CREATE Sonoma INSTALLER USB (15.855 GB REQUIRED):
 sudo '/Volumes/Install macOS Sonoma/Install macOS Sonoma.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallSonoma --nointeraction
 
-# CREATE Ventura INSTALLER USB (14.5 GB REQUIRED):
+# CREATE Ventura INSTALLER USB (14.4 GB REQUIRED):
 sudo '/Volumes/Install macOS Ventura/Install macOS Ventura.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallVentura --nointeraction
 
-# CREATE Monterey INSTALLER USB (14.7 GB REQUIRED):
+# CREATE Monterey INSTALLER USB (14.605 GB REQUIRED):
 sudo '/Volumes/Install macOS Monterey/Install macOS Monterey.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallMonterey --nointeraction
 
-# CREATE Big Sur INSTALLER USB (13.6 GB REQUIRED):
+# CREATE Big Sur INSTALLER USB (13.535 GB REQUIRED):
 sudo '/Volumes/Install macOS Big Sur/Install macOS Big Sur.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallBigSur --nointeraction
 
-# CREATE Catalina INSTALLER USB (8.4 GB REQUIRED):
+# CREATE Catalina INSTALLER USB (8.33 GB REQUIRED):
 sudo '/Volumes/Install macOS Catalina/Install macOS Catalina.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallCatalina --nointeraction
 
 

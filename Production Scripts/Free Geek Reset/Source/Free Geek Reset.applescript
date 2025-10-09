@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.8.20-1
+-- Version: 2025.10.2-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: CFBundleAlternateNames: ["FG Reset", "fgreset", "Reset"]
@@ -311,28 +311,37 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 		try
 			activate
 		end try
-		display dialog "Are you sure want to reset this Mac?
-
-
-This Mac will reset itself automatically after clicking the confirmation button below.
+		display alert "Are you sure want to reset this Mac?" message "This Mac will reset itself automatically after clicking the confirmation button below.
 
 During the reset process this Mac will reboot into Recovery for Activation, which requires internet. So, it is best to connect an Ethernet cable now for a fully automated process, but you will also be able to manually connect to Wi-Fi in Recovery if needed.
 
-NOTE: You may need to select a language when rebooted into Recovery before Activation can start." buttons {"No, Don't Reset This Mac Yet", "Yes, Reset This Mac"} cancel button 1 default button 2 with title (name of me) with icon note
+NOTE: You may need to select a language when rebooted into Recovery before Activation can start." buttons {"No, Don't Reset This Mac Yet", "Yes, Reset This Mac"} cancel button 1 default button 2
 	end if
 	
-	set progress total steps to -1
+	if (isTahoeOrNewer) then
+		-- There is a bug in macOS 26 Tahoe where setting indeterminate progress at launch just displays 0 progress, EVEN IF manually running startAnimation on the NSProgressIndicator directly.
+		-- To workaround this, first set determinate progress, then delay 0.01s to make sure the UI updates (without a delay the progress bar occasionally still doesn't animate), then set indeterminate progress, and THEN STILL startAnimation on the NSProgressIndicator directly.
+		
+		set progress total steps to 1
+	else
+		set progress total steps to -1
+	end if
+	
+	set progress completed steps to 0
 	set progress description to "
 🚧	Preparing to Reset This Mac…"
+	
+	set progressWindowProgressBar to missing value
 	
 	try
 		repeat with thisWindow in (current application's NSApp's |windows|())
 			if (thisWindow's isVisible() is true) then
 				if (((thisWindow's title()) as text) is equal to (name of me)) then
 					repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-						if ((((thisProgressWindowSubView's className()) as text) is equal to "NSButton") and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
+						if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
+							set progressWindowProgressBar to thisProgressWindowSubView
+						else if ((((thisProgressWindowSubView's className()) as text) is equal to "NSButton") and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
 							(thisProgressWindowSubView's setEnabled:false)
-							exit repeat
 						end if
 					end repeat
 				end if
@@ -340,9 +349,20 @@ NOTE: You may need to select a language when rebooted into Recovery before Activ
 		end repeat
 	end try
 	
+	if (isTahoeOrNewer) then -- See comments above about macOS 26 Tahoe bug when setting indeterminate progress at launch.
+		delay 0.01
+		
+		set progress total steps to -1
+		
+		try
+			if (progressWindowProgressBar is not equal to missing value) then
+				(progressWindowProgressBar's startAnimation:(missing value))
+			end if
+		end try
+	end if
+	
 	checkRemoteManagement()
 	
-	set progress total steps to -1
 	set progress description to "🚧	Resetting This Mac…"
 	set progress additional description to "
 🚫	DO NOT TOUCH THIS MAC WHILE IT IS BEING RESET"
@@ -624,7 +644,6 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 						end try
 					end repeat
 					
-					set progress total steps to -1
 					set progress description to "
 🔒	Checking for Remote Management"
 					delay 0.5

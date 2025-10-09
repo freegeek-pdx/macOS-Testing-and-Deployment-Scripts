@@ -24,21 +24,31 @@ readonly MIST_PATH='/usr/local/bin/mist'
 PROJECT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)/.."
 readonly PROJECT_DIR
 
-installer_dmgs_path="${PROJECT_DIR}/../../MacLand Images/macOS Installers"
+installer_dmgs_path="$(realpath "${PROJECT_DIR}/../../MacLand Images/macOS Installers")"
 
-declare -a installer_names_to_download=( 'Big Sur' 'Monterey' 'Ventura' 'Sonoma' 'Sequoia' 'Tahoe Beta' ) # NOT including 'High Sierra' 'Mojave' 'Catalina' anymore since the latest installers are already downloaded and they will never get any new updates.
+declare -a installer_names_to_download=( 'Sonoma' 'Sequoia' 'Tahoe' ) # NOT including 'High Sierra' 'Mojave' 'Catalina' 'Big Sur' 'Monterey' 'Ventura' anymore since the latest installers are already downloaded and they will never get any new updates.
 
-beta_catalog_url='https://swscan.apple.com/content/catalogs/others/index-26seed-26-15-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz'
+catalog_url='' # Fill with custom Software Update Catalog URL if needed.
+
+run_as_sudo_if_needed() { # Based On: https://github.com/freegeek-pdx/mkuser/blob/main/utilities/download-and-install-mkuser.sh#L41-L48
+	if (( ${EUID:-$(id -u)} != 0 )); then # Only need to run with "sudo" if this script itself IS NOT already running as root.
+		sudo -p 'Enter Password for "%p" to Download macOS Installer: ' "$@"
+	else
+		"$@"
+	fi
+}
 
 for this_installer_name_to_download in "${installer_names_to_download[@]}"; do
 	mist_list_options=( 'list' 'installer' "${this_installer_name_to_download}" )
+
 	if [[ "${this_installer_name_to_download}" == *' '[Bb][Ee][Tt][Aa] ]]; then
 		mist_list_options+=( '-b' )
-
-		if [[ -n "${beta_catalog_url}" ]]; then
-			mist_list_options+=( '-c' "${beta_catalog_url}" )
-		fi
 	fi
+
+	if [[ -n "${catalog_url}" ]]; then
+		mist_list_options+=( '-c' "${catalog_url}" )
+	fi
+
 	mist_list_options+=( '-lqo' 'json' )
 
 	this_installer_info_json="$("${MIST_PATH}" "${mist_list_options[@]}")"
@@ -64,16 +74,18 @@ function run(argv) {
 			rm -f "${installer_dmgs_path}/Install ${this_installer_info[0]} "*'.dmg' # Delete any outdated installer dmgs.
 
 			mist_download_options=( 'download' 'installer' "${this_installer_info[2]}" 'image' )
+
 			if [[ "${this_installer_name_to_download}" == *' '[Bb][Ee][Tt][Aa] ]]; then
 				mist_download_options+=( '-b' )
-
-				if [[ -n "${beta_catalog_url}" ]]; then
-					mist_download_options+=( '-c' "${beta_catalog_url}" )
-				fi
 			fi
+
+			if [[ -n "${catalog_url}" ]]; then
+				mist_download_options+=( '-c' "${catalog_url}" )
+			fi
+
 			mist_download_options+=( '-o' "${installer_dmgs_path}" )
 
-			sudo "${MIST_PATH}" "${mist_download_options[@]}"
+			run_as_sudo_if_needed "${MIST_PATH}" "${mist_download_options[@]}"
 		fi
 	else
 		echo "\"${this_installer_name_to_download}\" WAS NOT FOUND: $(declare -p this_installer_info | cut -d '=' -f 2-)"

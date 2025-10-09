@@ -76,10 +76,10 @@
 // For convenience, the CSReq hex string generated from the app on disk will be copied to the clipboard when the script is run.
 
 
+// @ts-nocheck: Do not check for TypeScript errors since there's a lot of JXA and JXA-ObjC code that would incorrectly show errors.
+
 'use strict'
-// @ts-ignore: JXA-ObjC
 ObjC.import('Security')
-// @ts-ignore: JXA-ObjC
 ObjC.import('AppKit') // Only needed for "NSPasteboard".
 
 function run(argv) {
@@ -90,19 +90,13 @@ function run(argv) {
 
 	// "csreq" source reference: https://opensource.apple.com/source/security_systemkeychain/security_systemkeychain-55202/src/csreq.cpp.auto.html
 
-	// @ts-ignore: JXA-ObjC
 	const staticCodeRef = $()
-	// @ts-ignore: JXA-ObjC
 	$.SecStaticCodeCreateWithPath($.NSURL.fileURLWithPath(pathToApp), $.kSecCSDefaultFlags, staticCodeRef)
 
-	// @ts-ignore: JXA-ObjC
 	const csreqRef = $()
-	// @ts-ignore: JXA-ObjC
 	$.SecCodeCopyDesignatedRequirement(staticCodeRef, $.kSecCSDefaultFlags, csreqRef)
 
-	// @ts-ignore: JXA-ObjC
 	const csreqDataRef = $()
-	// @ts-ignore: JXA-ObjC
 	$.SecRequirementCopyData(csreqRef, $.kSecCSDefaultFlags, csreqDataRef)
 
 	csreqsOutput += '\n\nCSREQ HEX FROM APP ON DISK (this is what is written to TCC.db by macOS and what *SHOULD BE USED* for AppleEvents TCC to work on Mojave & Catalina):\n'
@@ -111,17 +105,13 @@ function run(argv) {
 		csreqHexFromAppOnDisk += csreqBytesArray[thisByteIndex].toString(16).padStart(2, 0)
 	csreqsOutput += csreqHexFromAppOnDisk
 
-	// @ts-ignore: JXA-ObjC
 	const pasteboard = $.NSPasteboard.generalPasteboard
 	pasteboard.clearContents
-	const didCopy = (pasteboard.writeObjects([csreqHexFromAppOnDisk])) // Copy this best from of the CSReq from the app on disk to the Clipboard for convenience.
+	const didCopy = pasteboard.writeObjects([csreqHexFromAppOnDisk]) // Copy this best form of the CSReq from the app on disk to the Clipboard for convenience.
 	csreqsOutput += `\n>>> ${didCopy ? 'COPIED' : 'WARNING: *FAILED* TO COPY'} THIS CSREQ HEX STRING FROM THE APP ON DISK TO CLIPBOARD`
 
-	// @ts-ignore: JXA-ObjC
 	const csreqStringRef = $()
-	// @ts-ignore: JXA-ObjC
 	$.SecRequirementCopyString(csreqRef, $.kSecCSDefaultFlags, csreqStringRef) // This just gets the code requirement *string* from the specified app.
-	// @ts-ignore: JXA-ObjC
 	$.SecRequirementCreateWithString(csreqStringRef, $.kSecCSDefaultFlags, csreqRef) // Re-create the csreqRef based on the code requirements *string* instead of directly from the app on disk.
 
 	csreqsOutput += `\n\nCODE REQUIREMENTS STRING:\n${csreqStringRef.js}`
@@ -131,7 +121,6 @@ function run(argv) {
 	// VS DIRECTLY FROM AN APP ON DISK (using SecStaticCodeCreateWithPath & SecCodeCopyDesignatedRequirement)
 	// See comment above for more detailed information about these differences.
 
-	// @ts-ignore: JXA-ObjC
 	$.SecRequirementCopyData(csreqRef, $.kSecCSDefaultFlags, csreqDataRef) // This and the next steps are the same as above, but now the csreqRef is coming from the code requirements *string* instead of directly from the app on disk.
 
 	csreqsOutput += '\n\nCSREQ HEX FROM CODE REQUIREMENTS STRING (this is what the "csreq" binary piped to "xxd" would output since the string is always the source which *MAY NOT WORK* on Mojave & Catalina for AppleEvents TCC which have a target app/indirect object):\n'

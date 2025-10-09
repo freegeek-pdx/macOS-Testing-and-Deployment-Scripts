@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2024.11.5-1
+-- Version: 2025.10.2-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -127,6 +127,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		set isBigSurOrNewer to (systemVersion ≥ "11.0")
 		set isVenturaOrNewer to (systemVersion ≥ "13.0")
 		set isSonomaOrNewer to (systemVersion ≥ "14.0")
+		set is15dot6OrNewer to (systemVersion ≥ "15.6")
 	end considering
 	
 	try
@@ -623,40 +624,66 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 							if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
 								set thisWiFiInterfaceID to ((id of interface of thisActiveNetworkService) as text)
 								try
-									set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & thisWiFiInterfaceID)))
+									set preferredWirelessNetworks to (paragraphs of (do shell script ("networksetup -listpreferredwirelessnetworks " & (quoted form of thisWiFiInterfaceID))))
+									
 									try
-										set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & thisWiFiInterfaceID)
+										set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & (quoted form of thisWiFiInterfaceID))
 										set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
 										if (getWiFiNetworkColonOffset > 0) then
 											set (end of preferredWirelessNetworks) to (tab & (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput))
-										else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
-											set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
-											if (connectedWiFiNetworkName is not equal to "") then
-												set (end of preferredWirelessNetworks) to (tab & connectedWiFiNetworkName)
+										else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then
+											-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
+											-- So, fallback to using "ipconfig getsummary" instead.
+											
+											if (is15dot6OrNewer) then
+												-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
+												-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
+												
+												try
+													tell me to doShellScriptAsAdmin("ipconfig setverbose 1")
+												end try
+											end if
+											
+											try
+												set connectedWiFiNetworkName to (do shell script "ipconfig getsummary " & (quoted form of thisWiFiInterfaceID) & " | awk -F ' SSID : ' '/ SSID : / { print $2; exit }'")
+												if ((connectedWiFiNetworkName is not equal to "") and (connectedWiFiNetworkName is not equal to "<redacted>")) then -- Should never be "<redacted>", but still check just in case.
+													set (end of preferredWirelessNetworks) to (tab & connectedWiFiNetworkName)
+												end if
+											end try
+											
+											if (is15dot6OrNewer) then
+												-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
+												
+												try
+													tell me to doShellScriptAsAdmin("ipconfig setverbose 0")
+												end try
 											end if
 										end if
 									end try
+									
 									repeat with thisPreferredWirelessNetwork in preferredWirelessNetworks
 										if (thisPreferredWirelessNetwork starts with tab) then
 											set thisPreferredWirelessNetwork to ((characters 2 thru -1 of thisPreferredWirelessNetwork) as text)
 											if ((thisPreferredWirelessNetwork is not equal to "FG Staff") and (thisPreferredWirelessNetwork is not equal to "Free Geek")) then
 												try
-													do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " off")
+													do shell script ("networksetup -setairportpower " & (quoted form of thisWiFiInterfaceID) & " off")
 												end try
 												try
-													tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & thisWiFiInterfaceID & " " & (quoted form of thisPreferredWirelessNetwork))
+													tell me to doShellScriptAsAdmin("networksetup -removepreferredwirelessnetwork " & (quoted form of thisWiFiInterfaceID) & " " & (quoted form of thisPreferredWirelessNetwork))
 												end try
 												set (end of wirelessNetworkPasswordsToDelete) to thisPreferredWirelessNetwork
 											end if
 										end if
 									end repeat
 								end try
+								
 								try
-									do shell script ("networksetup -setairportpower " & thisWiFiInterfaceID & " on")
+									do shell script ("networksetup -setairportpower " & (quoted form of thisWiFiInterfaceID) & " on")
 								end try
+								
 								try
 									-- This needs admin privileges to add network to preferred network if it's not already preferred (it will pop up a gui prompt in this case if not run with admin).
-									tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & thisWiFiInterfaceID & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]"))
+									tell me to doShellScriptAsAdmin("networksetup -setairportnetwork " & (quoted form of thisWiFiInterfaceID) & " 'FG Staff' " & (quoted form of "[MACLAND SCRIPT BUILDER WILL REPLACE THIS PLACEHOLDER WITH OBFUSCATED WI-FI PASSWORD]") & " > /dev/null 2>&1 &")
 								end try
 							end if
 						end repeat
@@ -713,7 +740,11 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 				tell application id "com.apple.finder"
 					set warns before emptying of trash to false
 					try
-						empty the trash
+						with timeout of 1 second -- On macOS 26 Tahoe, attempting to empty the trash when it is empty hangs, so only attempt to empty if full (and also give it a short timeout just in case).
+							if ((count of items of trash) is greater than 0) then
+								empty the trash
+							end if
+						end timeout
 					end try
 					set warns before emptying of trash to true
 				end tell
@@ -1011,9 +1042,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 				if (isAwake and isUnlocked) then
 					exit repeat
 				else
-					tell application id "com.apple.systemevents"
-						if (running of screen saver preferences) then key code 53 -- If screen saver is active, simulate Escape key to end it.
-					end tell
+					try
+						tell application id "com.apple.systemevents"
+							if (running of screen saver preferences) then key code 53 -- If screen saver is active, simulate Escape key to end it.
+						end tell
+					end try
 					
 					delay 1
 				end if
@@ -1101,37 +1134,11 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 					((((POSIX path of (path to desktop folder from user domain)) & "TESTING") as POSIX file) as alias)
 					set isOnFreeGeekNetwork to true
 				on error
-					if (isConnectedToInternet) then
-						try
-							tell application id "com.apple.systemevents" to tell current location of network preferences
-								repeat with thisActiveNetworkService in (every service whose active is true)
-									if (((name of interface of thisActiveNetworkService) as text) is equal to "Wi-Fi") then
-										try
-											set getWiFiNetworkOutput to (do shell script "networksetup -getairportnetwork " & ((id of interface of thisActiveNetworkService) as text))
-											set getWiFiNetworkColonOffset to (offset of ":" in getWiFiNetworkOutput)
-											
-											set connectedWiFiNetworkName to "UNKNOWN"
-											if (getWiFiNetworkColonOffset > 0) then
-												set connectedWiFiNetworkName to (text (getWiFiNetworkColonOffset + 2) thru -1 of getWiFiNetworkOutput)
-											else if (getWiFiNetworkOutput is equal to "You are not associated with an AirPort network.") then -- "networksetup -getairportnetwork" always returns "You are not associated with an AirPort network." on macOS 15 Sequoia (presuably because of privacy reasons), but the current Wi-Fi network is still available from "system_profiler SPAirPortDataType"
-												set connectedWiFiNetworkName to (do shell script ("bash -c " & (quoted form of "/usr/libexec/PlistBuddy -c 'Print :0:_items:0:spairport_airport_interfaces:0:spairport_current_network_information:_name' /dev/stdin <<< \"$(system_profiler -xml SPAirPortDataType)\" 2> /dev/null")))
-											end if
-											
-											set isOnFreeGeekNetwork to ((connectedWiFiNetworkName is equal to "FG Staff") or (connectedWiFiNetworkName is equal to "Free Geek"))
-											if (isOnFreeGeekNetwork) then exit repeat
-										end try
-									end if
-								end repeat
-							end tell
-						end try
-						
-						if (not isOnFreeGeekNetwork) then
-							try
-								do shell script "ping -c 1 -t 5 data.fglan" -- Will error if not wired FG network.
-								set isOnFreeGeekNetwork to true
-							end try
+					try
+						if (isConnectedToInternet and (do shell script "curl -m 5 -sfL 'https://api.freegeek.org/location'") starts with "Free Geek") then
+							set isOnFreeGeekNetwork to true
 						end if
-					end if
+					end try
 				end try
 				
 				if (not isOnFreeGeekNetwork) then
@@ -1218,7 +1225,7 @@ The reset process is only a few steps and will take less than 10 minutes.
 
 
 PLEASE CONTACT Free Geek THROUGH eBay IF YOU HAVE ANY QUESTIONS.
-If you've recieved this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form." buttons {"Shut Down                                             ", "Reset This Mac                                             "} cancel button 1 default button 2 with title (name of me) with icon caution
+If you've received this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form." buttons {"Shut Down                                             ", "Reset This Mac                                             "} cancel button 1 default button 2 with title (name of me) with icon caution
 							
 							try
 								-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
@@ -1244,7 +1251,7 @@ You WILL NOT need to return this Mac to Free Geek for it to be reset.
 
 Please contact Free Geek through the eBay messaging system so that we can send you the simple instructions to reset this Mac yourself.
 
-If you've recieved this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form.
+If you've received this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form.
 
 
 This Mac is currently set up with custom settings that are not intended for personal use. A reset process must be run to remove these custom settings and prepare this Mac for you to create your own account.
@@ -1277,9 +1284,23 @@ The reset process is only a few steps and will take less than 10 minutes." butto
 					
 					tell application id "com.apple.systemevents"
 						tell screen saver preferences
-							if (running is true) then key code 53 -- make sure screen saver is stopped
-							if (show clock is true) then set show clock to false
-							if (delay interval is not 300) then set delay interval to 300
+							try
+								if (running is true) then key code 53 -- make sure screen saver is stopped
+							end try
+							try -- On macOS 26 Tahoe, accessing either "show clock" or "delay interval" of "screen saver preferences" throws "AppleEvent handler failed. (-10000)"
+								if (show clock is true) then set show clock to false
+							on error
+								try
+									do shell script "defaults -currentHost write 'com.apple.screensaver' showClock -bool false"
+								end try
+							end try
+							try
+								if (delay interval is not 300) then set delay interval to 300
+							on error
+								try
+									do shell script "defaults -currentHost write 'com.apple.screensaver' idleTime -int 300"
+								end try
+							end try
 						end tell
 					end tell
 					
@@ -1460,9 +1481,23 @@ defaults -currentHost write com.apple.ScreenSaverPhotoChooser CustomFolderDict \
 							try
 								tell application id "com.apple.systemevents"
 									tell screen saver preferences
-										if (running is true) then key code 53 -- make sure screen saver is stopped
-										if (show clock is true) then set show clock to false
-										if (delay interval is not 300) then set delay interval to 300
+										try
+											if (running is true) then key code 53 -- make sure screen saver is stopped
+										end try
+										try -- On macOS 26 Tahoe, accessing either "show clock" or "delay interval" of "screen saver preferences" throws "AppleEvent handler failed. (-10000)"
+											if (show clock is true) then set show clock to false
+										on error
+											try
+												do shell script "defaults -currentHost write 'com.apple.screensaver' showClock -bool false"
+											end try
+										end try
+										try
+											if (delay interval is not 300) then set delay interval to 300
+										on error
+											try
+												do shell script "defaults -currentHost write 'com.apple.screensaver' idleTime -int 300"
+											end try
+										end try
 									end tell
 									
 									if (isCatalinaOrNewer and (randomScreenSaverName is equal to "iLifeSlideshows")) then

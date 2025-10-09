@@ -380,7 +380,7 @@ ditto " & (quoted form of (thisScriptFolderPath & "Source/" & thisScriptName & "
 plutil -replace CFBundleIconFile -string " & (quoted form of thisScriptName) & " " & (quoted form of thisScriptAppInfoPlistPath) & "
 if [[ -f " & (quoted form of (thisScriptFolderPath & "Source/" & thisScriptName & " Icon/Assets.car")) & " ]]; then
 	ditto " & (quoted form of (thisScriptFolderPath & "Source/" & thisScriptName & " Icon/Assets.car")) & " " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Assets.car")) & "
-	plutil -replace CFBundleIconName -string " & (quoted form of thisScriptName) & " " & (quoted form of thisScriptAppInfoPlistPath) & "
+	plutil -replace CFBundleIconName -string 'AppIcon' " & (quoted form of thisScriptAppInfoPlistPath) & "
 fi
 ")
 										

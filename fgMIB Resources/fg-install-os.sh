@@ -20,7 +20,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-readonly SCRIPT_VERSION='2025.6.11-1'
+readonly SCRIPT_VERSION='2025.9.10-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -735,7 +735,7 @@ create_custom_global_tcc_database() {
 			allowed_or_authorized_fields='2,4'
 			footer_fields="NULL,0,'UNUSED',NULL,0,${current_unix_time}"
 		else # New fields were added to the "access" table in macOS 14 Sonoma.
-			if (( installed_os_darwin_major_version >= 24 )); then # The TCC.db version was changed in macOS 15 Sequoia, but the table structure is the same as macOS 14 Sonoma.
+			if (( installed_os_darwin_major_version >= 24 )); then # The TCC.db version was changed to "30" in macOS 15 Sequoia (and stays as "30" in macOS 26 Tahoe), but the table structure is the same as macOS 14 Sonoma.
 				create_global_tcc_db_commands+="INSERT INTO admin VALUES('version',30);"
 			else
 				create_global_tcc_db_commands+="INSERT INTO admin VALUES('version',29);"
@@ -1386,7 +1386,7 @@ for this_os_installer_search_group_prefixes in '/Volumes/Image ' '/Volumes/Insta
 					{ ! $SUPPORTS_MACOS_13_VENTURA && [[ "${this_os_installer_name}" == *' Ventura'* ]]; } ||
 					{ ! $SUPPORTS_MACOS_14_SONOMA && [[ "${this_os_installer_name}" == *' Sonoma'* ]]; } ||
 					{ ! $SUPPORTS_MACOS_15_SEQUOIA && [[ "${this_os_installer_name}" == *' Sequoia'* ]]; } ||
-					{ ! $SUPPORTS_MACOS_26_TAHOE && [[ "${this_os_installer_name}" == *' Tahoe'* || "${this_os_installer_name}" == *' Beta'* ]]; }; then
+					{ ! $SUPPORTS_MACOS_26_TAHOE && [[ "${this_os_installer_name}" == *' Tahoe'* ]]; }; then
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Model Does Not Support ${this_os_installer_name}${CLEAR_ANSI}"
 				elif [[ "$(strip_ansi_styles "${os_installer_choices_display}")" == *": ${this_os_installer_name}"* ]]; then
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"

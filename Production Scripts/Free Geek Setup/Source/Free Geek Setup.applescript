@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.8.20-1
+-- Version: 2025.10.2-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -174,27 +174,50 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	try
 		activate
 	end try
-	set progress total steps to -1
+	
+	if (isTahoeOrNewer) then
+		-- There is a bug in macOS 26 Tahoe where setting indeterminate progress at launch just displays 0 progress, EVEN IF manually running startAnimation on the NSProgressIndicator directly.
+		-- To workaround this, first set determinate progress, then delay 0.01s to make sure the UI updates (without a delay the progress bar occasionally still doesn't animate), then set indeterminate progress, and THEN STILL startAnimation on the NSProgressIndicator directly.
+		
+		set progress total steps to 1
+	else
+		set progress total steps to -1
+	end if
+	
 	set progress completed steps to 0
 	set progress description to "🚧	" & (name of me) & " is Preparing " & osName & "…"
 	set progress additional description to "
 🚫	DO NOT TOUCH THIS MAC WHILE IT IS BEING SET UP"
+	
+	set progressWindowProgressBar to missing value
 	
 	try
 		repeat with thisWindow in (current application's NSApp's |windows|())
 			if (thisWindow's isVisible() is true) then
 				if (((thisWindow's title()) as text) is equal to (name of me)) then
 					repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
-						if (((thisProgressWindowSubView's className()) as text) is equal to "NSButton" and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
+						if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
+							set progressWindowProgressBar to thisProgressWindowSubView
+						else if (((thisProgressWindowSubView's className()) as text) is equal to "NSButton" and ((thisProgressWindowSubView's title() as text) is equal to "Stop")) then
 							(thisProgressWindowSubView's setEnabled:false)
-							
-							exit repeat
 						end if
 					end repeat
 				end if
 			end if
 		end repeat
 	end try
+	
+	if (isTahoeOrNewer) then -- See comments above about macOS 26 Tahoe bug when setting indeterminate progress at launch.
+		delay 0.01
+		
+		set progress total steps to -1
+		
+		try
+			if (progressWindowProgressBar is not equal to missing value) then
+				(progressWindowProgressBar's startAnimation:(missing value))
+			end if
+		end try
+	end if
 	
 	try
 		(((buildInfoPath & ".fgUpdaterJustFinished") as POSIX file) as alias)
@@ -524,8 +547,31 @@ killall ControlStrip
 	
 	-- Unmount any fgMIB, Install macOS, or MacLand Boot drives (this can now work on Big Sur and newer as well since this app will have Full Disk Access and access to removable drives wouldn't need to be manually approved by the technician).
 	try
-		do shell script "for this_installer_volume in '/Volumes/fgMIB'* '/Volumes/Install '* '/Volumes/'*' Boot'*; do if [ -d \"${this_installer_volume}\" ]; then diskutil unmountDisk \"${this_installer_volume}\"; fi done"
+		do shell script "for this_installer_volume in '/Volumes/fgMIB'* '/Volumes/Install '* '/Volumes/'*' Boot'*; do if [ -d \"${this_installer_volume}\" ]; then diskutil unmountDisk \"${this_installer_volume}\" > /dev/null 2>&1 & fi done"
 	end try
+	
+	if (isTahoeOrNewer) then
+		-- Remove Desktop widgets on macOS 26 Tahoe
+		-- https://macadmins.slack.com/archives/GA92U9YV9/p1750793773418789?thread_ts=1750284879.050399&cid=GA92U9YV9
+		-- Modifying the preferences within the NotificationCenterUI Container requires Full Disk Access TCC privileges, so it must be done in this script on first login since it will have FDA.
+		
+		try
+			do shell script ("
+defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.notificationcenterui/Data/Library/Preferences/com.apple.notificationcenterui' widgets -dict \\
+	DesktopWidgetPlacementStorage \"<data>$(plutil -create binary1 - |
+		plutil -insert 'CompatibilityVersion' -integer 1 -o - - |
+		plutil -insert 'NumberedDisplays' -array -o - - | base64)</data>\" \\
+	instances '<array/>' \\
+	vers '<integer>1</integer>'
+")
+		end try
+		
+		try
+			with timeout of 1 second
+				tell application id "com.apple.notificationcenterui" to quit
+			end timeout
+		end try
+	end if
 	
 	do shell script ("rm -rf " & (quoted form of ("/Users/" & demoUsername & "/Desktop/" & (name of me) & ".app")))
 	
@@ -576,29 +622,6 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 ")
 			end try
 		end if
-	end if
-	
-	if (isTahoeOrNewer) then
-		-- Remove Desktop widgets on macOS 26 Tahoe
-		-- https://macadmins.slack.com/archives/GA92U9YV9/p1750793773418789?thread_ts=1750284879.050399&cid=GA92U9YV9
-		-- Modifying the preferences within the NotificationCenterUI Container requires Full Disk Access TCC privileges, so it must be done in this script on first login since it will have FDA.
-		
-		try
-			do shell script ("
-defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.notificationcenterui/Data/Library/Preferences/com.apple.notificationcenterui' widgets -dict \\
-	DesktopWidgetPlacementStorage \"<data>$(plutil -create binary1 - |
-		plutil -insert 'CompatibilityVersion' -integer 1 -o - - |
-		plutil -insert 'NumberedDisplays' -array -o - - | base64)</data>\" \\
-	instances '<array/>' \\
-	vers '<integer>1</integer>'
-")
-		end try
-		
-		try
-			with timeout of 1 second
-				tell application id "com.apple.notificationcenterui" to quit
-			end timeout
-		end try
 	end if
 	
 	set demoHelperAppPath to ("/Users/" & demoUsername & "/Applications/Free Geek Demo Helper.app")

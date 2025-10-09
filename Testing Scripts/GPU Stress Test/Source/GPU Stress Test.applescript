@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2024.11.11-1
+-- Version: 2025.10.2-1
 
 -- App Icon is “Donut” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -444,7 +444,7 @@ if (shouldRunGPUStressTest) then
 	try
 		tell application id "com.apple.systemevents" to set startupDiskCapacity to ((capacity of startup disk) as number)
 	end try
-	if ((startupDiskCapacity ≤ 3.3E+10) and (serialNumber is equal to "C02R49Y5G8WP")) then
+	if ((startupDiskCapacity ≤ 3.3E+10) and (serialNumber is equal to "C07WV2F8G1J2")) then
 		set isBootedToSourceDrive to true
 	end if
 	

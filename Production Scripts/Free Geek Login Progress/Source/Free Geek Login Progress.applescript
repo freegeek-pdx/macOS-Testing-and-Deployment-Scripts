@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2023.2.9-1
+-- Version: 2025.10.2-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -82,7 +82,20 @@ set isResetting to ((POSIX path of (path to me)) contains "/fg-snapshot-reset/")
 set logPath to "/Users/Shared/Build Info/Prepare OS Log.txt"
 if (isResetting) then set logPath to "/Users/Shared/fg-snapshot-reset/log.txt"
 
-set progress total steps to -1
+set systemVersion to (system version of (system info))
+considering numeric strings
+	set isTahoeOrNewer to (systemVersion ≥ "16.0")
+end considering
+
+if (isTahoeOrNewer) then
+	-- There is a bug in macOS 26 Tahoe where setting indeterminate progress at launch just displays 0 progress, EVEN IF manually running startAnimation on the NSProgressIndicator directly.
+	-- To workaround this, first set determinate progress, then delay 0.01s to make sure the UI updates (without a delay the progress bar occasionally still doesn't animate), then set indeterminate progress, and THEN STILL startAnimation on the NSProgressIndicator directly.
+	
+	set progress total steps to 1
+else
+	set progress total steps to -1
+end if
+
 set progress completed steps to 0
 
 set doNotDisturbNote to "🚫	DO NOT DISTURB THIS MAC WHILE IT IS BEING CUSTOMIZED"
@@ -97,12 +110,16 @@ end if
 set progress additional description to ("
 " & doNotDisturbNote)
 
+set progressWindowProgressBar to missing value
+
 try
 	repeat with thisWindow in (current application's NSApp's |windows|())
 		if (thisWindow's isVisible() is true) then
 			if (((thisWindow's title()) as text) is equal to (name of me)) then
 				repeat with thisProgressWindowSubView in ((thisWindow's contentView())'s subviews())
 					if (((thisProgressWindowSubView's className()) as text) is equal to "NSProgressIndicator") then
+						set progressWindowProgressBar to thisProgressWindowSubView
+						
 						if (isResetting) then
 							(thisWindow's setTitle:"Free Geek Reset Progress")
 						else
@@ -140,6 +157,18 @@ try
 		end if
 	end repeat
 end try
+
+if (isTahoeOrNewer) then -- See comments above about macOS 26 Tahoe bug when setting indeterminate progress at launch.
+	delay 0.01
+	
+	set progress total steps to -1
+	
+	try
+		if (progressWindowProgressBar is not equal to missing value) then
+			(progressWindowProgressBar's startAnimation:(missing value))
+		end if
+	end try
+end if
 
 repeat
 	try

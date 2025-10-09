@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.6.11-1
+-- Version: 2025.10.3-2
 
 -- App Icon is “Microscope” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -2286,8 +2286,7 @@ This should not have happened, please inform Free Geek I.T." buttons {"Continue"
 	
 	if (supportsTahoe) then
 		set supportedOS to "
-	macOS 15 Sequoia
-	✅	WILL SUPPORT macOS 26 Tahoe"
+	macOS 26 Tahoe"
 	else if (supportsSequoia) then
 		set supportedOS to "
 	macOS 15 Sequoia

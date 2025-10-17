@@ -46,7 +46,7 @@
 	# It seems that somehow the "deleted" daemon is maybe marking the reset Snapshot as unusable and preventing it from being able to show up in "Restore from Time Machine Backup" in Recovery. This seems to not be an issue on macOS 11 Big Sur though.
 	# So, ALWAYS manipulate the system date (Solution 1) to keep set to the Snapshot date on macOS 10.15 Catalina and do not bother mounting the Snapshot (since knowing the Snapshot got purged is better user feedback than it just not showing in Recovery).
 
-readonly SCRIPT_VERSION='2024.10.29-1'
+readonly SCRIPT_VERSION='2025.10.16-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
@@ -59,7 +59,7 @@ readonly DEMO_USERNAME='fg-demo'
 DEMO_USER_UID="$(id -u "${DEMO_USERNAME}" 2> /dev/null || echo '502')"
 readonly DEMO_USER_UID
 
-DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 18 = 10.14, 19 = 10.15, 20 = 11.0, 21 = 12.0, 22 = 13.0, 23 = 14.0, etc.
+DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 19 = 10.15 Catalina, 20 = 11 Big Sur, 21 = 12 Monterey, 22 = 13 Ventura, 23 = 14 Sonoma, 24 = 15 Sequoia, 25 = 26 Tahoe, etc.
 readonly DARWIN_MAJOR_VERSION
 
 write_to_log() {

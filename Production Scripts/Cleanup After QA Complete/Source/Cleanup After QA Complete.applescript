@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.9.25-1
+-- Version: 2025.10.17-1
 
 -- App Icon is “Broom” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -135,7 +135,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		end try
 		display alert "“" & fgSetupName & "” Hasn't Finished Running" message "Please wait for “" & fgSetupName & "” to finish and then try running “" & (name of me) & "” again." buttons {"Quit"} default button 1 as critical giving up after 15
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/" & fgSetupName & ".app"))
 		end try
 		quit
@@ -200,7 +200,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		((("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app") as POSIX file) as alias)
 		
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script ("open -na '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
 		end try
 		
@@ -280,7 +280,7 @@ This Mac CANNOT BE SOLD in its current state, please set this Mac aside and info
 	try
 		if ((length of (paragraphs of doShellScriptAsAdmin("bioutil -sr"))) > 2) then -- If Touch ID exists, this output will be more than 2 lines regardless of the Touch ID config or number of fingerprints enrolled.
 			set deleteTouchIDnote to "
-	⁃ Delete all Touch ID fingerprints."
+	• Delete all Touch ID fingerprints."
 		end if
 	end try
 	
@@ -290,7 +290,7 @@ This Mac CANNOT BE SOLD in its current state, please set this Mac aside and info
 		tell application id "com.apple.systemevents" to set nameOfCurrentStartupDisk to (name of startup disk)
 	end try
 	if (nameOfCurrentStartupDisk is not equal to "Macintosh HD") then set renameInternalDriveNote to "
-	⁃ Rename internal drive to “Macintosh HD”."
+	• Rename internal drive to “Macintosh HD”."
 	
 	try
 		activate
@@ -298,30 +298,30 @@ This Mac CANNOT BE SOLD in its current state, please set this Mac aside and info
 	display dialog "Are you sure you're ready to Cleanup After QA Complete?
 
 You should only Cleanup After QA Complete after you've:
-	⁃ Finished the entire QA process.
-	⁃ Logged this Mac as QA Complete in QA Helper.
-	⁃ Set this Mac’s Product in PCs for People CRM.
+	• Finished the entire QA process.
+	• Logged this Mac as QA Complete in QA Helper.
+	• Set this Mac’s Product in PCs for People CRM.
 
 
 The following actions will be peformed:
-	⁃ Check if Remote Management is enabled on this Mac.
-	⁃ Quit all running apps.
-	⁃ Clear Clipboard contents.
-	⁃ Reset Safari to factory settings.
-	⁃ Erase Terminal history.
-	⁃ Remove all printers.
-	⁃ Remove all shared folders." & deleteTouchIDnote & "
-	⁃ Empty the trash." & renameInternalDriveNote & "
-	⁃ Turn on Wi-Fi.
-	⁃ Set Power On and Shutdown schedules.
-	⁃ Remove “QA Helper” alias from Desktop.
-	⁃ Delete “" & (name of me) & "” app.
+	• Check if Remote Management is enabled on this Mac.
+	• Quit all running apps.
+	• Clear Clipboard contents.
+	• Reset Safari to factory settings.
+	• Erase Terminal history.
+	• Remove all printers.
+	• Remove all shared folders." & deleteTouchIDnote & "
+	• Empty the trash." & renameInternalDriveNote & "
+	• Turn on Wi-Fi.
+	• Set Power On and Shutdown schedules.
+	• Remove “QA Helper” alias from Desktop.
+	• Delete “" & (name of me) & "” app.
 	
 This process cannot be undone." buttons {"Don't Cleanup After QA Complete Yet", "Cleanup After QA Complete"} cancel button 1 default button 2 with title (name of me) with icon note
 	
 	set hasT2chip to false
 	try
-		set hasT2chip to ((do shell script "ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
+		set hasT2chip to ((do shell script "ioreg -rn 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
 	end try
 	
 	set isAppleSilicon to false
@@ -380,7 +380,7 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 				delay 10
 			else
 				try
-					doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect, which does not need to happen now and will just happen after next boot.
+					doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take effect, which does not need to happen now and will just happen after next boot.
 				end try
 			end if
 		end if
@@ -1079,7 +1079,7 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 			((("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app") as POSIX file) as alias)
 			
 			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 				do shell script ("open -na '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
 			end try
 			
@@ -1161,7 +1161,12 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 		end if
 	else
 		set tabOrLinebreaks to tab
-		if (isBigSurOrNewer) then set tabOrLinebreaks to (linefeed & linefeed)
+		set nulCharOrNot to ""
+		if (isTahoeOrNewer) then
+			set nulCharOrNot to (ASCII character 0) -- Even though text in alerts on macOS 26 Tahoe are left aligned, they still trim leading spaces like previous versions of macOS with centered alert text. So, need to add a NUL characters before a tab for it to be indented properly.
+		else if (isBigSurOrNewer) then
+			set tabOrLinebreaks to (linefeed & linefeed)
+		end if
 		
 		try
 			((("/Users/" & demoUsername & "/Applications/Free Geek Reset.app") as POSIX file) as alias)
@@ -1169,10 +1174,10 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 			
 			try
 				display alert "✅" & tabOrLinebreaks & "Finished Cleaning Up
-	After QA Complete" buttons {"Don't Shut Down or Reset Yet", "Shut Down", "Reset Mac"} cancel button 2 default button 3
+" & nulCharOrNot & "	After QA Complete" buttons {"Don't Shut Down or Reset Yet", "Shut Down", "Reset Mac"} cancel button 2 default button 3
 				if ((button returned of result) is equal to "Reset Mac") then
 					try
-						-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+						-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 						do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Reset.app"))
 					end try
 				else
@@ -1208,7 +1213,7 @@ This should not have happened, please inform and deliver this Mac to Free Geek I
 				doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgCleanupLaunchedDemoHelper")))
 			end try
 			
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script ("open -na " & (quoted form of demoHelperAppPath))
 		end try
 	end if

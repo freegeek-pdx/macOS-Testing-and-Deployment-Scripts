@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.2-1
+-- Version: 2025.10.13-1
 
 -- App Icon is “Donut” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -125,7 +125,7 @@ try
 	
 	if (not freeGeekUpdaterIsRunning) then
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na '/Applications/Test Boot Setup.app'"
 		end try
 	end if
@@ -482,22 +482,22 @@ if (shouldRunGPUStressTest) then
    any artifacts in the animation or if the “GpuTest” app crashed.
 
 ✅	GPU STRESS TEST PASSED IF:
-	⁃ The “GpuTest” app runs without crashing.
-	⁃ No artifacts are ever seen in the animation.
-	⁃ The animation doesn't freeze for extended periods.
-	⁃ The machine does not shut down at any point.
-	⁃ If the Temperature Graph in the “XRG” app:
-		⁃ Rises steadily and levels off throughout the test.
+	• The “GpuTest” app runs without crashing.
+	• No artifacts are ever seen in the animation.
+	• The animation doesn't freeze for extended periods.
+	• The machine does not shut down at any point.
+	• If the Temperature Graph in the “XRG” app:
+		• Rises steadily and levels off throughout the test.
 
 ❌	GPU STRESS TEST FAILED IF:
-	⁃ The “GpuTest” app doesn't launch or shows an error.
-	⁃ The “GpuTest” app crashes at any point.
-	⁃ Any artifacts are ever seen in the animation.
-	⁃ The animation freezes for extended periods.
-	⁃ The machine shuts down at any point.
-	⁃ If the Temperature Graph in the “XRG” app:
-		⁃ Spikes and dips throughout the test.
-		⁃ Never levels off throughout the test.
+	• The “GpuTest” app doesn't launch or shows an error.
+	• The “GpuTest” app crashes at any point.
+	• Any artifacts are ever seen in the animation.
+	• The animation freezes for extended periods.
+	• The machine shuts down at any point.
+	• If the Temperature Graph in the “XRG” app:
+		• Spikes and dips throughout the test.
+		• Never levels off throughout the test.
 
    👉 CONSULT AN INSTRUCTOR IF GPU STRESS TEST FAILS ‼️" buttons {"Run Longer Test…", "Quit", "Start " & (name of me)} cancel button 2 default button 3 with title (name of me)
 	

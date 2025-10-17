@@ -26,7 +26,10 @@ readonly PROJECT_DIR
 
 installer_dmgs_path="$(realpath "${PROJECT_DIR}/../../MacLand Images/macOS Installers")"
 
-declare -a installer_names_to_download=( 'Sonoma' 'Sequoia' 'Tahoe' ) # NOT including 'High Sierra' 'Mojave' 'Catalina' 'Big Sur' 'Monterey' 'Ventura' anymore since the latest installers are already downloaded and they will never get any new updates.
+declare -a installer_names_to_download=(
+#	'High Sierra' 'Mojave' 'Catalina' 'Big Sur' 'Monterey' 'Ventura' # NOT including these versions anymore since the latest installers are already downloaded and they will never get any new updates.
+	'Sonoma' 'Sequoia' 'Tahoe'
+)
 
 catalog_url='' # Fill with custom Software Update Catalog URL if needed.
 

@@ -23,7 +23,7 @@
 # NOTICE: This script will only exist on boot to be able to run via LaunchDaemon when booting after restoring from the reset Snapshot.
 # ALSO: fg-prepare-os will have created AppleSetupDone to not show Setup Assistant BEFORE creating the reset Snapshot so that Setup Assistant would also not show during Snapshot reset.
 
-readonly SCRIPT_VERSION='2023.9.25-1'
+readonly SCRIPT_VERSION='2025.10.13-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -344,7 +344,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 
 					startup_security_is_full=true
 
-					if [[ -n "$(ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1)" ]]; then
+					if [[ -n "$(ioreg -rn 'Apple T2 Controller' -d 1)" ]]; then
 						write_to_log 'Verifying T2 Startup Security'
 
 						if [[ "$(nvram '94B73556-2197-4702-82A8-3E1337DAFBFB:AppleSecureBootPolicy' 2> /dev/null)" != *$'\t%02' ]]; then # https://github.com/dortania/OpenCore-Legacy-Patcher/blob/b85256d9708a299b9f7ea15cb3456248a1a666b7/resources/utilities.py#L242 & https://macadmins.slack.com/archives/CGXNNJXJ9/p1686766296067939?thread_ts=1686766055.849109&cid=CGXNNJXJ9
@@ -374,7 +374,7 @@ if [[ "${SCRIPT_DIR}" == '/Users/Shared/fg-snapshot-reset' && -f "${launch_daemo
 						if ! $sip_is_enabled && ! $is_apple_silicon; then
 
 							# ENABLE SYSTEM INTEGRITY PROTECTION (SIP)
-							# "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect (so it will be cleared on next boot to Setup Assistant).
+							# "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take effect (so it will be cleared on next boot to Setup Assistant).
 							# BUT, if running on Apple Silicon, "csrutil clear" requires authentication from a Secure Token admin (which won't have ever existed) to enable or disable it,
 							# so it should be impossible to be enabled during our process, but if somehow it is enabled then this reset process will fail with an error during this step.
 

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.3-1
+-- Version: 2025.10.17-1
 
 -- App Icon is “Green Apple” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -127,7 +127,7 @@ try
 	
 	if (not freeGeekUpdaterIsRunning) then
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na '/Applications/Test Boot Setup.app'"
 		end try
 	end if
@@ -151,6 +151,7 @@ considering numeric strings
 	set isVenturaOrNewer to (systemVersion ≥ "13.0")
 	set isVenturaThirteenDotThreeOrNewer to (systemVersion ≥ "13.3")
 	set isSonomaOrNewer to (systemVersion ≥ "14.0")
+	set isTahoeOrNewer to (systemVersion ≥ "16.0")
 end considering
 
 if (isMojaveOrNewer) then
@@ -629,7 +630,7 @@ ObjC.import(\"CoreServices\");
 			end try
 			try
 				tell application id "com.apple.systempreferences"
-					repeat 180 times -- Wait for Security pane to load
+					repeat 180 times -- Wait for Startup Disk pane to load
 						try
 							activate
 						end try
@@ -702,7 +703,9 @@ ObjC.import(\"CoreServices\");
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
-								if (isSonomaOrNewer) then
+								if (isTahoeOrNewer) then
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 3 of splitter group 1 of group 1 of window 1)
+								else if (isSonomaOrNewer) then
 									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
 								else
 									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
@@ -712,23 +715,20 @@ ObjC.import(\"CoreServices\");
 									delay 3 -- Wait a few more seconds for disks to load since it's possible that not all startup disks are actually loaded yet.
 									set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
 									
-									set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup) -- Check if the internal drive is already set as the Startup Disk.
-									if (currentlySelectedStartupDiskValue ends with ("“" & chosenStartupDiskName & "”.")) then
+									set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
+									if (currentlySelectedStartupDiskValue ends with ("“" & chosenStartupDiskName & "”.")) then -- Check if the chosen drive is already set as the Startup Disk.
 										set didSetStartUpDisk to true
-									else
-										if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the internal disk is to the right or left of that.
-											set foundSelectedStartupDisk to false
-											repeat with thisStartupDiskGroup in (groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
-												set thisStartDiskName to (value of static text 1 of thisStartupDiskGroup)
-												if (currentlySelectedStartupDiskValue ends with ("“" & thisStartDiskName & "”.")) then
-													exit repeat -- If we found the selected startup disk and have not found the internal disk yet, they means it must be to the RIGHT, which leftOrRightArrowKeyCode is already set to.
-												else if (thisStartDiskName is equal to selectedStartupDiskName) then
-													-- If we're at the internal disk and we HAVE NOT already passed the selected disk (since we haven't exited to loop yet), we need to move LEFT from the selected disk.
-													set leftOrRightArrowKeyCode to 123 -- LEFT ARROW Key
-													exit repeat
-												end if
-											end repeat
-										end if
+									else if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the chosen disk is to the right or left of that.
+										repeat with thisStartupDiskGroup in (groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
+											set thisStartDiskName to (value of static text 1 of thisStartupDiskGroup)
+											if (currentlySelectedStartupDiskValue ends with ("“" & thisStartDiskName & "”.")) then
+												exit repeat -- If we found the selected startup disk and have not found the chosen disk yet, they means it must be to the RIGHT, which leftOrRightArrowKeyCode is already set to.
+											else if (thisStartDiskName is equal to chosenStartupDiskName) then
+												-- If we're at the chosen disk and we HAVE NOT already passed the selected disk (since we haven't exited to loop yet), we need to move LEFT from the selected disk.
+												set leftOrRightArrowKeyCode to 123 -- LEFT ARROW Key
+												exit repeat
+											end if
+										end repeat
 									end if
 									exit repeat
 								end if
@@ -740,36 +740,66 @@ ObjC.import(\"CoreServices\");
 						set didAuthenticateStartupDisk to false
 						
 						repeat numberOfStartupDisks times -- The loop should be exited before even getting through numberOfStartupDisks, but want some limit so we don't get stuck in an infinite loop if something goes very wrong.
-							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
-								-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
-								set frontmost to true
-								if (isSonomaOrNewer) then
-									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
-								else
-									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
-								end if
-								set focused of (scroll area 1 of startupDisksSelectionGroup) to true
-								set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
-								repeat 5 times -- Click up to 5 times until the selected startup disk changed (in case some clicks get lost)
-									set frontmost to true
-									key code leftOrRightArrowKeyCode
-									delay 0.25
-									if (currentlySelectedStartupDiskValue is not equal to (value of static text 2 of startupDisksSelectionGroup)) then exit repeat
-								end repeat
-							end tell
+							set currentlySelectedStartupDiskValue to "UNKNOWN"
+							set didChangeStartupDiskSelection to false
 							
-							if (not didAuthenticateStartupDisk) then
+							repeat 30 times
+								try
+									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+										-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
+										set frontmost to true
+										
+										if (isTahoeOrNewer) then
+											set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 3 of splitter group 1 of group 1 of window 1)
+										else if (isSonomaOrNewer) then
+											set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+										else
+											set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+										end if
+										
+										if (currentlySelectedStartupDiskValue is equal to "UNKNOWN") then
+											set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
+										else if (currentlySelectedStartupDiskValue is not equal to (value of static text 2 of startupDisksSelectionGroup)) then -- If not first iteration, check if previous iteration already changed the selection (see comments below about how an exception could have gotten thrown getting the changed text value after actually changing the selection).
+											set didChangeStartupDiskSelection to true
+										end if
+										
+										if (not didChangeStartupDiskSelection) then
+											set focused of (scroll area 1 of startupDisksSelectionGroup) to true
+											repeat 5 times -- Click up to 5 times until the selected startup disk changed (in case some clicks get lost)
+												set frontmost to true
+												key code leftOrRightArrowKeyCode
+												delay 0.25
+												if (currentlySelectedStartupDiskValue is not equal to (value of static text 2 of startupDisksSelectionGroup)) then -- On first boot of macOS 26 Tahoe during the first launch of System Settings, getting this text value here can throw an exception for some reason, so wrap the whole block in a "try" within a "repeat" loop to reattempt since it should work on next attempt without having to quit System Settings and try the whole process again. 
+													set didChangeStartupDiskSelection to true
+													exit repeat
+												end if
+											end repeat
+										end if
+									end tell
+								end try
+								
+								if didChangeStartupDiskSelection then exit repeat
+								delay 1
+							end repeat
+							
+							if (not didChangeStartupDiskSelection) then
+								error "FAILED to Change Startup Disk Selection"
+							else if (not didAuthenticateStartupDisk) then
 								set didTryToAuthenticateStartupDisk to false
 								if (isVenturaThirteenDotThreeOrNewer) then
 									-- Starting on macOS 13.3 Ventura, the System Settings password authentication prompt is now handled by "LocalAuthenticationRemoteService" XPC service within a regular sheet of the System Setting app instead of the "SecurityAgent.bundle" which presented a separate app prompt window.
+									repeat 60 times -- Wait for password prompt
+										delay 0.5
+										try
+											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+												set frontmost to true
+												if (((number of sheets of window (number of windows)) is equal to 1) and ((number of buttons of sheet 1 of window (number of windows)) is equal to 2) and ((number of text fields of sheet 1 of window (number of windows)) is equal to 2)) then exit repeat
+											end tell
+										end try
+										delay 0.5
+									end repeat
+									
 									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
-										repeat 60 times -- Wait for password prompt
-											delay 0.5
-											set frontmost to true
-											if ((number of sheets of window (number of windows)) is equal to 1) then exit repeat
-											delay 0.5
-										end repeat
-										
 										if ((number of sheets of window (number of windows)) is equal to 1) then
 											repeat with thisSheetButton in (buttons of sheet 1 of window (number of windows))
 												if (((name of thisSheetButton) is equal to "Unlock") or ((name of thisSheetButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
@@ -785,7 +815,7 @@ ObjC.import(\"CoreServices\");
 									
 									if (isSonomaOrNewer) then -- On macOS 14 Sonoma, ANOTHER standalone SecurityAgent auth prompt comes up AFTER the initial LocalAuthenticationRemoteService XPC sheet prompt WHEN RUNNING AS A STANDARD USER.
 										set didTryToAuthenticateStartupDisk to false
-										repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
+										repeat 30 times -- Wait up to 30 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
 											delay 1
 											try
 												if (application securityAgentPath is running) then
@@ -800,8 +830,8 @@ ObjC.import(\"CoreServices\");
 																	exit repeat
 																end if
 															end repeat
+															exit repeat
 														end if
-														exit repeat
 													end tell
 												end if
 											end try
@@ -823,8 +853,8 @@ ObjC.import(\"CoreServices\");
 																exit repeat
 															end if
 														end repeat
+														exit repeat
 													end if
-													exit repeat
 												end tell
 											end if
 										end try
@@ -877,7 +907,9 @@ ObjC.import(\"CoreServices\");
 							
 							if (didAuthenticateStartupDisk) then
 								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
-									if (isSonomaOrNewer) then
+									if (isTahoeOrNewer) then
+										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 3 of splitter group 1 of group 1 of window 1)
+									else if (isSonomaOrNewer) then
 										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
 									else
 										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
@@ -888,6 +920,17 @@ ObjC.import(\"CoreServices\");
 									end if
 								end tell
 							else
+								if (isSonomaOrNewer) then -- The SECOND SecurityAgent prompt on macOS 14 Sonoma DOES NOT close on its own when System Settings is quit.
+									if (application securityAgentPath is running) then
+										tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+											if ((number of windows) is 1) then
+												set frontmost to true
+												key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
+											end if
+										end tell
+									end if
+								end if
+								
 								if (isVenturaThirteenDotThreeOrNewer) then
 									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 										if ((number of sheets of window (number of windows)) is equal to 1) then
@@ -895,17 +938,6 @@ ObjC.import(\"CoreServices\");
 											key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
 										end if
 									end tell
-									
-									if (isSonomaOrNewer) then -- The SECOND SecurityAgent prompt on macOS 14 Sonoma DOES NOT close on its own when System Settings is quit.
-										if (application securityAgentPath is running) then
-											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
-												if ((number of windows) is 1) then
-													set frontmost to true
-													key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
-												end if
-											end tell
-										end if
-									end if
 								end if -- Do not need to cancel the SecurityAgent prompt since it will just be closed when System Settings is quit and will not block quitting.
 								
 								exit repeat -- If did not authenticate, better to exit this loop and start all over with System Settings being quit and re-launched instead of continuing to arrow through the Startup Disks.
@@ -924,17 +956,16 @@ ObjC.import(\"CoreServices\");
 										set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of window 1)
 										
 										set currentlySelectedStartupDiskValue to (value of static text 1 of window 1)
-										if ((value of static text 1 of window 1) ends with ("“" & chosenStartupDiskName & ".”")) then -- Check if the internal drive is already set as the Startup Disk.
+										if ((value of static text 1 of window 1) ends with ("“" & chosenStartupDiskName & ".”")) then -- Check if the chosen drive is already set as the Startup Disk.
 											set didSetStartUpDisk to true
 										else
-											if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the internal disk is to the right or left of that.
-												set foundSelectedStartupDisk to false
+											if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the chosen disk is to the right or left of that.
 												repeat with thisStartupDiskGroup in (groups of list 1 of scroll area 1 of window 1)
 													set thisStartDiskName to (value of static text 1 of thisStartupDiskGroup)
 													if (currentlySelectedStartupDiskValue ends with ("“" & thisStartDiskName & ".”")) then
-														exit repeat -- If we found the selected startup disk and have not found the internal disk yet, they means it must be to the RIGHT, which leftOrRightArrowKeyCode is already set to.
-													else if (thisStartDiskName is equal to selectedStartupDiskName) then
-														-- If we're at the internal disk and we HAVE NOT already passed the selected disk (since we haven't exited to loop yet), we need to move LEFT from the selected disk.
+														exit repeat -- If we found the selected startup disk and have not found the chosen disk yet, they means it must be to the RIGHT, which leftOrRightArrowKeyCode is already set to.
+													else if (thisStartDiskName is equal to chosenStartupDiskName) then
+														-- If we're at the chosen disk and we HAVE NOT already passed the selected disk (since we haven't exited to loop yet), we need to move LEFT from the selected disk.
 														set leftOrRightArrowKeyCode to 123 -- LEFT ARROW Key
 														exit repeat
 													end if
@@ -947,7 +978,7 @@ ObjC.import(\"CoreServices\");
 								else
 									if ((number of radio buttons of radio group 1 of scroll area 1 of group 1 of splitter group 1 of window 1) is not 0) then
 										delay 3 -- Wait a few more seconds for disks to load since it's possible that not all startup disks are actually loaded yet.
-										set didSetStartUpDisk to ((value of static text 2 of group 1 of splitter group 1 of window 1) ends with ("“" & chosenStartupDiskName & ".”")) -- Check if the internal drive is already set as the Startup Disk.
+										set didSetStartUpDisk to ((value of static text 2 of group 1 of splitter group 1 of window 1) ends with ("“" & chosenStartupDiskName & ".”")) -- Check if the chosen drive is already set as the Startup Disk.
 										
 										exit repeat
 									end if

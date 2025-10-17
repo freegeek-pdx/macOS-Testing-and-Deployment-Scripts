@@ -5,7 +5,7 @@ get_marketing_model_name() {
 	##
 	## Created by Pico Mitchell (of Free Geek)
 	##
-	## Version: 2023.11.8-1
+	## Version: 2025.10.10-1
 	##
 	## MIT License
 	##
@@ -285,7 +285,7 @@ Xserve (Late 2006):Xserve1,1:'
 		marketing_model_name+=" / ${MODEL_IDENTIFIER}"
 	fi
 
-	if $INCLUDE_MODEL_PART_NUMBER && { $IS_APPLE_SILICON || [[ -n "$(ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1)" ]]; }; then # The "M####LL/A" style Model Part Number is only be accessible in software on Apple Silicon or T2 Macs.
+	if $INCLUDE_MODEL_PART_NUMBER && { $IS_APPLE_SILICON || [[ -n "$(ioreg -rn 'Apple T2 Controller' -d 1)" ]]; }; then # The "M####LL/A" style Model Part Number is only be accessible in software on Apple Silicon or T2 Macs.
 		local possible_model_part_number
 		possible_model_part_number="$(/usr/libexec/remotectl dumpstate | awk '($1 == "RegionInfo") { if ($NF == "=>") { region_info = "LL/A" } else { region_info = $NF } } ($1 == "ModelNumber") { if ($NF ~ /\//) { print $NF } else { print $NF region_info } exit }')" # I have seen a T2 Mac without any "RegionInfo" specified, so just assume "LL/A" (USA) in that case.
 		if [[ "${possible_model_part_number}" == *'/'* ]]; then

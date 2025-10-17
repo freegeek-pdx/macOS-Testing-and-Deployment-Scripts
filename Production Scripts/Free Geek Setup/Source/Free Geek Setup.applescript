@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.2-1
+-- Version: 2025.10.16-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -238,7 +238,21 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		end timeout
 	end try
 	
-	-- TURN OFF SCREEN LOCK (only do this on Mojave and newer since that is when the "sysadminctl -screenLock off" command was added, on High Sierra Screen Lock will be disabled with GUI scripting during "Cleanup After QA Complete".
+	if (isTahoeOrNewer) then
+		-- On first boot of macOS 26 Tahoe, it seems to take a while for the Dock and desktop background become visible and the system to be fully ready and settled (unlike previous versions of macOS).
+		-- So, wait for Dock Extra XPC service to launch before continuing (NOT just Dock which launches early even though it won't be visible).
+		-- The Dock Extra XPC service seems to load during/after the Dock and desktop background become visible and CPU usage settles down.
+		
+		try
+			set dockExtraXPCServicePath to "/System/Library/CoreServices/Dock.app/Contents/XPCServices/com.apple.dock.extra.xpc/Contents/MacOS/com.apple.dock.extra"
+			((dockExtraXPCServicePath as POSIX file) as alias) -- Make sure file exists to not infinite loop if changes in the future.
+			repeat until (application dockExtraXPCServicePath is running)
+				delay 1
+			end repeat
+		end try
+	end if
+	
+	-- TURN OFF SCREEN LOCK (Check for Mojave or newer since that is when the "sysadminctl -screenLock off" command was added.)
 	if (isMojaveOrNewer) then
 		try
 			do shell script "printf '%s' " & (quoted form of demoPassword) & " | sysadminctl -screenLock off -password -"
@@ -273,7 +287,7 @@ killall ControlStrip
 		((("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app") as POSIX file) as alias)
 		
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script ("open -na '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
 		end try
 		
@@ -316,7 +330,7 @@ killall ControlStrip
 			end repeat
 			
 			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 				do shell script ("open -na " & (quoted form of freeGeekUpdaterAppPath))
 			end try
 			
@@ -327,7 +341,7 @@ killall ControlStrip
 	
 	set hasT2chip to false
 	try
-		set hasT2chip to ((do shell script "ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
+		set hasT2chip to ((do shell script "ioreg -rn 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
 	end try
 	
 	set isAppleSilicon to false
@@ -345,6 +359,7 @@ killall ControlStrip
 		set bundleIDofFreeGeekUpdaterApp to "org.freegeek.Free-Geek-Updater"
 		set bundleIDofFreeGeekSnapshotHelperApp to "org.freegeek.Free-Geek-Snapshot-Helper"
 		set bundleIDofFreeGeekDemoHelperApp to "org.freegeek.Free-Geek-Demo-Helper"
+		set bundleIDofFreeGeekTaskRunnerApp to "org.freegeek.Free-Geek-Task-Runner"
 		set bundleIDofCleanupAfterQACompleteApp to "org.freegeek.Cleanup-After-QA-Complete"
 		set bundleIDofKeyboardTestApp to "org.freegeek.Keyboard-Test"
 		set bundleIDofFreeGeekResetApp to "org.freegeek.Free-Geek-Reset"
@@ -357,6 +372,7 @@ killall ControlStrip
 			-- Full Disk Access was introduced in macOS 10.14 Mojave.
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceSystemPolicyAllFiles")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access") -- This should not be possible to hit since reading the global TCC.db would have errored if this app didn't have FDA, but check anyways.
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Demo Helper” DOES NOT HAVE REQUIRED Full Disk Access"
+			if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekTaskRunnerApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Task Runner” DOES NOT HAVE REQUIRED Full Disk Access"
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofCleanupAfterQACompleteApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Cleanup After QA Complete” DOES NOT HAVE REQUIRED Full Disk Access"
 			
 			set snapshotHelperIsInstalled to false
@@ -423,6 +439,7 @@ killall ControlStrip
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekUpdaterApp & "|kTCCServiceMicrophone")) then error "“Free Geek Updater” WAS NOT DENIED Microphone Access"
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekSnapshotHelperApp & "|kTCCServiceMicrophone")) then error "“Free Geek Snapshot Helper” WAS NOT DENIED Microphone Access"
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceMicrophone")) then error "“Free Geek Demo Helper” WAS NOT DENIED Microphone Access"
+					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekTaskRunnerApp & "|kTCCServiceMicrophone")) then error "“Free Geek Task Runner” WAS NOT DENIED Microphone Access"
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofCleanupAfterQACompleteApp & "|kTCCServiceMicrophone")) then error "“Cleanup After QA Complete” WAS NOT DENIED Microphone Access"
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofKeyboardTestApp & "|kTCCServiceMicrophone")) then error "“Keyboard Test” WAS NOT DENIED Microphone Access"
 				end if
@@ -439,6 +456,7 @@ killall ControlStrip
 				set csreqForFreeGeekUpdaterApp to "fade0c00000000ac0000000100000006000000020000001e6f72672e667265656765656b2e467265652d4765656b2d557064617465720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForFreeGeekSnapshotHelperApp to "fade0c00000000b4000000010000000600000002000000266f72672e667265656765656b2e467265652d4765656b2d536e617073686f742d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForFreeGeekDemoHelperApp to "fade0c00000000b0000000010000000600000002000000226f72672e667265656765656b2e467265652d4765656b2d44656d6f2d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
+				set csreqForFreeGeekTaskRunnerApp to "fade0c00000000b0000000010000000600000002000000226f72672e667265656765656b2e467265652d4765656b2d5461736b2d52756e6e65720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForCleanupAfterQACompleteApp to "fade0c00000000b4000000010000000600000002000000266f72672e667265656765656b2e436c65616e75702d41667465722d51412d436f6d706c6574650000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForKeyboardTestApp to "fade0c00000000a80000000100000006000000020000001a6f72672e667265656765656b2e4b6579626f6172642d546573740000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForQAHelperApp to "fade0c00000000a4000000010000000600000002000000166f72672e667265656765656b2e51412d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
@@ -497,6 +515,7 @@ killall ControlStrip
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekUpdaterApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekUpdaterApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekSnapshotHelperApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekSnapshotHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekDemoHelperApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekDemoHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekTaskRunnerApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekTaskRunnerApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofCleanupAfterQACompleteApp & "',0," & unauthorizedFields & ",1,X'" & csreqForCleanupAfterQACompleteApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofKeyboardTestApp & "',0," & unauthorizedFields & ",1,X'" & csreqForKeyboardTestApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 				end if
@@ -635,7 +654,7 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.Safari/
 			doShellScriptAsAdmin("touch " & (quoted form of (buildInfoPath & ".fgSetupLaunchedDemoHelper")))
 		end try
 		
-		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+		-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 		do shell script ("open -na " & (quoted form of demoHelperAppPath)) -- Launch Demo Helper once first before any other long processes start and any situations that may cause Setup to not finish. Demo Helper will be set to auto-launch after Setup is finished.
 		
 		set demoHelperDidLaunch to false
@@ -794,7 +813,7 @@ ObjC.import(\"CoreServices\");
 			end try
 			try
 				tell application id "com.apple.systempreferences"
-					repeat 180 times -- Wait for Security pane to load
+					repeat 180 times -- Wait for Startup Disk pane to load
 						try
 							activate
 						end try
@@ -867,7 +886,9 @@ ObjC.import(\"CoreServices\");
 						repeat 30 times -- Wait for startup disk list to populate
 							delay 1
 							try
-								if (isSonomaOrNewer) then
+								if (isTahoeOrNewer) then
+									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 3 of splitter group 1 of group 1 of window 1)
+								else if (isSonomaOrNewer) then
 									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
 								else
 									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
@@ -877,23 +898,20 @@ ObjC.import(\"CoreServices\");
 									delay 3 -- Wait a few more seconds for disks to load since it's possible that not all startup disks are actually loaded yet.
 									set numberOfStartupDisks to (number of groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
 									
-									set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup) -- Check if the internal drive is already set as the Startup Disk.
-									if (currentlySelectedStartupDiskValue ends with ("“" & nameOfBootedDisk & "”.")) then
+									set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
+									if (currentlySelectedStartupDiskValue ends with ("“" & nameOfBootedDisk & "”.")) then -- Check if the internal drive is already set as the Startup Disk.
 										set didSetStartUpDisk to true
-									else
-										if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the internal disk is to the right or left of that.
-											set foundSelectedStartupDisk to false
-											repeat with thisStartupDiskGroup in (groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
-												set thisStartDiskName to (value of static text 1 of thisStartupDiskGroup)
-												if (currentlySelectedStartupDiskValue ends with ("“" & thisStartDiskName & "”.")) then
-													exit repeat -- If we found the selected startup disk and have not found the internal disk yet, they means it must be to the RIGHT, which leftOrRightArrowKeyCode is already set to.
-												else if (thisStartDiskName is equal to nameOfBootedDisk) then
-													-- If we're at the internal disk and we HAVE NOT already passed the selected disk (since we haven't exited to loop yet), we need to move LEFT from the selected disk.
-													set leftOrRightArrowKeyCode to 123 -- LEFT ARROW Key
-													exit repeat
-												end if
-											end repeat
-										end if
+									else if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the internal disk is to the right or left of that.
+										repeat with thisStartupDiskGroup in (groups of list 1 of scroll area 1 of startupDisksSelectionGroup)
+											set thisStartDiskName to (value of static text 1 of thisStartupDiskGroup)
+											if (currentlySelectedStartupDiskValue ends with ("“" & thisStartDiskName & "”.")) then
+												exit repeat -- If we found the selected startup disk and have not found the internal disk yet, they means it must be to the RIGHT, which leftOrRightArrowKeyCode is already set to.
+											else if (thisStartDiskName is equal to nameOfBootedDisk) then
+												-- If we're at the internal disk and we HAVE NOT already passed the selected disk (since we haven't exited to loop yet), we need to move LEFT from the selected disk.
+												set leftOrRightArrowKeyCode to 123 -- LEFT ARROW Key
+												exit repeat
+											end if
+										end repeat
 									end if
 									exit repeat
 								end if
@@ -905,36 +923,66 @@ ObjC.import(\"CoreServices\");
 						set didAuthenticateStartupDisk to false
 						
 						repeat numberOfStartupDisks times -- The loop should be exited before even getting through numberOfStartupDisks, but want some limit so we don't get stuck in an infinite loop if something goes very wrong.
-							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
-								-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
-								set frontmost to true
-								if (isSonomaOrNewer) then
-									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
-								else
-									set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
-								end if
-								set focused of (scroll area 1 of startupDisksSelectionGroup) to true
-								set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
-								repeat 5 times -- Click up to 5 times until the selected startup disk changed (in case some clicks get lost)
-									set frontmost to true
-									key code leftOrRightArrowKeyCode
-									delay 0.25
-									if (currentlySelectedStartupDiskValue is not equal to (value of static text 2 of startupDisksSelectionGroup)) then exit repeat
-								end repeat
-							end tell
+							set currentlySelectedStartupDiskValue to "UNKNOWN"
+							set didChangeStartupDiskSelection to false
 							
-							if (not didAuthenticateStartupDisk) then
+							repeat 30 times
+								try
+									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+										-- Can't click elements in new fancy Startup Disk list, but I can arrow through them.
+										set frontmost to true
+										
+										if (isTahoeOrNewer) then
+											set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 3 of splitter group 1 of group 1 of window 1)
+										else if (isSonomaOrNewer) then
+											set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+										else
+											set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
+										end if
+										
+										if (currentlySelectedStartupDiskValue is equal to "UNKNOWN") then
+											set currentlySelectedStartupDiskValue to (value of static text 2 of startupDisksSelectionGroup)
+										else if (currentlySelectedStartupDiskValue is not equal to (value of static text 2 of startupDisksSelectionGroup)) then -- If not first iteration, check if previous iteration already changed the selection (see comments below about how an exception could have gotten thrown getting the changed text value after actually changing the selection).
+											set didChangeStartupDiskSelection to true
+										end if
+										
+										if (not didChangeStartupDiskSelection) then
+											set focused of (scroll area 1 of startupDisksSelectionGroup) to true
+											repeat 5 times -- Click up to 5 times until the selected startup disk changed (in case some clicks get lost)
+												set frontmost to true
+												key code leftOrRightArrowKeyCode
+												delay 0.25
+												if (currentlySelectedStartupDiskValue is not equal to (value of static text 2 of startupDisksSelectionGroup)) then -- On first boot of macOS 26 Tahoe during the first launch of System Settings, getting this text value here can throw an exception for some reason, so wrap the whole block in a "try" within a "repeat" loop to reattempt since it should work on next attempt without having to quit System Settings and try the whole process again. 
+													set didChangeStartupDiskSelection to true
+													exit repeat
+												end if
+											end repeat
+										end if
+									end tell
+								end try
+								
+								if didChangeStartupDiskSelection then exit repeat
+								delay 1
+							end repeat
+							
+							if (not didChangeStartupDiskSelection) then
+								error "FAILED to Change Startup Disk Selection"
+							else if (not didAuthenticateStartupDisk) then
 								set didTryToAuthenticateStartupDisk to false
 								if (isVenturaThirteenDotThreeOrNewer) then
 									-- Starting on macOS 13.3 Ventura, the System Settings password authentication prompt is now handled by "LocalAuthenticationRemoteService" XPC service within a regular sheet of the System Setting app instead of the "SecurityAgent.bundle" which presented a separate app prompt window.
+									repeat 60 times -- Wait for password prompt
+										delay 0.5
+										try
+											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
+												set frontmost to true
+												if (((number of sheets of window (number of windows)) is equal to 1) and ((number of buttons of sheet 1 of window (number of windows)) is equal to 2) and ((number of text fields of sheet 1 of window (number of windows)) is equal to 2)) then exit repeat
+											end tell
+										end try
+										delay 0.5
+									end repeat
+									
 									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
-										repeat 60 times -- Wait for password prompt
-											delay 0.5
-											set frontmost to true
-											if ((number of sheets of window (number of windows)) is equal to 1) then exit repeat
-											delay 0.5
-										end repeat
-										
 										if ((number of sheets of window (number of windows)) is equal to 1) then
 											repeat with thisSheetButton in (buttons of sheet 1 of window (number of windows))
 												if (((name of thisSheetButton) is equal to "Unlock") or ((name of thisSheetButton) is equal to "Modify Settings")) then -- The button title is usually "Unlock" but I have occasionally seen it be "Modify Settings" during my testing and I'm not sure why, but check for either title.
@@ -950,7 +998,7 @@ ObjC.import(\"CoreServices\");
 									
 									if (isSonomaOrNewer) then -- On macOS 14 Sonoma, ANOTHER standalone SecurityAgent auth prompt comes up AFTER the initial LocalAuthenticationRemoteService XPC sheet prompt WHEN RUNNING AS A STANDARD USER.
 										set didTryToAuthenticateStartupDisk to false
-										repeat 10 times -- Wait up to 10 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
+										repeat 30 times -- Wait up to 30 seconds for SecurityAgent to launch and present the admin auth prompt since it can take a moment.
 											delay 1
 											try
 												if (application securityAgentPath is running) then
@@ -965,8 +1013,8 @@ ObjC.import(\"CoreServices\");
 																	exit repeat
 																end if
 															end repeat
+															exit repeat
 														end if
-														exit repeat
 													end tell
 												end if
 											end try
@@ -988,8 +1036,8 @@ ObjC.import(\"CoreServices\");
 																exit repeat
 															end if
 														end repeat
+														exit repeat
 													end if
-													exit repeat
 												end tell
 											end if
 										end try
@@ -1042,7 +1090,9 @@ ObjC.import(\"CoreServices\");
 							
 							if (didAuthenticateStartupDisk) then
 								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
-									if (isSonomaOrNewer) then
+									if (isTahoeOrNewer) then
+										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 3 of splitter group 1 of group 1 of window 1)
+									else if (isSonomaOrNewer) then
 										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
 									else
 										set startupDisksSelectionGroup to (group 1 of scroll area 1 of group 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1)
@@ -1053,6 +1103,17 @@ ObjC.import(\"CoreServices\");
 									end if
 								end tell
 							else
+								if (isSonomaOrNewer) then -- The SECOND SecurityAgent prompt on macOS 14 Sonoma DOES NOT close on its own when System Settings is quit.
+									if (application securityAgentPath is running) then
+										tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
+											if ((number of windows) is 1) then
+												set frontmost to true
+												key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
+											end if
+										end tell
+									end if
+								end if
+								
 								if (isVenturaThirteenDotThreeOrNewer) then
 									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.systempreferences")
 										if ((number of sheets of window (number of windows)) is equal to 1) then
@@ -1060,17 +1121,6 @@ ObjC.import(\"CoreServices\");
 											key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
 										end if
 									end tell
-									
-									if (isSonomaOrNewer) then -- The SECOND SecurityAgent prompt on macOS 14 Sonoma DOES NOT close on its own when System Settings is quit.
-										if (application securityAgentPath is running) then
-											tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is securityAgentID)
-												if ((number of windows) is 1) then
-													set frontmost to true
-													key code 53 -- Press ESCAPE in case something went wrong and the password prompt is still up.
-												end if
-											end tell
-										end if
-									end if
 								end if -- Do not need to cancel the SecurityAgent prompt since it will just be closed when System Settings is quit and will not block quitting.
 								
 								exit repeat -- If did not authenticate, better to exit this loop and start all over with System Settings being quit and re-launched instead of continuing to arrow through the Startup Disks.
@@ -1093,7 +1143,6 @@ ObjC.import(\"CoreServices\");
 											set didSetStartUpDisk to true
 										else
 											if (currentlySelectedStartupDiskValue is not equal to "") then -- If some startup disk is already selected, figure out if the internal disk is to the right or left of that.
-												set foundSelectedStartupDisk to false
 												repeat with thisStartupDiskGroup in (groups of list 1 of scroll area 1 of window 1)
 													set thisStartDiskName to (value of static text 1 of thisStartupDiskGroup)
 													if (currentlySelectedStartupDiskValue ends with ("“" & thisStartDiskName & ".”")) then
@@ -1320,7 +1369,7 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 				delay 0.2 -- Delay to make sure progress gets updated.
 				
 				try
-					doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect.
+					doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take effect.
 				end try
 			end if
 			
@@ -1948,6 +1997,7 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 		
 		-- NOTE: The following LaunchAgent is setup to run a signed script which launches the app and has "AssociatedBundleIdentifiers" specified to be properly displayed in the "Login Items" list in "System Settings" on macOS 13 Ventura and newer.
 		-- On macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the signed launcher script will behave just as if we ran "/usr/bin/open" directly via the LaunchAgent.
+		
 		set demoHelperLaunchAgentLabel to "org.freegeek.Free-Geek-Demo-Helper"
 		set demoHelperLaunchAgentPlistName to (demoHelperLaunchAgentLabel & ".plist")
 		set demoHelperUserLaunchAgentPlistPath to (userLaunchAgentsPath & demoHelperLaunchAgentPlistName)
@@ -1962,6 +2012,7 @@ If the hard drive was not replaced, and the fans are running high, there may be 
 	-c 'Add :StandardOutPath string /dev/null' \\
 	-c 'Add :StandardErrorPath string /dev/null' \\
 	" & (quoted form of demoHelperUserLaunchAgentPlistPath) & "
+
 launchctl bootstrap gui/$(id -u " & demoUsername & ") " & (quoted form of demoHelperUserLaunchAgentPlistPath))
 		end try
 		
@@ -1985,6 +2036,7 @@ launchctl bootstrap gui/$(id -u " & demoUsername & ") " & (quoted form of demoHe
 		end if
 		
 		do shell script ("launchctl bootout gui/$(id -u " & demoUsername & ")/org.freegeek.Free-Geek-Setup; rm -f " & (quoted form of (userLaunchAgentsPath & "org.freegeek.Free-Geek-Setup.plist")))
+		
 		try
 			set pathToMe to (POSIX path of (path to me))
 			if ((offset of ".app" in pathToMe) > 0) then

@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.9.12-1
+-- Version: 2025.10.13-1
 
 -- App Icon is “Victory Hand” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -125,7 +125,7 @@ try
 	
 	if (not freeGeekUpdaterIsRunning) then
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na '/Applications/Test Boot Setup.app'"
 		end try
 	end if
@@ -368,13 +368,13 @@ repeat
 	display dialog "				FINISHED Trackpad Click Tests
 
 	✅	CLICK TESTS PASSED IF:
-		⁃ The click action responded instantly in each zone.
- 		⁃ The click action never felt stiff, sticky, or funky.
+		• The click action responded instantly in each zone.
+ 		• The click action never felt stiff, sticky, or funky.
 
 	❌	CLICK TESTS FAILED IF:
-		⁃ The trackpad didn't click properly.
-		⁃ The click action didn't respond instantly.
-		⁃ The click action felt stiff, sticky, or funky in any zone.
+		• The trackpad didn't click properly.
+		• The click action didn't respond instantly.
+		• The click action felt stiff, sticky, or funky in any zone.
 
 
   ‼️ CONSULT AN INSTRUCTOR IF THERE WERE ANY ISSUES ‼️
@@ -574,16 +574,16 @@ repeat
 		display dialog "			FINISHED Trackpad Touch Tests
 
 	✅	TOUCH TESTS PASSED IF:
-		⁃ The trackpad always responded instantly.
-		⁃ The trackpad had no dead or rough zones.
-		⁃ Exactly where you touched the trackpad
+		• The trackpad always responded instantly.
+		• The trackpad had no dead or rough zones.
+		• Exactly where you touched the trackpad
 		  was exactly what you saw in “FingerMgmt”.
 
 	❌	TOUCH TESTS FAILED IF:
-		⁃ The trackpad is physically damaged in any way.
- 		⁃ The trackpad didn't respond instantly.
-		⁃ The trackpad had any dead zones.
-		⁃ Exactly where you touched the trackpad
+		• The trackpad is physically damaged in any way.
+ 		• The trackpad didn't respond instantly.
+		• The trackpad had any dead zones.
+		• Exactly where you touched the trackpad
 		  WAS NOT exactly what you saw in “FingerMgmt”.
 
 

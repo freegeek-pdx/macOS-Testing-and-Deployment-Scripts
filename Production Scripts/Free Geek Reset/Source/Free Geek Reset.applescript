@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.2-1
+-- Version: 2025.10.17-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: CFBundleAlternateNames: ["FG Reset", "fgreset", "Reset"]
@@ -116,7 +116,7 @@ set demoPassword to "freegeek"
 
 set hasT2chip to false
 try
-	set hasT2chip to ((do shell script "ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
+	set hasT2chip to ((do shell script "ioreg -rn 'Apple T2 Controller' -d 1") contains "Apple T2 Controller")
 end try
 
 set isAppleSilicon to false
@@ -145,7 +145,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		end try
 		display alert "“" & fgSetupName & "” Hasn't Finished Running" message "Please wait for “" & fgSetupName & "” to finish and then try running “" & (name of me) & "” again." buttons {"Quit"} default button 1 as critical giving up after 15
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/" & fgSetupName & ".app"))
 		end try
 		quit
@@ -161,7 +161,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		end try
 		display alert "“" & cleanupAppName & "” Hasn't Been Run Yet" message "“" & cleanupAppName & "” must be run before this Mac can be reset." buttons {"Launch “" & cleanupAppName & "”"} default button 1 as critical giving up after 15
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/" & cleanupAppName & ".app"))
 		end try
 		quit
@@ -180,7 +180,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 			((("/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app") as POSIX file) as alias)
 			
 			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 				do shell script ("open -na '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
 			end try
 			
@@ -598,9 +598,19 @@ on errorAndQuit(errorMessage)
 	try
 		do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 	end try
-	display alert "CRITICAL “" & (name of me) & "” ERROR:
+	
+	try
+		display alert "CRITICAL “" & (name of me) & "” ERROR:
 
-" & errorMessage message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Quit"} default button 1 as critical
+" & errorMessage message "This should not have happened, please inform and deliver this Mac to Free Geek I.T. for further research." buttons {"Quit", "Try Again"} cancel button 1 default button 2 as critical
+		
+		quitAllApps()
+		
+		try
+			do shell script "osascript -e 'delay 0.5' -e 'repeat while (application \"" & (POSIX path of (path to me)) & "\" is running)' -e 'delay 0.5' -e 'end repeat' -e 'do shell script \"open -na \\\"" & (POSIX path of (path to me)) & "\\\"\"' > /dev/null 2>&1 &"
+		end try
+	end try
+	
 	quit
 	delay 10
 end errorAndQuit
@@ -1012,7 +1022,7 @@ on clearNVRAMandCheckStartupSecurityAndClearSIP()
 				errorAndQuit("System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac.") -- "Erase Assistant" (EAC&S) reset will actually still work with SIP disabled on an Apple Silicon Mac and it will re-enable it, but error anyways since this shouldn't happen.
 			else
 				try
-					doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect, which will happen after Erase Assistant has been run.
+					doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take effect, which will happen after Erase Assistant has been run.
 				end try
 			end if
 		end if

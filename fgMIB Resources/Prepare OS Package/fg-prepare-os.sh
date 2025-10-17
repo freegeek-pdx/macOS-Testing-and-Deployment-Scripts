@@ -30,11 +30,11 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2025.6.24-1'
+readonly SCRIPT_VERSION='2025.10.16-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
-DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 18 = 10.14, 19 = 10.15, 20 = 11.0, 21 = 12.0, 22 = 13.0, 23 = 14.0, etc.
+DARWIN_MAJOR_VERSION="$(uname -r | cut -d '.' -f 1)" # 19 = 10.15 Catalina, 20 = 11 Big Sur, 21 = 12 Monterey, 22 = 13 Ventura, 23 = 14 Sonoma, 24 = 15 Sequoia, 25 = 26 Tahoe, etc.
 readonly DARWIN_MAJOR_VERSION
 
 TMPDIR="$([[ -d "${TMPDIR}" && -w "${TMPDIR}" ]] && echo "${TMPDIR%/}/" || echo '/private/tmp/')" # Make sure "TMPDIR" is always set and that it always has a trailing slash for consistency regardless of the current environment.
@@ -1126,7 +1126,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			declare -a create_hidden_admin_user_options=(
 				'--account-name' "${hidden_admin_user_account_name}"
 				'--full-name' "${hidden_admin_user_full_name}"
-				'--generated-uid' '0CAA0000-0A00-0000-BA00-0B000C00B00A' # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT208050
+				'--generated-uid' '0CAA0000-0A00-0000-BA00-0B000C00B00A' # This GUID is from the "johnappleseed" user shown on https://web.archive.org/web/20221023033850/https://support.apple.com/en-us/HT208050
 				'--stdin-password'
 				'--password-hint' 'If you do not know this password, then you should not be logging in as this user.'
 				'--picture' "${fg_user_picture_path}"
@@ -1169,7 +1169,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 			declare -a create_standard_autologin_user_options=(
 				'--account-name' "${standard_autologin_user_account_name}"
 				'--full-name' "${standard_autologin_user_full_name}"
-				'--generated-uid' 'B0ABCAB0-D000-00C0-A0D0-00000CA000C0' # This GUID is from the "johnappleseed" user shown on https://support.apple.com/en-us/HT201548 (which is different from the one above)
+				'--generated-uid' 'B0ABCAB0-D000-00C0-A0D0-00000CA000C0' # This GUID is from the "johnappleseed" user shown on https://support.apple.com/102547 (which is different from the one above)
 				'--stdin-password'
 				'--password-hint' "The password is \"${standard_autologin_user_password}\"."
 				'--picture' "${fg_user_picture_path}"
@@ -1263,6 +1263,14 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults delete 'com.apple.finder' NewWindowTargetPath &> /dev/null
 
 
+						if (( DARWIN_MAJOR_VERSION >= 23 )); then
+
+							# DISABLE "CLICK WALLPAPER TO SHOW DESKTOP ITEMS" ON SONOMA AND NEWER
+
+							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.WindowManager' EnableStandardClickToShowDesktop -bool false
+						fi
+
+
 						# DISABLE DICTATION (Don't want to alert to turn on dictation when clicking Fn multiple times)
 
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.HIToolbox' AppleDictationAutoEnable -bool false
@@ -1329,7 +1337,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 								plutil -insert 'scheduledTime.enabled' -bool true -o - - |
 								plutil -insert 'scheduledTime.end' -float 1439 -o - - |
 								plutil -insert 'scheduledTime.start' -float 0 -o - - |
-								plutil -convert binary1 -o - - | xxd -p | tr -d '[:space:]')" # "xxd" converts the binary data into hex, which is what "defaults" needs.
+								plutil -convert binary1 -o - - | xxd -p | tr -d '[:space:]')" # "xxd" converts the binary data into hex, which is what "defaults write" needs.
 						else
 							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults -currentHost write 'com.apple.notificationcenterui' dndEnabledDisplayLock -bool true
 							launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults -currentHost write 'com.apple.notificationcenterui' dndEnabledDisplaySleep -bool true
@@ -1341,9 +1349,16 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 
 						# DISABLE NOTIFICATIONS FOR BACKGROUND TASK MANAGEMENT ON VENTURA (TO HIDE NOTIFICATIONS WHEN ADDING A LAUNCHDAEMON OR LAUNCHAGENT)
-						# On macOS 13 Ventura, each new login item, LaunchDaemon, or LaunchAgent added posts a notification to inform the user, which is great for regular users but unnecessary for our technicians during testing (such as when the "Free Geek Demo Helper" LaunchAgent is created by "Free Geek Setup").
+						# On macOS 13 Ventura and newer, each new login item, LaunchDaemon, or LaunchAgent added posts a notification to inform the user, which is great for regular users but unnecessary for our technicians during testing (such as when the "Free Geek Demo Helper" LaunchAgent is created by "Free Geek Setup").
 						# So, completely disable all notifications from the "BTMNotificationAgent" process which will hide these new "Background Task Management" notifications.
-						# Credit to @LucasM on the MacAdmins Slack for discovering and sharing how to disable these notifications: https://macadmins.slack.com/archives/GA92U9YV9/p1663919213484999?thread_ts=1663782045.275729&channel=GA92U9YV9&message_ts=1663919213.484999
+						# Credit to @macmol.tech on the MacAdmins Slack for discovering and sharing how to disable these notifications: https://macadmins.slack.com/archives/GA92U9YV9/p1663919213484999?thread_ts=1663782045.275729&channel=GA92U9YV9&message_ts=1663919213.484999
+
+						# On macOS 26 Tahoe, the settings to disable notifications have moved from the "com.apple.ncprefs" preferences domain to "~/Library/Group Containers/group.com.apple.usernoted/Library/Preferences/group.com.apple.usernoted.plist"
+						# and any settings set in "com.apple.ncprefs" domain will be migrated to there, EXCEPT macOS will overwrite the "com.apple.BTMNotificationAgent" settings with a "flags" value that show the notifications (even if set directly in the new path).
+						# But, if the "flags" value is set after login, they seem at least take effect temporarily before macOS overwrites them again.
+						# So, on macOS 26 Tahoe and newer, also set up a LaunchAgent run by "Free Geek Task Runner" (which has Full Disk Access which is required to modify files in another apps Group Container)
+						# to run at login and also whenever the new "usernoted" preferences path is modified (via "WatchPaths") to re-set the "flags" value for "com.apple.BTMNotificationAgent" to be re-disabled immediately whenever macOS overwrites them.
+						# NOTE: The LaunchAgent described above is created below after the "Free Geek Task Runner" app has been installed.
 
 						notification_center_disable_all_flags='8401217' # macOS 11 Big Sur and newer: "Allow Notifications" disabled, alert style "None", and every checkbox option disabled.
 
@@ -1590,6 +1605,9 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 								fi
 
 
+								this_user_launch_agents_folder="${this_home_folder}/Library/LaunchAgents"
+								mkdir -p "${this_user_launch_agents_folder}"
+
 								if [[ -d "${this_user_apps_folder}/Free Geek Setup.app" ]]; then
 
 									write_to_log "Preparing \"Free Geek Setup\" for \"${this_username}\" User"
@@ -1604,10 +1622,6 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 
 									# SETUP FREE GEEK SETUP AUTO-LAUNCH
-
-									this_user_launch_agents_folder="${this_home_folder}/Library/LaunchAgents"
-
-									mkdir -p "${this_user_launch_agents_folder}"
 
 									# NOTE: In the following "Free Geek Setup" LaunchAgent, the AssociatedBundleIdentifiers key is set to "org.freegeek.Free-Geek-Setup" so that the LaunchAgent is displayed nicely in the new Login Items section in macOS 13 Ventura.
 									# This also requires "Program" argument be a SIGNED script or binary with with the same Team ID as the app of the AssociatedBundleIdentifiers, so the "Launch Free Geek Setup" script
@@ -1638,9 +1652,67 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 										-c 'Add :StandardOutPath string /dev/null' \
 										-c 'Add :StandardErrorPath string /dev/null' \
 										"${this_user_launch_agents_folder}/org.freegeek.Free-Geek-Setup.plist" &> /dev/null
-
-									chown -R "${this_uid}:20" "${this_user_launch_agents_folder}"
 								fi
+
+								if (( DARWIN_MAJOR_VERSION >= 25 )) && [[ -d "${this_user_apps_folder}/Free Geek Task Runner.app" && -d '/System/Library/UserNotifications/Bundles/com.apple.BTMNotificationAgent.bundle' ]]; then
+
+									write_to_log "Creating LaunchAgent to Disable BTM Notifications for \"${this_username}\" User"
+
+									# NOTE: See comments in "SETUP FREE GEEK SETUP AUTO-LAUNCH" section above for information about "AssociatedBundleIdentifiers", and using "LSRegisterURL" and "open" for the "Free Geek Task Runner" app name and icon properly show for the following LaunchAgent in the Login Items section.
+									osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); run = argv => $.LSRegisterURL($.NSURL.fileURLWithPath(argv[0]), true)' -- "${this_user_apps_folder}/Free Geek Task Runner.app" &> /dev/null
+									launchctl asuser "${this_uid}" sudo -u "${this_username}" open -na "${this_user_apps_folder}/Free Geek Task Runner.app"
+
+									# NOTE: See comments in "DISABLE NOTIFICATIONS FOR BACKGROUND TASK MANAGEMENT" section above for information about why this LaunchAgent is being created on macOS 26 Tahoe to disable BTM notifications.
+									PlistBuddy \
+										-c 'Add :Label string org.freegeek.Disable-BTM-Notifications' \
+										-c 'Add :ProgramArguments array' \
+										-c "Add :ProgramArguments: string '${this_user_apps_folder}/Free Geek Task Runner.app/Contents/Resources/Launch Free Geek Task Runner'" \
+										-c "Add :ProgramArguments: string bash" \
+										-c 'Add :AssociatedBundleIdentifiers string org.freegeek.Free-Geek-Task-Runner' \
+										-c 'Add :RunAtLoad bool true' \
+										-c 'Add :WatchPaths array' \
+										-c "Add :WatchPaths: string '${this_home_folder}/Library/Group Containers/group.com.apple.usernoted/Library/Preferences/group.com.apple.usernoted.plist'" \
+										-c 'Add :StandardOutPath string /dev/null' \
+										-c 'Add :StandardErrorPath string /dev/null' \
+										"${this_user_launch_agents_folder}/org.freegeek.Disable-BTM-Notifications.plist" &> /dev/null
+
+									disable_btm_notifications_code="
+PATH='/usr/bin:/bin:/usr/sbin:/sbin'
+
+TMPDIR=\"\$([[ -d \"\${TMPDIR}\" && -w \"\${TMPDIR}\" ]] && echo \"\${TMPDIR%/}/\" || echo '/private/tmp/')\" # Make sure TMPDIR is always set and that it always has a trailing slash for consistency regardless of the current environment.
+
+rm -rf \"\${TMPDIR}fg-usernoted.plist\"
+
+usernoted_preferences_domain='${this_home_folder}/Library/Group Containers/group.com.apple.usernoted/Library/Preferences/group.com.apple.usernoted'
+defaults export \"\${usernoted_preferences_domain}\" \"\${TMPDIR}fg-usernoted.plist\"
+
+this_usernoted_apps_index=0
+while this_usernoted_apps_bundle_id=\"\$(plutil -extract \"apps.\${this_usernoted_apps_index}.bundle-id\" raw \"\${TMPDIR}fg-usernoted.plist\" -o - 2> /dev/null)\"; do
+	if [[ \"\${this_usernoted_apps_bundle_id}\" == 'com.apple.BTMNotificationAgent' ]]; then
+		if [[ \"\$(plutil -extract \"apps.\${this_usernoted_apps_index}.flags\" raw \"\${TMPDIR}fg-usernoted.plist\" -o - 2> /dev/null)\" != '${notification_center_disable_all_flags}' ]]; then
+			plutil -replace \"apps.\${this_usernoted_apps_index}.flags\" -integer '${notification_center_disable_all_flags}' \"\${TMPDIR}fg-usernoted.plist\"
+			defaults import \"\${usernoted_preferences_domain}\" \"\${TMPDIR}fg-usernoted.plist\"
+			killall usernoted
+		fi
+
+		break
+	fi
+
+	(( this_usernoted_apps_index ++ ))
+done
+
+rm -f \"\${TMPDIR}fg-usernoted.plist\"
+"
+
+									plutil -insert 'ProgramArguments' -string "${disable_btm_notifications_code}" -append "${this_user_launch_agents_folder}/org.freegeek.Disable-BTM-Notifications.plist"
+									# Use "plutil" for script code that may contain special xml/plist characters that need to be escaped.
+									# "PlistBuddy" would escape special xml/plist characters in values properly too, but because of how "PlistBuddy" values need to be specified inside of commands that
+									# are within a quoted string means that quotes in the values (which also exist) would need to be escaped to not break the "PlistBuddy" commands themselves.
+									# That possible nested quoting issue doesn't exist with "plutil" because of how values are specified as their own separate argument rather than within commands like with "PlistBuddy".
+								fi
+
+								chown -R "${this_uid}:20" "${this_user_launch_agents_folder}"
+
 
 								if [[ -f '/Users/Shared/.fgResetSnapshotCreated' && -d "${this_user_apps_folder}/Free Geek Snapshot Helper.app" ]]; then
 

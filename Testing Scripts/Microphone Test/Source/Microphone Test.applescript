@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.9.12-1
+-- Version: 2025.10.13-1
 
 -- App Icon is “Studio Microphone” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -124,7 +124,7 @@ try
 	
 	if (not freeGeekUpdaterIsRunning) then
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na '/Applications/Test Boot Setup.app'"
 		end try
 	end if
@@ -290,11 +290,11 @@ try
 
 
 	✅	MICROPHONE TEST PASSED IF:
-		⁃ You hear your recording crisply and clearly.
+		• You hear your recording crisply and clearly.
 
 	❌	MICROPHONE TEST FAILED IF:
-		⁃ Nothing gets recorded.
-		⁃ The recording doesn't sound crisp and clear.
+		• Nothing gets recorded.
+		• The recording doesn't sound crisp and clear.
 
 
 👉 CONSULT INSTRUCTOR IF MICROPHONE TEST FAILS ‼️" buttons microphoneTestButtons cancel button 1 default button 2 with title "Microphone Test"
@@ -411,11 +411,11 @@ try
 
 
 ✅	MICROPHONE TEST PASSED IF:
-	⁃ You hear your recording crisply and clearly.
+	• You hear your recording crisply and clearly.
 		
 ❌	MICROPHONE TEST FAILED IF:
-	⁃ Nothing got recorded.
-	⁃ The recording doesn't sound crisp and clear.
+	• Nothing got recorded.
+	• The recording doesn't sound crisp and clear.
 
 
 👉 CONSULT INSTRUCTOR IF MIC TEST FAILED ‼️" buttons {endPlaybackDialogButton} default button 1 with title (name of me) with icon note giving up after (microphoneTestDuration + 2)

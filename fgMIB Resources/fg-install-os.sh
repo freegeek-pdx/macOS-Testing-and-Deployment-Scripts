@@ -20,7 +20,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-readonly SCRIPT_VERSION='2025.9.10-1'
+readonly SCRIPT_VERSION='2025.10.16-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -56,10 +56,10 @@ fi
 
 BOOTED_BUILD_VERSION="$(sw_vers -buildVersion)"
 readonly BOOTED_BUILD_VERSION
-BOOTED_DARWIN_MAJOR_VERSION="$(echo "${BOOTED_BUILD_VERSION}" | cut -c -2 | tr -dc '[:digit:]')" # 18 = 10.14, 19 = 10.15, 20 = 11.0, 21 = 12.0, 22 = 13.0, 23 = 14.0, etc. ("uname -r" is not available in recoveryOS).
+BOOTED_DARWIN_MAJOR_VERSION="$(echo "${BOOTED_BUILD_VERSION}" | cut -c -2 | tr -dc '[:digit:]')" # 19 = 10.15 Catalina, 20 = 11 Big Sur, 21 = 12 Monterey, 22 = 13 Ventura, 23 = 14 Sonoma, 24 = 15 Sequoia, 25 = 26 Tahoe, etc. ("uname -r" is not available in recoveryOS).
 readonly BOOTED_DARWIN_MAJOR_VERSION
 
-HAS_T2_CHIP="$([[ "$1" == 'debugT2' || -n "$(ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1)" ]] && echo 'true' || echo 'false')"
+HAS_T2_CHIP="$([[ "$1" == 'debugT2' || -n "$(ioreg -rn 'Apple T2 Controller' -d 1)" ]] && echo 'true' || echo 'false')"
 if $HAS_T2_CHIP && [[ "$1" == 'debugNoT2' ]]; then HAS_T2_CHIP=false; fi
 readonly HAS_T2_CHIP
 
@@ -752,6 +752,7 @@ create_custom_global_tcc_database() {
 		# But, that would reduce security by allowing any app that's first to launch with the specified Bundle Identifier to be granted the specified TCC permissions (even though fraudulent apps spoofing our Bundle IDs isn't a risk in our environment).
 		local csreq_for_free_geek_setup_app='fade0c00000000a80000000100000006000000020000001c6f72672e667265656765656b2e467265652d4765656b2d5365747570000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000'
 		local csreq_for_free_geek_demo_helper_app='fade0c00000000b0000000010000000600000002000000226f72672e667265656765656b2e467265652d4765656b2d44656d6f2d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000'
+		local csreq_for_free_geek_task_runner_app='fade0c00000000b0000000010000000600000002000000226f72672e667265656765656b2e467265652d4765656b2d5461736b2d52756e6e65720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000'
 		local csreq_for_cleanup_after_qa_complete_app='fade0c00000000b4000000010000000600000002000000266f72672e667265656765656b2e436c65616e75702d41667465722d51412d436f6d706c6574650000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000'
 		local csreq_for_free_geek_snapshot_helper_app='fade0c00000000b4000000010000000600000002000000266f72672e667265656765656b2e467265652d4765656b2d536e617073686f742d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000'
 		local csreq_for_keyboard_clean_tool_app='fade0c00000000cc0000000100000006000000060000000f000000020000001f636f6d2e686567656e626572672e4b6579626f617264436c65616e546f6f6c00000000070000000e000000000000000a2a864886f7636406010900000000000000000006000000060000000e000000010000000a2a864886f763640602060000000000000000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a4441465653585a3832500000'
@@ -765,6 +766,7 @@ create_custom_global_tcc_database() {
 		if (( installed_os_darwin_major_version >= 18 )); then # Full Disk Access was introduced in macOS 10.14 Mojave
 			create_global_tcc_db_commands+="INSERT INTO access VALUES('kTCCServiceSystemPolicyAllFiles','org.freegeek.Free-Geek-Setup',0,${allowed_or_authorized_fields},1,X'${csreq_for_free_geek_setup_app}',${footer_fields});" # Free Geek Setup needs FDA since it confirms all of these Global TCC permissions got set correctly AND grants all apps their required User TCC permissions at first login.
 			create_global_tcc_db_commands+="INSERT INTO access VALUES('kTCCServiceSystemPolicyAllFiles','org.freegeek.Free-Geek-Demo-Helper',0,${allowed_or_authorized_fields},1,X'${csreq_for_free_geek_demo_helper_app}',${footer_fields});" # Free Geek Demo Helper just has FDA so that it can explicitly confirm all it's own TCC permissions are correct instead of needing to do implicit checks/prompts.
+			create_global_tcc_db_commands+="INSERT INTO access VALUES('kTCCServiceSystemPolicyAllFiles','org.freegeek.Free-Geek-Task-Runner',0,${allowed_or_authorized_fields},1,X'${csreq_for_free_geek_task_runner_app}',${footer_fields});" # Free Geek Task Runner Helper has FDA to be able to run LaunchAgent scripts that require FDA.
 			create_global_tcc_db_commands+="INSERT INTO access VALUES('kTCCServiceSystemPolicyAllFiles','org.freegeek.Cleanup-After-QA-Complete',0,${allowed_or_authorized_fields},1,X'${csreq_for_cleanup_after_qa_complete_app}',${footer_fields});" # Cleanup After QA Complete just has FDA so that it can explicitly confirm all it's own TCC permissions are correct instead of needing to do implicit checks/prompts.
 
 			if (( installed_os_darwin_major_version >= 20 )); then

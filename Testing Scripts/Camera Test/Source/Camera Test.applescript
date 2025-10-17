@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.9.12-1
+-- Version: 2025.10.13-1
 
 -- App Icon is “Movie Camera” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -124,7 +124,7 @@ try
 	
 	if (not freeGeekUpdaterIsRunning) then
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na '/Applications/Test Boot Setup.app'"
 		end try
 	end if
@@ -223,14 +223,14 @@ try
 	
 	
 	✅	CAMERA TEST PASSED IF:
-		⁃ The image is crisp, clear, and bright.
-		⁃ There is no dark edge around the image.
-		⁃ There are no spots or artifacts in the image.
+		• The image is crisp, clear, and bright.
+		• There is no dark edge around the image.
+		• There are no spots or artifacts in the image.
 
 	❌	CAMERA TEST FAILED IF:
-		⁃ The image is blurry or dim.
-		⁃ There is a dark edge around the image.
-		⁃ There are any spots or artifacts in the image.
+		• The image is blurry or dim.
+		• There is a dark edge around the image.
+		• There are any spots or artifacts in the image.
 
 
 	👉 CONSULT INSTRUCTOR IF CAMERA TEST FAILS ‼️" buttons cameraTestButtons cancel button 1 default button 2 with title "Camera Test"

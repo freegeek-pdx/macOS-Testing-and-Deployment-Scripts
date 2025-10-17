@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.2-1
+-- Version: 2025.10.16-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -111,7 +111,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		
 		if ((do shell script ("id -F " & (quoted form of demoUsername))) is equal to "Free Geek Reset User") then -- Quit and launch "Free Geek Reset" if it's currently running or was started but somehow not finished (since this app will launch automatically at boot and periodically, this is a safety net if "Free Geek Reset" is somehow interrupted.)
 			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 				do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Reset.app"))
 			end try
 			
@@ -128,6 +128,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		set isVenturaOrNewer to (systemVersion ≥ "13.0")
 		set isSonomaOrNewer to (systemVersion ≥ "14.0")
 		set is15dot6OrNewer to (systemVersion ≥ "15.6")
+		set isTahoeOrNewer to (systemVersion ≥ "16.0")
 	end considering
 	
 	try
@@ -318,7 +319,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 				end if
 			end try
 			
-			-- TURN OFF SCREEN LOCK (only do this on Mojave and newer since that is when the "sysadminctl -screenLock off" command was added, on High Sierra Screen Lock will be disabled with GUI scripting during "Free Geek Setup".
+			-- TURN OFF SCREEN LOCK (Check for Mojave or newer since that is when the "sysadminctl -screenLock off" command was added.)
 			if (isMojaveOrNewer) then
 				try
 					do shell script "printf '%s' " & (quoted form of demoPassword) & " | sysadminctl -screenLock off -password -"
@@ -446,6 +447,11 @@ defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false
 				set desktop shows connected servers to true
 			end tell
 			do shell script "defaults delete com.apple.finder NewWindowTargetPath; defaults write com.apple.finder NewWindowTarget -string 'PfCm'"
+			
+			-- DISABLE "CLICK WALLPAPER TO SHOW DESKTOP ITEMS" ON SONOMA AND NEWER
+			if (isSonomaOrNewer) then
+				do shell script "defaults write 'com.apple.WindowManager' EnableStandardClickToShowDesktop -bool false"
+			end if
 			
 			-- SET SCREEN ZOOM TO USE SCROLL GESTURE WITH MODIFIER KEY, ZOOM FULL SCREEN, AND MOVE CONTINUOUSLY WITH POINTER
 			-- This can only work on High Sierra, the pref is protected on Mojave and newer: https://eclecticlight.co/2020/03/04/how-macos-10-14-and-later-overrides-write-permission-on-some-files/
@@ -755,7 +761,9 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 				try
 					-- In macOS 11 Big Sur, the Do Not Disturb data is stored as binary of a plist within the "dnd_prefs" of "com.apple.ncprefs": https://www.reddit.com/r/osx/comments/ksbmay/comment/gq5fu0m/
 					do shell script "
-defaults write com.apple.ncprefs dnd_prefs -data \"$(echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to create an empty plist with root type of dictionary. This is effectively same as starting with 'plutil -create xml1 -' (which can be verified by comparing the output to 'echo '<dict/>' | plutil -convert xml1 -o - -') but the 'plutil -create' option is only available on macOS 12 Monterey and newer.
+current_ncprefs_hex=\"$(defaults export com.apple.ncprefs - | plutil -extract dnd_prefs raw - | base64 -D | xxd -p | tr -d '[:space:]')\"
+
+intended_ncprefs_hex=\"$(echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to create an empty plist with root type of dictionary. This is effectively same as starting with 'plutil -create xml1 -' (which can be verified by comparing the output to 'echo '<dict/>' | plutil -convert xml1 -o - -') but the 'plutil -create' option is only available on macOS 12 Monterey and newer.
 	plutil -insert 'dndDisplayLock' -bool true -o - - | # Using a pipeline of 'plutil' commands reading from stdin and outputting to stdout is a clean way of creating a plist string without needing to hardcode the plist contents and without creating a file (which would be required if PlistBuddy was used).
 	plutil -insert 'dndDisplaySleep' -bool true -o - - | # Even though doing this is technically less efficient vs just hard coding a plist string, it makes for cleaner and smaller code.
 	plutil -insert 'dndMirrored' -bool true -o - - |
@@ -766,21 +774,26 @@ defaults write com.apple.ncprefs dnd_prefs -data \"$(echo '<dict/>' | # NOTE: St
 	plutil -insert 'scheduledTime.end' -float 1439 -o - - |
 	plutil -insert 'scheduledTime.start' -float 0 -o - - |
 	plutil -convert binary1 -o - - | xxd -p | tr -d '[:space:]')\"
-" -- "xxd" converts the binary data into hex, which is what "defaults" needs.
+
+if [ \"${current_ncprefs_hex}\" != \"${intended_ncprefs_hex}\" ]; then
+	defaults write com.apple.ncprefs dnd_prefs -data \"${intended_ncprefs_hex}\"
+	killall usernoted
+fi
+" -- "xxd" converts the binary data into hex, which is what "defaults write" needs.
 				end try
 			else
-				do shell script "
+				try
+					do shell script "
 defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplayLock -bool true
 defaults -currentHost write com.apple.notificationcenterui dndEnabledDisplaySleep -bool true
 defaults -currentHost write com.apple.notificationcenterui dndMirroring -bool true
 defaults -currentHost write com.apple.notificationcenterui dndEnd -float 1439
 defaults -currentHost write com.apple.notificationcenterui dndStart -float 0
 defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool false
+killall usernoted
 "
+				end try
 			end if
-			try
-				do shell script "killall usernoted"
-			end try
 			try
 				with timeout of 1 second
 					tell application id "com.apple.notificationcenterui" to quit
@@ -991,7 +1004,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 						set tabOrLinebreaks to tab
 						if (isBigSurOrNewer) then
 							set linebreakOrNot to ""
-							set tabOrLinebreaks to (linefeed & linefeed)
+							if (not isTahoeOrNewer) then set tabOrLinebreaks to (linefeed & linefeed)
 						end if
 						
 						try
@@ -1003,7 +1016,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 				end repeat
 				
 				try -- Only launch QA Helper if Setup has finished and installed the Demo Helper LaunchAgent to help not interfere with initial setup possibilities.
-					-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+					-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 					do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/QA Helper.app"))
 				on error
 					try
@@ -1087,7 +1100,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 			end try
 			
 			try
-				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+				-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 				do shell script ("open -na '/Users/" & demoUsername & "/Applications/Free Geek Snapshot Helper.app'")
 			end try
 			
@@ -1118,7 +1131,7 @@ defaults -currentHost write com.apple.notificationcenterui doNotDisturb -bool fa
 						set tabOrLinebreaks to tab
 						if (isBigSurOrNewer) then
 							set linebreakOrNot to ""
-							set tabOrLinebreaks to (linefeed & linefeed)
+							if (not isTahoeOrNewer) then set tabOrLinebreaks to (linefeed & linefeed)
 						end if
 						
 						try
@@ -1228,7 +1241,7 @@ PLEASE CONTACT Free Geek THROUGH eBay IF YOU HAVE ANY QUESTIONS.
 If you've received this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form." buttons {"Shut Down                                             ", "Reset This Mac                                             "} cancel button 1 default button 2 with title (name of me) with icon caution
 							
 							try
-								-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+								-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 								do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/Free Geek Reset.app"))
 							end try
 						on error
@@ -1356,7 +1369,7 @@ killall WallpaperAgent
 										tell application id "com.apple.finder" to activate
 									end try
 									try -- Instead of just activating QA Helper, re-launch it in case it was quit, which will also just activate it if it's already running.
-										-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+										-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 										do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/QA Helper.app"))
 									end try
 								end if
@@ -1534,7 +1547,7 @@ defaults -currentHost write com.apple.screensaver moduleDict \"$(echo '<dict/>' 
 													tell application id "com.apple.finder" to activate
 												end try
 												try -- Instead of just activating QA Helper, re-launch it in case it was quit, which will also just activate it if it's already running.
-													-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+													-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." QA Helper has LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 													do shell script "open -na " & (quoted form of ("/Users/" & demoUsername & "/Applications/QA Helper.app"))
 												end try
 											end if

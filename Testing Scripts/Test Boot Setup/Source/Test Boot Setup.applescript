@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.2-2
+-- Version: 2025.10.17-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -133,6 +133,7 @@ if ((currentUsername is equal to "Tester") and ((POSIX path of (path to me)) is 
 	considering numeric strings
 		set isMojaveOrNewer to (systemVersion ≥ "10.14")
 		set isCatalinaOrNewer to (systemVersion ≥ "10.15")
+		set isSonomaOrNewer to (systemVersion ≥ "14.0")
 		set isBigSurOrNewer to (systemVersion ≥ "11.0")
 		set is15dot6OrNewer to (systemVersion ≥ "15.6")
 	end considering
@@ -266,7 +267,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			-- The MTB version is NOT stored in a user accessable location so that it cannot be super easily manually edited.
 			set currentMTBversion to doShellScriptAsAdmin("cat '/private/var/root/.mtbVersion'") -- If the file doesn't exist, it's older than 20220726 which was the first version to include this file (version 20220705 stored the file at "/Users/Shared/.mtbVersion" and no MTB version file existed before that).
 			
-			set validMTBversions to {"20251001", "20251002"}
+			set validMTBversions to {"20251013", "20251017"}
 			if (validMTBversions does not contain currentMTBversion) then error "OUTDATED"
 		on error
 			set serialNumber to ""
@@ -636,6 +637,11 @@ defaults write '/Library/Preferences/com.apple.commerce' AutoUpdate -bool false
 		set desktop shows connected servers to true
 	end tell
 	do shell script "defaults delete com.apple.finder NewWindowTargetPath; defaults write com.apple.finder NewWindowTarget -string 'PfCm'"
+	
+	-- DISABLE "CLICK WALLPAPER TO SHOW DESKTOP ITEMS" ON SONOMA AND NEWER
+	if (isSonomaOrNewer) then
+		do shell script "defaults write 'com.apple.WindowManager' EnableStandardClickToShowDesktop -bool false"
+	end if
 	
 	-- SET SCREEN ZOOM TO USE SCROLL GESTURE WITH MODIFIER KEY, ZOOM FULL SCREEN, AND MOVE CONTINUOUSLY WITH POINTER
 	-- This can only work on High Sierra, the pref is protected on Mojave and newer: https://eclecticlight.co/2020/03/04/how-macos-10-14-and-later-overrides-write-permission-on-some-files/
@@ -1174,7 +1180,7 @@ killall usernoted
 			delay 0.2 -- Delay to make sure progress gets updated.
 			
 			try
-				doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take affect.
+				doShellScriptAsAdmin("csrutil clear") -- "csrutil clear" can run from full macOS (Recovery is not required) but still needs a reboot to take effect.
 			end try
 			
 			-- Quit all apps before rebooting

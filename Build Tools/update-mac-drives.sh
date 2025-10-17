@@ -30,7 +30,7 @@ if (( ${EUID:-$(id -u)} != 0 )); then
 	exit 1
 fi
 
-echo -e "\nUSB Device Tree:\n$(system_profiler SPUSBDataType)"
+echo -e "\nUSB Device Tree:\n$(system_profiler "$(system_profiler -listDataTypes | grep -m 1 '^SPUSB')")" # On macOS 14 Sequoia and older the data type name is "SPUSBDataType" and then on macOS 26 Tahoe and newer it was changed to "SPUSBHostDataType". 
 
 external_disk_list="$(diskutil list external physical)"
 external_disk_count="$(echo "${external_disk_list}" | grep -c '^/dev/disk')"
@@ -84,6 +84,8 @@ if [[ "${confirm_format_drives}" =~ ^[Yy] ]]; then
 
 			diskutil_partition_disk_array=(
 				JHFS+ 'fgMIB'						1.33G		# 1.2 GB
+			#	JHFS+ 'Install macOS High Sierra'	5.435G		# 5.305 GB
+			#	JHFS+ 'Install macOS Mojave'		6.245G		# 6.115 GB
 				JHFS+ 'Install macOS Catalina'		8.46G		# 8.33 GB
 				JHFS+ 'Install macOS Big Sur'		13.665G		# 13.535 GB
 				JHFS+ 'Install macOS Monterey'		14.735G		# 14.605 GB
@@ -151,7 +153,10 @@ human_readable_duration_from_seconds() { # Based On: https://stackoverflow.com/a
 
 overall_start_timestamp="$(date '+%s')"
 
-declare -a installer_names_to_update=( 'Catalina' 'Big Sur' 'Monterey' 'Ventura' 'Sonoma' 'Sequoia' 'Tahoe' )
+declare -a installer_names_to_update=(
+#	'High Sierra' 'Mojave'
+	'Catalina' 'Big Sur' 'Monterey' 'Ventura' 'Sonoma' 'Sequoia' 'Tahoe'
+)
 
 for this_installer_name_to_update in "${installer_names_to_update[@]}"; do
 	this_installer_start_timestamp="$(date '+%s')"

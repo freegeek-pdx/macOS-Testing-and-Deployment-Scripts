@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.3-2
+-- Version: 2025.10.13-1
 
 -- App Icon is “Microscope” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -127,7 +127,7 @@ try
 	
 	if (not freeGeekUpdaterIsRunning) then
 		try
-			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited to this will not actually ever open a new instance.
+			-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
 			do shell script "open -na '/Applications/Test Boot Setup.app'"
 		end try
 	end if
@@ -470,7 +470,7 @@ repeat
 				set processorInfo to processorTotalCoreCount & "-Core" & processorHyperthreadingNote & ": " & processorsCountPart & processorModelPart & " @ " & processorSpeed & " GHz"
 				
 				try
-					if ((do shell script "ioreg -rc AppleUSBDevice -n 'Apple T2 Controller' -d 1") contains "Apple T2 Controller") then
+					if ((do shell script "ioreg -rn 'Apple T2 Controller' -d 1") contains "Apple T2 Controller") then
 						set hasT2chip to true
 						set processorInfo to (processorInfo & "
 	T2 Security Chip")

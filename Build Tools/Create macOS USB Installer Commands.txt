@@ -27,10 +27,10 @@ sudo '/Volumes/Install macOS Catalina/Install macOS Catalina.app/Contents/Resour
 
 # UNUSED INSTALLER COMMANDS
 
-# CREATE Mojave INSTALLER USB (7 GB REQUIRED):
+# CREATE Mojave INSTALLER USB (6.115 GB REQUIRED):
 sudo '/Volumes/Install macOS Mojave/Install macOS Mojave.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallMojave --nointeraction
 
-# CREATE High Sierra INSTALLER USB (6 GB REQUIRED):
+# CREATE High Sierra INSTALLER USB (5.305 GB REQUIRED):
 sudo '/Volumes/Install macOS High Sierra/Install macOS High Sierra.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallHighSierra --nointeraction
 
 # CREATE Sierra INSTALLER USB (6 GB REQUIRED)

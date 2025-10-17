@@ -426,7 +426,7 @@ rm -f " & (quoted form of (thisScriptAppPath & "/Contents/Resources/.DS_Store"))
 												-- When on macOS 12 Monterey and older, the "AssociatedBundleIdentifiers" will just be ignored and the "Launch [APP NAME]" will function the same as if we directly specified "/usr/bin/open" with the path to the app in the LA/LD.
 												-- Search for "AssociatedBundleIdentifiers" throughout other scripts to see the LA/LD creation code.
 												do shell script ("echo '#!/bin/sh
-/usr/bin/open -na \"${0%/Contents/*}\"' > " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Launch " & thisScriptName)) & "
+/usr/bin/open -na \"${0%/Contents/*}\" --args \"$@\"' > " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Launch " & thisScriptName)) & "
 chmod +x " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Launch " & thisScriptName)) & "
 codesign -s 'Developer ID Application' --identifier " & (quoted form of (bundleIdentifierPrefix & "Launch-" & thisScriptHyphenatedName)) & " --strict " & (quoted form of (thisScriptAppPath & "/Contents/Resources/Launch " & thisScriptName)))
 											end if

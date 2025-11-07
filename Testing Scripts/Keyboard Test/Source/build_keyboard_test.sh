@@ -3,7 +3,7 @@
 
 # By: Pico Mitchell
 # For: MacLand @ Free Geek
-# Last Updated: 07/01/24
+# Last Updated: 11/04/25
 #
 # MIT License
 #
@@ -36,7 +36,7 @@ open "${PROJECT_PATH}/../../../../Keyboard Test"
 exit 1
 
 readonly BUILD_DIR="${PROJECT_PATH}/.."
-readonly ZIPS_FOR_AUTO_UPDATE_PATH="${BUILD_DIR}/../../ZIPs for Auto-Update"
+readonly ZIPS_FOR_AUTO_UPDATE_PATH='/Users/Shared/Mac Deployment/App ZIPs for Auto-Update'
 readonly fgMIB_USERAPPS_PATH="${BUILD_DIR}/../../fgMIB Resources/Prepare OS Package/Package Resources/User/fg-demo/Apps/darwin-all-versions"
 
 readonly KEYBOARD_TESTER_URL='https://www.keyboardtester.com/tester.html'

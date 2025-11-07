@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.16-1
+-- Version: 2025.10.27-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -127,7 +127,7 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		set isBigSurOrNewer to (systemVersion ≥ "11.0")
 		set isVenturaOrNewer to (systemVersion ≥ "13.0")
 		set isSonomaOrNewer to (systemVersion ≥ "14.0")
-		set is15dot6OrNewer to (systemVersion ≥ "15.6")
+		set isSequoiaFifteenDotSixOrNewer to (systemVersion ≥ "15.6")
 		set isTahoeOrNewer to (systemVersion ≥ "16.0")
 	end considering
 	
@@ -338,6 +338,12 @@ defaults write '/Library/Preferences/.GlobalPreferences' AppleMeasurementUnits -
 defaults write '/Library/Preferences/.GlobalPreferences' AppleMetricUnits -bool false
 defaults write '/Library/Preferences/.GlobalPreferences' AppleTemperatureUnit -string 'Fahrenheit'
 defaults write '/Library/Preferences/.GlobalPreferences' AppleTextDirection -bool false
+
+# SET KEYBOARD TYPES FOR KNOWN USED DEVICES SO THAT Keyboard Setup Assistant DOES NOT OPEN FOR THEM (https://macadmin.fraserhess.com/2023/01/29/suppressing-keyboard-setup-assistant/)
+defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '4-4-0' -integer '40' # USB Switcher (https://www.amazon.com/dp/B08TM4YLQK)
+defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '50475-1133-0' -integer '40' # Logitech CU0007 Unifying Receiver
+defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '49473-1046-0' -integer '40' # WoneNice Wireless Barcode Scanner Receiver
+defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '4608-1504-0' -integer '40' # Symbol Wired Barcode Scanner
 ")
 			end try
 			
@@ -641,7 +647,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 											-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
 											-- So, fallback to using "ipconfig getsummary" instead.
 											
-											if (is15dot6OrNewer) then
+											if (isSequoiaFifteenDotSixOrNewer) then
 												-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
 												-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
 												
@@ -657,7 +663,7 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 												end if
 											end try
 											
-											if (is15dot6OrNewer) then
+											if (isSequoiaFifteenDotSixOrNewer) then
 												-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
 												
 												try
@@ -754,6 +760,14 @@ scutil --set LocalHostName " & (quoted form of newLocalHostName))
 					end try
 					set warns before emptying of trash to true
 				end tell
+			end try
+			
+			-- DISABLE OS UPDATE NOTIFICATIONS (https://lapcatsoftware.com/articles/2024/2/2.html)
+			try
+				do shell script "
+defaults write 'com.apple.SoftwareUpdate' MajorOSUserNotificationDate -date \"$(date -jv '+5y' '+%F')\"
+defaults write 'com.apple.SoftwareUpdate' UserNotificationDate -date \"$(date -jv '+5y' '+%F')\"
+"
 			end try
 			
 			-- DISABLE NOTIFICATIONS
@@ -887,22 +901,24 @@ killall usernoted
 				if (application id "com.apple.UserNotificationCenter" is running) then
 					repeat 60 times
 						set clickedIgnoreCancelDontSendButton to false
-						with timeout of 2 seconds -- Adding timeout because maybe this could be where things are getting hung sometimes.
-							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
-								repeat with thisUNCWindow in windows
-									if ((count of buttons of thisUNCWindow) ≥ 2) then
-										repeat with thisUNCButton in (buttons of thisUNCWindow)
-											if ((title of thisUNCButton is "Ignore") or (title of thisUNCButton is "Cancel") or (title of thisUNCButton is "Don’t Send")) then
-												click thisUNCButton
-												set clickedIgnoreCancelDontSendButton to true
-												exit repeat
-											end if
-										end repeat
-									end if
-								end repeat
-							end tell
-						end timeout
-						if (not clickedIgnoreCancelDontSendButton) then exit repeat
+						try
+							with timeout of 2 seconds -- Adding timeout because maybe this could be where things are getting hung sometimes.
+								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
+									repeat with thisUNCWindow in windows
+										if ((count of buttons of thisUNCWindow) ≥ 2) then
+											repeat with thisUNCButton in (buttons of thisUNCWindow)
+												if ((title of thisUNCButton is "Ignore") or (title of thisUNCButton is "Cancel") or (title of thisUNCButton is "Don’t Send")) then
+													click thisUNCButton
+													set clickedIgnoreCancelDontSendButton to true
+													exit repeat
+												end if
+											end repeat
+										end if
+									end repeat
+								end tell
+							end timeout
+						end try
+						if (not clickedIgnoreCancelDontSendButton) then exit repeat -- Exit loop after NOT clicked to be sure ALL windows have been closed.
 						delay 0.5
 					end repeat
 				end if
@@ -912,22 +928,24 @@ killall usernoted
 				if (application "/System/Library/CoreServices/backupd.bundle/Contents/Resources/TMHelperAgent.app" is running) then -- if application id "com.apple.TMHelperAgent" is used then compilation could fail if TMHelperAgent hasn't been run yet this boot.
 					repeat 60 times
 						set clickedDontUseButton to false
-						with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.TMHelperAgent")
-								repeat with thisTMHAWindow in windows
-									if ((count of buttons of thisTMHAWindow) ≥ 2) then
-										repeat with thisTMHAButton in (buttons of thisTMHAWindow)
-											if (title of thisTMHAButton is "Don't Use") then
-												click thisTMHAButton
-												set clickedDontUseButton to true
-												exit repeat
-											end if
-										end repeat
-									end if
-								end repeat
-							end tell
-						end timeout
-						if (not clickedDontUseButton) then exit repeat
+						try
+							with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
+								tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.TMHelperAgent")
+									repeat with thisTMHAWindow in windows
+										if ((count of buttons of thisTMHAWindow) ≥ 2) then
+											repeat with thisTMHAButton in (buttons of thisTMHAWindow)
+												if (title of thisTMHAButton is "Don't Use") then
+													click thisTMHAButton
+													set clickedDontUseButton to true
+													exit repeat
+												end if
+											end repeat
+										end if
+									end repeat
+								end tell
+							end timeout
+						end try
+						if (not clickedDontUseButton) then exit repeat -- Exit loop after NOT clicked to be sure ALL windows have been closed.
 						delay 0.5
 					end repeat
 				end if
@@ -1221,14 +1239,13 @@ killall usernoted
 						-- or it will display instruction on how to perform the Snapshot Reset and auto-reboot into Recovery if is a pre-T2 Mac or running macOS 11 Big Sur or older.
 						
 						try
-							display dialog "THIS MAC IS NOT READY FOR PERSONAL USE, but you can reset this Mac yourself!
+							set notResetAlertTitle to "THIS MAC IS NOT READY FOR PERSONAL USE, but you can reset this Mac yourself!
 
 It appears you've purchased a Mac from Free Geek that was not reset to be ready for you to use. This was our mistake, we apologize for the inconvenience.
 
-You WILL NOT need to return this Mac to Free Geek for it to be reset.
-
-
-This Mac is currently set up with custom settings that are not intended for personal use. A reset process must be run to remove these custom settings and prepare this Mac for you to create your own account.
+You WILL NOT need to return this Mac to Free Geek for it to be reset."
+							
+							set notResetAlertMessage to "This Mac is currently set up with custom settings that are not intended for personal use. A reset process must be run to remove these custom settings and prepare this Mac for you to create your own account.
 
 IF YOU SAVE YOUR PERSONAL INFORMATION ON THIS MAC BEFORE RUNNING THE RESET PROCESS, IT WILL BE PERMANENTLY DELETED ONCE THE RESET IS PERFORMED.
 
@@ -1238,7 +1255,27 @@ The reset process is only a few steps and will take less than 10 minutes.
 
 
 PLEASE CONTACT Free Geek THROUGH eBay IF YOU HAVE ANY QUESTIONS.
-If you've received this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form." buttons {"Shut Down                                             ", "Reset This Mac                                             "} cancel button 1 default button 2 with title (name of me) with icon caution
+If you've received this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form."
+							
+							set notResetAlertButtonsRegularPadding to {"                         Shut Down                         ", "                         Reset This Mac                         "}
+							set notResetAlertButtonsWorkaroundPadding to {"Shut Down                                                  ", "Reset This Mac                                                  "}
+							-- On macOS 10.15 Catalina and newer, space padded text in DIALOG buttons (but not ALERT buttons) doesn't work as expected,
+							-- and the spaces that you want to pad with on each side must be DOUBLED at the END of the text rather than equally on both sides.
+							-- On macOS 26 Tahoe and newer ALERT buttons now ALSO need the same workaround for space padded text in buttons.
+							
+							if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+								-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+								-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+								
+								display dialog (notResetAlertTitle & linefeed & linefeed & linefeed & notResetAlertMessage) buttons notResetAlertButtonsWorkaroundPadding cancel button 1 default button 2 with title (name of me) with icon caution
+							else
+								set notResetAlertButtons to notResetAlertButtonsRegularPadding
+								if (isTahoeOrNewer) then -- See notes above about ALERT buttons needing space padding workaround on macOS 26 Tahoe and newer (like DIALOG buttons have since macOS 10.15 Catalina).
+									set notResetAlertButtons to notResetAlertButtonsWorkaroundPadding
+								end if
+								
+								display alert (notResetAlertTitle & linefeed) message notResetAlertMessage buttons notResetAlertButtons cancel button 1 default button 2 as critical
+							end if
 							
 							try
 								-- For some reason, on Big Sur, apps are not opening unless we specify "-n" to "Open a new instance of the application(s) even if one is already running." All scripts have LSMultipleInstancesProhibited so this will not actually ever open a new instance.
@@ -1251,10 +1288,7 @@ If you've received this Mac from Free Geek some other way than eBay, please visi
 						quit
 						delay 10
 					on error
-						set contactFreeGeekDialogButton to "                                                 Shut Down                                                 "
-						-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
-						if (isCatalinaOrNewer) then set contactFreeGeekDialogButton to "Shut Down                                                                                                  "
-						display dialog "THIS MAC IS NOT READY FOR PERSONAL USE!
+						set notResetAlertTitle to "THIS MAC IS NOT READY FOR PERSONAL USE!
 PLEASE CONTACT Free Geek THROUGH eBay!
 
 It appears you've purchased a Mac from Free Geek that was not reset to be ready for you to use.
@@ -1264,16 +1298,35 @@ You WILL NOT need to return this Mac to Free Geek for it to be reset.
 
 Please contact Free Geek through the eBay messaging system so that we can send you the simple instructions to reset this Mac yourself.
 
-If you've received this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form.
-
-
-This Mac is currently set up with custom settings that are not intended for personal use. A reset process must be run to remove these custom settings and prepare this Mac for you to create your own account.
+If you've received this Mac from Free Geek some other way than eBay, please visit \"freegeek.org/contact\" and contact us using that form."
+						
+						set notResetAlertMessage to "This Mac is currently set up with custom settings that are not intended for personal use. A reset process must be run to remove these custom settings and prepare this Mac for you to create your own account.
 
 IF YOU SAVE YOUR PERSONAL INFORMATION ON THIS MAC BEFORE RUNNING THE RESET PROCESS, IT WILL BE PERMANENTLY DELETED ONCE THE RESET IS PERFORMED.
 
 You SHOULD NOT USE this Mac until you've contacted Free Geek so that we can guide you through the reset process.
 
-The reset process is only a few steps and will take less than 10 minutes." buttons {contactFreeGeekDialogButton} default button 1 with title (name of me) with icon caution
+The reset process is only a few steps and will take less than 10 minutes."
+						
+						set notResetAlertButtonsRegularPadding to {"                                                    Shut Down                                                    "}
+						set notResetAlertButtonsWorkaroundPadding to {"Shut Down                                                                                                        "}
+						-- On macOS 10.15 Catalina and newer, space padded text in DIALOG buttons (but not ALERT buttons) doesn't work as expected,
+						-- and the spaces that you want to pad with on each side must be DOUBLED at the END of the text rather than equally on both sides.
+						-- On macOS 26 Tahoe and newer ALERT buttons now ALSO need the same workaround for space padded text in buttons.
+						
+						if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+							-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+							-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+							
+							display dialog (notResetAlertTitle & linefeed & linefeed & linefeed & notResetAlertMessage) buttons notResetAlertButtonsWorkaroundPadding default button 1 with title (name of me) with icon caution
+						else
+							set notResetAlertButtons to notResetAlertButtonsRegularPadding
+							if (isTahoeOrNewer) then -- See notes above about ALERT buttons needing space padding workaround on macOS 26 Tahoe and newer (like DIALOG buttons have since macOS 10.15 Catalina).
+								set notResetAlertButtons to notResetAlertButtonsWorkaroundPadding
+							end if
+							
+							display alert (notResetAlertTitle & linefeed) message notResetAlertMessage buttons notResetAlertButtons default button 1 as critical
+						end if
 						
 						tell application id "com.apple.systemevents" to shut down with state saving preference
 						

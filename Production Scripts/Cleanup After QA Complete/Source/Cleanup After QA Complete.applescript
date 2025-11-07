@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.17-1
+-- Version: 2025.10.24-1
 
 -- App Icon is “Broom” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -148,7 +148,8 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 		set isCatalinaOrNewer to (systemVersion ≥ "10.15")
 		set isBigSurOrNewer to (systemVersion ≥ "11.0")
 		set isMontereyOrNewer to (systemVersion ≥ "12.0")
-		set is15dot6OrNewer to (systemVersion ≥ "15.6")
+		set isVenturaOrNewer to (systemVersion ≥ "13.0")
+		set isSequoiaFifteenDotSixOrNewer to (systemVersion ≥ "15.6")
 		set isTahoeOrNewer to (systemVersion ≥ "16.0")
 	end considering
 	
@@ -275,12 +276,25 @@ This Mac CANNOT BE SOLD in its current state, please set this Mac aside and info
 		delay 10
 	end if
 	
+	set tabOrNulAndTab to tab
+	if (isVenturaOrNewer) then
+		-- On macOS 13 Ventura and newer with the "extended" alert style AND on macOS 26 Tahoe where alerts text will be left aligned,
+		-- the system still trim leading spaces like the centered text alerts of macOS 11 Big Sur.
+		-- So, need to work around this trimming behaviro by using NUL+TAB instead of just TAB so that the line will no longer
+		-- start with whitespace (since it will start with a NUL char instead) and therefore will NOT be trimmed.
+		
+		set tabOrNulAndTab to ((ASCII character 0) & tab)
+	end if
+	
+	set confirmCleanupAlertTitle to "Are you sure you're ready to Cleanup After QA Complete?
+
+You should only Cleanup After QA Complete after all tests have been completed and this Mac has been logged as QA Complete in QA Helper."
 	
 	set deleteTouchIDnote to ""
 	try
 		if ((length of (paragraphs of doShellScriptAsAdmin("bioutil -sr"))) > 2) then -- If Touch ID exists, this output will be more than 2 lines regardless of the Touch ID config or number of fingerprints enrolled.
 			set deleteTouchIDnote to "
-	• Delete all Touch ID fingerprints."
+" & tabOrNulAndTab & "• Delete all Touch ID fingerprints."
 		end if
 	end try
 	
@@ -290,34 +304,37 @@ This Mac CANNOT BE SOLD in its current state, please set this Mac aside and info
 		tell application id "com.apple.systemevents" to set nameOfCurrentStartupDisk to (name of startup disk)
 	end try
 	if (nameOfCurrentStartupDisk is not equal to "Macintosh HD") then set renameInternalDriveNote to "
-	• Rename internal drive to “Macintosh HD”."
+" & tabOrNulAndTab & "• Rename internal drive to “Macintosh HD”."
+	
+	set confirmCleanupAlertMessage to "The following actions will be peformed:
+" & tabOrNulAndTab & "• Check if Remote Management is enabled on this Mac.
+" & tabOrNulAndTab & "• Quit all running apps.
+" & tabOrNulAndTab & "• Clear Clipboard contents.
+" & tabOrNulAndTab & "• Reset Safari to factory settings.
+" & tabOrNulAndTab & "• Erase Terminal history.
+" & tabOrNulAndTab & "• Remove all printers.
+" & tabOrNulAndTab & "• Remove all shared folders." & deleteTouchIDnote & "
+" & tabOrNulAndTab & "• Empty the trash." & renameInternalDriveNote & "
+" & tabOrNulAndTab & "• Turn on Wi-Fi.
+" & tabOrNulAndTab & "• Set Power On and Shutdown schedules.
+" & tabOrNulAndTab & "• Remove “QA Helper” alias from Desktop.
+" & tabOrNulAndTab & "• Delete “" & (name of me) & "” app.
+
+This process cannot be undone."
+	
+	set confirmCleanupAlertButtons to {"Don't Cleanup After QA Complete Yet", "Cleanup After QA Complete"}
 	
 	try
 		activate
 	end try
-	display dialog "Are you sure you're ready to Cleanup After QA Complete?
-
-You should only Cleanup After QA Complete after you've:
-	• Finished the entire QA process.
-	• Logged this Mac as QA Complete in QA Helper.
-	• Set this Mac’s Product in PCs for People CRM.
-
-
-The following actions will be peformed:
-	• Check if Remote Management is enabled on this Mac.
-	• Quit all running apps.
-	• Clear Clipboard contents.
-	• Reset Safari to factory settings.
-	• Erase Terminal history.
-	• Remove all printers.
-	• Remove all shared folders." & deleteTouchIDnote & "
-	• Empty the trash." & renameInternalDriveNote & "
-	• Turn on Wi-Fi.
-	• Set Power On and Shutdown schedules.
-	• Remove “QA Helper” alias from Desktop.
-	• Delete “" & (name of me) & "” app.
-	
-This process cannot be undone." buttons {"Don't Cleanup After QA Complete Yet", "Cleanup After QA Complete"} cancel button 1 default button 2 with title (name of me) with icon note
+	if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+		-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+		-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+		
+		display dialog (confirmCleanupAlertTitle & linefeed & linefeed & linefeed & confirmCleanupAlertMessage) buttons confirmCleanupAlertButtons cancel button 1 default button 2 with title (name of me) with icon note
+	else
+		display alert confirmCleanupAlertTitle message confirmCleanupAlertMessage buttons confirmCleanupAlertButtons cancel button 1 default button 2
+	end if
 	
 	set hasT2chip to false
 	try
@@ -455,18 +472,31 @@ System Integrity Protection (SIP) IS NOT enabled on this Apple Silicon Mac." mes
 							delay 0.5
 							
 							try
-								display dialog "You must be connected to the internet to be able to check for Remote Management.
+								set internetRequiredAlertTitle to "You must be connected to the internet to be able to check for Remote Management.
 
-The rest of “" & (name of me) & "” cannot be run and this Mac CANNOT BE SOLD until it has been confirmed that Remote Management is not enabled on this Mac.
-
-
-Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
+The rest of “" & (name of me) & "” cannot be run and this Mac CANNOT BE SOLD until it has been confirmed that Remote Management is not enabled on this Mac."
+								
+								set internetRequiredAlertMessage to "Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
 
 If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
 
 Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
 
-If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Quit", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T."
+								
+								set internetRequiredAlertButtons to {"Quit", "Try Again"}
+								
+								try
+									activate
+								end try
+								if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+									-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+									-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+									
+									display dialog (internetRequiredAlertTitle & linefeed & linefeed & linefeed & internetRequiredAlertMessage) buttons internetRequiredAlertButtons cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
+								else
+									display alert internetRequiredAlertTitle message internetRequiredAlertMessage buttons internetRequiredAlertButtons cancel button 1 default button 2 as critical giving up after 30
+								end if
 							on error
 								quit
 								delay 10
@@ -594,7 +624,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 								end repeat
 								
 								if (not remoteManagedMacIsAlreadyLogged) then
-									set remoteManagedMacPID to ""
+									set remoteManagedMacID to ""
 									repeat
 										try
 											activate
@@ -603,27 +633,27 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 											do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 										end try
 										
-										set invalidPIDnote to ""
+										set invalidIDnote to ""
 										
-										if (remoteManagedMacPID is not equal to "") then
-											set invalidPIDnote to "
-❌	“" & remoteManagedMacPID & "” IS NOT A VALID PID - TRY AGAIN
+										if (remoteManagedMacID is not equal to "") then
+											set invalidIDnote to "
+❌	“" & remoteManagedMacID & "” IS NOT A VALID ID - TRY AGAIN
 "
 										end if
 										
-										set remoteManagedMacPIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
-" & invalidPIDnote & "
-Enter the PID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacPID buttons {"Log Remote Managed Mac Without PID", "Log Remote Managed Mac"} default button 2)
+										set remoteManagedMacIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
+" & invalidIDnote & "
+Enter the ID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacID buttons {"Log Remote Managed Mac Without ID", "Log Remote Managed Mac"} default button 2)
 										
-										set remoteManagedMacPID to (text returned of remoteManagedMacPIDreply)
+										set remoteManagedMacID to (text returned of remoteManagedMacIDreply)
 										
-										if ((button returned of remoteManagedMacPIDreply) ends with "Without PID") then
-											set remoteManagedMacPID to "N/A"
+										if ((button returned of remoteManagedMacIDreply) ends with "Without ID") then
+											set remoteManagedMacID to "N/A"
 										end if
 										
-										if ((remoteManagedMacPID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacPID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
-											set remoteManagedMacPID to (do shell script "echo " & (quoted form of remoteManagedMacPID) & " | tr '[:lower:]' '[:upper:]'")
-											set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacPID)))
+										if ((remoteManagedMacID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
+											set remoteManagedMacID to (do shell script "echo " & (quoted form of remoteManagedMacID) & " | tr '[:lower:]' '[:upper:]'")
+											set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacID)))
 											exit repeat
 										end if
 									end repeat
@@ -666,7 +696,9 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 								end if
 								
 								set remoteManagementDialogButton to "                                                       Shut Down                                                       "
-								-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
+								-- On macOS 10.15 Catalina and newer, space padded text in DIALOG buttons (but not ALERT buttons) doesn't work as expected,
+								-- and the spaces that you want to pad with on each side must be DOUBLED at the END of the text rather than equally on both sides.
+								-- (On macOS 26 Tahoe and newer ALERT buttons now ALSO need the same workaround for space padded text in buttons.)
 								if (isCatalinaOrNewer) then set remoteManagementDialogButton to "Shut Down                                                                                                              "
 								
 								try
@@ -972,7 +1004,7 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 								-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
 								-- So, fallback to using "ipconfig getsummary" instead.
 								
-								if (is15dot6OrNewer) then
+								if (isSequoiaFifteenDotSixOrNewer) then
 									-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
 									-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
 									
@@ -988,7 +1020,7 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 									end if
 								end try
 								
-								if (is15dot6OrNewer) then
+								if (isSequoiaFifteenDotSixOrNewer) then
 									-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
 									
 									try
@@ -1099,12 +1131,11 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 	if (designedForSnapshotReset) then
 		if (not isAppleSilicon) then
 			try
-				display dialog "✅	Finished Cleaning Up After QA Complete
+				set finishedCleanupAlertTitle to "✅	Finished Cleaning Up After QA Complete
 
-Would you like to Snapshot Reset this Mac now?
-
-
-USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
+Would you like to Snapshot Reset this Mac now?"
+				
+				set finishedCleanupAlertMessage to "USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 
 • Reboot into Recovery (will happen automatically after clicking the confirmation button below).
 
@@ -1116,7 +1147,18 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 
 • Select the Local Snapshot with time close to midnight (there should only be one option).
 
-• Confirm restoring Snapshot." buttons {"Don't Shut Down or Reboot Into Recovery Yet", "No, Shut Down", "Yes, Reboot Into Recovery"} cancel button 2 default button 3 with title (name of me) with icon note
+• Confirm restoring Snapshot."
+				
+				set finishedCleanupAlertButtons to {"Don't Shut Down or Reboot Into Recovery Yet", "No, Shut Down", "Yes, Reboot Into Recovery"}
+				
+				if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+					-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+					-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+					
+					display dialog (finishedCleanupAlertTitle & linefeed & linefeed & linefeed & finishedCleanupAlertMessage) buttons finishedCleanupAlertButtons cancel button 2 default button 3 with title (name of me) with icon note
+				else
+					display alert (finishedCleanupAlertTitle & linefeed) message finishedCleanupAlertMessage buttons finishedCleanupAlertButtons cancel button 2 default button 3
+				end if
 				
 				if ((button returned of result) is equal to "Yes, Reboot Into Recovery") then
 					try
@@ -1135,12 +1177,11 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 			end try
 		else -- CANNOT auto-reboot into Recovery using NVRAM variables on Apple Silicon (but Apple Silicon Macs should always be doing the newer "Erase Assistant" (EAC&S) reset, but keep this here while transitioning to newer processes).
 			try
-				display dialog "✅	Finished Cleaning Up After QA Complete
+				set finishedCleanupAlertTitle to "✅	Finished Cleaning Up After QA Complete
 
-Don't forget to manually boot into Recovery to Snapshot Reset this Mac!
-
-
-USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
+Don't forget to manually boot into Recovery to Snapshot Reset this Mac!"
+				
+				set finishedCleanupAlertMessage to "USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 
 • Reboot into Recovery by holding the Power button when booting until “Loading startup options…” is shown and then choose “Options”.
 
@@ -1152,7 +1193,18 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 
 • Select the Local Snapshot with time close to midnight (there should only be one option).
 
-• Confirm restoring Snapshot." buttons {"Don't Shut Down Yet", "Shut Down Now"} cancel button 1 default button 2 with title (name of me) with icon note
+• Confirm restoring Snapshot."
+				
+				set finishedCleanupAlertButtons to {"Don't Shut Down Yet", "Shut Down Now"}
+				
+				if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+					-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+					-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+					
+					display dialog (finishedCleanupAlertTitle & linefeed & linefeed & linefeed & finishedCleanupAlertMessage) buttons finishedCleanupAlertButtons cancel button 1 default button 2 with title (name of me) with icon note
+				else
+					display alert (finishedCleanupAlertTitle & linefeed) message finishedCleanupAlertMessage buttons finishedCleanupAlertButtons cancel button 1 default button 2
+				end if
 				
 				set shutDownAfterCleanup to true
 			on error

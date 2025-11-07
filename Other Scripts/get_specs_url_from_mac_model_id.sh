@@ -30,8 +30,10 @@ fi
 echo "Model ID: ${model_identifier}"
 
 # The following list of Specs URLs with grouped Model IDs is generated from: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_every_docs_and_specs_id_with_marketing_model_name_and_model_ids_from_support_pages.sh
-# List last updated on 5/15/2025
-every_mac_specs_url_with_grouped_model_ids='Mac Laptop;121552;MacBook Pro (14-inch, 2024):MacBook Pro (14-inch, M4, 2024):Mac16,1:
+# And the full output from that script is here: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/scrape-support-pages-output/every_specs_id_with_marketing_model_name_and_model_ids_from_identification_pages.txt
+# List last updated on 10/27/2025
+every_mac_specs_url_with_grouped_model_ids='Mac Laptop;125405;MacBook Pro (14-inch, M5):MacBook Pro (14-inch, M5):Mac17,2:
+Mac Laptop;121552;MacBook Pro (14-inch, 2024):MacBook Pro (14-inch, M4, 2024):Mac16,1:
 Mac Laptop;121553;MacBook Pro (14-inch, 2024):MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):Mac16,6:Mac16,8:
 Mac Laptop;121554;MacBook Pro (16-inch, 2024):MacBook Pro (16-inch, 2024):Mac16,7:Mac16,5:
 Mac Laptop;117735;MacBook Pro (14-inch, Nov 2023):MacBook Pro (14-inch, M3, Nov 2023):Mac15,3:

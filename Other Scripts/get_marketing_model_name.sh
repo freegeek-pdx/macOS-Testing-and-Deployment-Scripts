@@ -104,6 +104,7 @@ get_marketing_model_name() {
 		readonly SERIAL_CONFIG_CODE
 
 		# The following list of Marketing Model Names with grouped Model IDs and Serial Config Codes is generated from: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/group_every_intel_mac_marketing_model_name_with_model_ids_and_serial_config_codes.sh
+		# And the full output from that script is here: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/serial-config-codes-output/every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes.txt
 		every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes='iMac (17-inch, Early 2006):iMac4,1:U2N:U2R:V4M:V4N:V4U:V66:VGB:VGZ:VH1:VHP:VV4:VV6:
 iMac (17-inch, Late 2006 CD):iMac5,2:
 iMac (17-inch, Late 2006):iMac5,1:AC1:VUX:VUY:WAR:WRR:WRW:WV8:WVR:X1A:X1W:X2W:X6Q:X9F:X9Y:XLF:Y3V:Y3W:Y3X:Y6K:Y94:Y97:YAG:YLJ:
@@ -166,7 +167,6 @@ Mac Pro (Rack, 2019):MacPro7,1:N5RH:N5RN:P7QQ:P7QR:P7QT:P7QV:PNTN:PNTP:PNTQ:PP3Y
 Mac Pro Server (Mid 2010):MacPro5,1:HPV:HPW:HPY:
 Mac Pro Server (Mid 2012):MacPro5,1:F4MF:F4MJ:F501:
 Mac Pro:MacPro1,1:MacPro2,1:
-MacBook (13-inch):MacBook1,1:
 MacBook (13-inch, Aluminum, Late 2008):MacBook5,1:
 MacBook (13-inch, Early 2008):MacBook4,1:0P0:0P1:0P2:0P4:0P5:0P6:1LX:1PX:1Q2:1Q7:1QA:1QB:1QE:1ZY:27H:27J:28C:28D:28E:385:3N9:3NA:3ND:3NE:3NF:3X6:47Z:4R7:4R8:
 MacBook (13-inch, Early 2009):MacBook5,2:4R1:4R2:4R3:79D:79E:79F:7A2:85D:88J:8CP:8SJ:93K:
@@ -177,6 +177,7 @@ MacBook (13-inch, Late 2009):MacBook6,1:
 MacBook (13-inch, Mid 2007):MacBook2,1:YA2:YA3:YA4:YA5:YA6:YA7:YA8:YA9:YJJ:YJK:YJL:YJM:YJN:YQ7:YQ8:YRG:YRH:YRJ:YRK:YSH:YSJ:YSK:YSL:YSM:YTK:YTL:YV8:YX1:YX2:YX4:YX5:YXZ:YY1:YYW:Z5V:Z5W:Z5X:Z5Y:Z5Z:Z60:Z88:ZA8:ZA9:ZAP:ZAQ:ZAS:ZAU:ZAV:ZAW:ZAX:ZAY:ZAZ:ZB0:ZB1:ZB2:ZB7:ZB8:ZB9:ZBA:ZBB:ZBE:ZBF:ZBG:ZBH:ZBJ:ZBK:ZCN:
 MacBook (13-inch, Mid 2009):MacBook5,2:9GU:9GV:A1W:A1X:A1Y:A9P:A9Q:A9Y:ABW:ASC:
 MacBook (13-inch, Mid 2010):MacBook7,1:
+MacBook (13-inch):MacBook1,1:
 MacBook (Retina, 12-inch, 2017):MacBook10,1:
 MacBook (Retina, 12-inch, Early 2015):MacBook8,1:
 MacBook (Retina, 12-inch, Early 2016):MacBook9,1:
@@ -229,7 +230,6 @@ MacBook Pro (15-inch, Mid 2009):MacBookPro5,3:
 MacBook Pro (15-inch, Mid 2010):MacBookPro6,2:
 MacBook Pro (15-inch, Mid 2012):MacBookPro9,1:
 MacBook Pro (16-inch, 2019):MacBookPro16,1:MacBookPro16,4:
-MacBook Pro (17-inch):MacBookPro1,2:
 MacBook Pro (17-inch, 2.4GHz):MacBookPro3,1:027:028:02D:09R:09S:0LR:0ND:0NM:0PD:1CW:1CX:1MF:1MG:2QW:X94:XA9:YAA:YAN:YAP:YNQ:YNS:YNW:YQ4:YQ5:YR2:YRD:YRE:YRF:YWB:YWC:YZ1:YZ2:Z5M:
 MacBook Pro (17-inch, Core 2 Duo):MacBookPro2,1:
 MacBook Pro (17-inch, Early 2008):MacBookPro4,1:1BY:1ED:1EN:1ER:1K2:1K8:1K9:1KA:1Q3:1SG:2CF:2DY:2DZ:2ED:3DC:3DD:3DE:3DF:3M0:3M4:3M5:YP3:YP4:ZLV:
@@ -239,6 +239,7 @@ MacBook Pro (17-inch, Late 2008):MacBookPro4,1:3R8:3R9:4RT:4RW:57J:5U0:634:65A:6
 MacBook Pro (17-inch, Late 2011):MacBookPro8,3:AY5W:DV10:DV11:DVHN:DVHV:DVHW:DW48:DY22:DY23:DY24:DY25:DY26:DY5W:DYG8:F13Y:F140:
 MacBook Pro (17-inch, Mid 2009):MacBookPro5,2:8YA:8YB:91T:A3M:A3N:A5R:A5W:AF3:AKV:AKW:AMV:AMW:AN1:ANC:AND:ANE:ANF:ANJ:AUU:E6L:
 MacBook Pro (17-inch, Mid 2010):MacBookPro6,1:
+MacBook Pro (17-inch):MacBookPro1,2:
 MacBook Pro (Original):MacBookPro1,1:THV:VGW:VGX:VGY:VJ0:VJ1:VJ2:VJ3:VJ5:VJ6:VJ7:VJM:VMU:VSD:VTZ:VU0:VWA:VWB:VXW:VXX:W2Q:
 MacBook Pro (Retina, 13-inch, Early 2013):MacBookPro10,2:FFRP:FFRR:FG1F:FG28:FGM8:FGN5:FGN6:FGPJ:FHCH:FHN0:
 MacBook Pro (Retina, 13-inch, Early 2015):MacBookPro12,1:

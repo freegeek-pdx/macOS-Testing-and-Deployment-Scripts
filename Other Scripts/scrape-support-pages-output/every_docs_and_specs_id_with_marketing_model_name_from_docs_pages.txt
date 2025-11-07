@@ -123,6 +123,7 @@ Mac Desktop:mac/110334:112546:Power Mac G4 (QuickSilver):Power Mac G4 (QuickSilv
 Mac Desktop:mac/119767:112316:Power Mac G5:Power Mac G5:Power Mac G5:
 Mac Laptop:mac/301086:122209:MacBook Air (13-inch, M4, 2025):MacBook Air (13-inch, M4, 2025):MacBook Air (13-inch, M4, 2025):
 Mac Laptop:mac/301087:122210:MacBook Air (15-inch, M4, 2025):MacBook Air (15-inch, M4, 2025):MacBook Air (15-inch, M4, 2025):
+Mac Laptop:mac/301274:125405:MacBook Pro (14-inch, M5):MacBook Pro (14-inch, M5):MacBook Pro (14-inch, M5):
 Mac Laptop:mac/301019:118551:MacBook Air (13-inch, M3, 2024):MacBook Air (13-inch, M3, 2024):MacBook Air (13-inch, M3, 2024):
 Mac Laptop:mac/301020:118552:MacBook Air (15-inch, M3, 2024):MacBook Air (15-inch, M3, 2024):MacBook Air (15-inch, M3, 2024):
 Mac Laptop:mac/301069:121553:MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):
@@ -300,6 +301,10 @@ iPad:ipad/301081:122241:iPad Air 11-inch (M3) Wi-Fi:iPad Air 11-inch (M3) Wi-Fi:
 iPad:ipad/301082:122241:iPad Air 11-inch (M3) Wi-Fi + Cellular:iPad Air 11-inch (M3) Wi-Fi + Cellular:iPad Air 11-inch (M3):
 iPad:ipad/301083:122242:iPad Air 13-inch (M3) Wi-Fi:iPad Air 13-inch (M3) Wi-Fi:iPad Air 13-inch (M3):
 iPad:ipad/301084:122242:iPad Air 13-inch (M3) Wi-Fi + Cellular:iPad Air 13-inch (M3) Wi-Fi + Cellular:iPad Air 13-inch (M3):
+iPad:ipad/301270:125406:iPad Pro 11-inch (M5) Wi-Fi:iPad Pro 11-inch (M5) Wi-Fi:iPad Pro 11-inch (M5):
+iPad:ipad/301271:125406:iPad Pro 11-inch (M5) Wi-Fi + Cellular:iPad Pro 11-inch (M5) Wi-Fi + Cellular:iPad Pro 11-inch (M5):
+iPad:ipad/301272:125407:iPad Pro 13-inch (M5) Wi-Fi:iPad Pro 13-inch (M5) Wi-Fi:iPad Pro 13-inch (M5):
+iPad:ipad/301273:125407:iPad Pro 13-inch (M5) Wi-Fi + Cellular:iPad Pro 13-inch (M5) Wi-Fi + Cellular:iPad Pro 13-inch (M5):
 iPad:ipad/301027:119894:iPad Air 11-inch (M2) Wi-Fi:iPad Air 11-inch (M2) Wi-Fi:iPad Air 11-inch (M2):
 iPad:ipad/301028:119894:iPad Air 11-inch (M2) Wi-Fi + Cellular:iPad Air 11-inch (M2) Wi-Fi + Cellular:iPad Air 11-inch (M2):
 iPad:ipad/301029:119893:iPad Air 13-inch (M2) Wi-Fi:iPad Air 13-inch (M2) Wi-Fi:iPad Air 13-inch (M2):
@@ -406,6 +411,7 @@ iPad Accessory:ipad/pl221:unknown:iPad Accessories:iPad Accessories:UNKNOWN Mark
 iPad Accessory:ipad/pp627:120121:Smart Folio for iPad Air 11-inch (M2):Smart Folio for iPad Air 11-inch (M2):Smart Folio for iPad Air 11-inch (M2):
 iPad Accessory:ipad/pp629:121572:Smart Folio for iPad mini (A17 Pro):Smart Folio for iPad mini (A17 Pro):Smart Folio for iPad mini (A17 Pro):
 iPad Accessory:ipad/pp626:120128:Smart Folio for iPad Pro 13-inch (M4):Smart Folio for iPad Pro 13-inch (M4):Smart Folio for iPad Pro 13-inch (M4):
+iPadOS:ipad/pp733:unknown:iPadOS 26:iPadOS 26:UNKNOWN Marketing Model Name from Specs Page:
 iPadOS:ipad/pp172:unknown:iPadOS 18:iPadOS 18:UNKNOWN Marketing Model Name from Specs Page:
 iPadOS:ipad/pp167:unknown:iPadOS 17:iPadOS 17:UNKNOWN Marketing Model Name from Specs Page:
 iPadOS:ipad/pp243:unknown:iPadOS 16:iPadOS 16:UNKNOWN Marketing Model Name from Specs Page:
@@ -413,6 +419,10 @@ iPadOS:ipad/pp220:unknown:iPadOS 15:iPadOS 15:UNKNOWN Marketing Model Name from 
 iPadOS:ipad/pp532:unknown:iPadOS 14:iPadOS 14:UNKNOWN Marketing Model Name from Specs Page:
 iPadOS:ipad/pp531:unknown:iPadOS 13:iPadOS 13:UNKNOWN Marketing Model Name from Specs Page:
 iPhone:iphone/301076:122208:iPhone 16e:iPhone 16e:iPhone 16e:
+iPhone:iphone/301247:125089:iPhone 17:iPhone 17:iPhone 17:
+iPhone:iphone/301245:125090:iPhone 17 Pro:iPhone 17 Pro:iPhone 17 Pro:
+iPhone:iphone/301246:125091:iPhone 17 Pro Max:iPhone 17 Pro Max:iPhone 17 Pro Max:
+iPhone:iphone/301244:125092:iPhone Air:iPhone Air:iPhone Air:
 iPhone:iphone/301045:121029:iPhone 16:iPhone 16:iPhone 16:
 iPhone:iphone/301046:121030:iPhone 16 Plus:iPhone 16 Plus:iPhone 16 Plus:
 iPhone:iphone/301047:121031:iPhone 16 Pro:iPhone 16 Pro:iPhone 16 Pro:
@@ -470,11 +480,17 @@ iPhone:iphone/132740:unknown:iPhone 3GS (China Mainland):iPhone 3GS (China Mainl
 iPhone:iphone/132035:112496:iPhone 3G:iPhone 3G:iPhone 3G:
 iPhone:iphone/131510:112445:iPhone (original):iPhone (original):iPhone:
 iPhone:iphone/pl133:unknown:iPhone:iPhone:UNKNOWN Marketing Model Name from Specs Page:
+iPhone Accessory:iphone/301265:125135:AirPods Pro 3:AirPods Pro 3:AirPods Pro 3:
+iPhone Accessory:iphone/pp736:125135:AirPods Pro 3 Charging Case:AirPods Pro 3 Charging Case:AirPods Pro 3:
+iPhone Accessory:iphone/301248:125312:iPhone Air MagSafe Battery:iPhone Air MagSafe Battery:iPhone Air MagSafe Battery:
+iPhone Accessory:iphone/301005:unknown:EarPods (USB-C):EarPods (USB-C):UNKNOWN Marketing Model Name from Specs Page:
 iPhone Accessory:iphone/300414:111857:MagSafe Battery Pack:MagSafe Battery Pack:MagSafe Battery Pack:
+iPhone Accessory:iphone/300244:unknown:MagSafe Charger:MagSafe Charger:UNKNOWN Marketing Model Name from Specs Page:
 iPhone Accessory:iphone/300149:unknown:iPhone 11 Pro Max Smart Battery Case:iPhone 11 Pro Max Smart Battery Case:UNKNOWN Marketing Model Name from Specs Page:
 iPhone Accessory:iphone/300148:unknown:iPhone 11 Pro Smart Battery Case:iPhone 11 Pro Smart Battery Case:UNKNOWN Marketing Model Name from Specs Page:
 iPhone Accessory:iphone/300147:unknown:iPhone 11 Smart Battery Case:iPhone 11 Smart Battery Case:UNKNOWN Marketing Model Name from Specs Page:
 iPhone Accessory:iphone/pl134:unknown:iPhone Accessories:iPhone Accessories:UNKNOWN Marketing Model Name from Specs Page:
+iOS:iphone/pp732:unknown:iOS 26:iOS 26:UNKNOWN Marketing Model Name from Specs Page:
 iOS:iphone/pp171:unknown:iOS 18:iOS 18:UNKNOWN Marketing Model Name from Specs Page:
 iOS:iphone/pp166:unknown:iOS 17:iOS 17:UNKNOWN Marketing Model Name from Specs Page:
 iOS:iphone/pp242:unknown:iOS 16:iOS 16:UNKNOWN Marketing Model Name from Specs Page:
@@ -490,6 +506,8 @@ iOS:iphone/pp465:unknown:iOS 7:iOS 7:UNKNOWN Marketing Model Name from Specs Pag
 iOS:iphone/pp464:unknown:iOS 6:iOS 6:UNKNOWN Marketing Model Name from Specs Page:
 iOS:iphone/pp463:unknown:iOS 5:iOS 5:UNKNOWN Marketing Model Name from Specs Page:
 iOS:iphone/pp152:unknown:Shortcuts:Shortcuts:UNKNOWN Marketing Model Name from Specs Page:
+Apple Watch:watch/pl654:125094:Apple Watch SE (3rd generation):Apple Watch SE (3rd generation):Apple Watch SE 3:
+Apple Watch:watch/pl653:125095:Apple Watch Ultra 3:Apple Watch Ultra 3:Apple Watch Ultra 3:
 Apple Watch:watch/pl213:121202:Apple Watch Series 10:Apple Watch Series 10:Apple Watch Series 10:
 Apple Watch:watch/pl207:111833:Apple Watch Series 9:Apple Watch Series 9:Apple Watch Series 9:
 Apple Watch:watch/301002:111832:Apple Watch Ultra 2:Apple Watch Ultra 2:Apple Watch Ultra 2:
@@ -508,6 +526,7 @@ Apple Watch:watch/pl283:112011:Apple Watch Edition (1st gen):Apple Watch Edition
 Apple Watch:watch/pl284:unknown:Apple Watch Hermès (1st gen):Apple Watch Hermès (1st gen):UNKNOWN Marketing Model Name from Specs Page:
 Apple Watch:watch/pl282:112010:Apple Watch Sport (1st gen):Apple Watch Sport (1st gen):Apple Watch Sport (1st generation):
 Apple Watch:watch/pl281:unknown:Apple Watch Standard (1st gen):Apple Watch Standard (1st gen):UNKNOWN Marketing Model Name from Specs Page:
+watchOS:watch/pp734:unknown:watchOS 26:watchOS 26:UNKNOWN Marketing Model Name from Specs Page:
 watchOS:watch/pp173:unknown:watchOS 11:watchOS 11:UNKNOWN Marketing Model Name from Specs Page:
 watchOS:watch/pp168:unknown:watchOS 10:watchOS 10:UNKNOWN Marketing Model Name from Specs Page:
 watchOS:watch/pp244:unknown:watchOS 9:watchOS 9:UNKNOWN Marketing Model Name from Specs Page:
@@ -515,8 +534,11 @@ watchOS:watch/pp219:unknown:watchOS 8:watchOS 8:UNKNOWN Marketing Model Name fro
 watchOS:watch/pp536:unknown:watchOS 7:watchOS 7:UNKNOWN Marketing Model Name from Specs Page:
 watchOS:watch/pp535:unknown:watchOS 6:watchOS 6:UNKNOWN Marketing Model Name from Specs Page:
 watchOS:watch/pl183:unknown:watchOS:watchOS:UNKNOWN Marketing Model Name from Specs Page:
+Apple Vision:vision/301269:125436:Apple Vision Pro (M5):Apple Vision Pro (M5):Apple Vision Pro (M5):
+Apple Vision:vision/pp735:unknown:visionOS 26:visionOS 26:UNKNOWN Marketing Model Name from Specs Page:
 Apple Vision:vision/301017:117810:Apple Vision Pro:Apple Vision Pro:Apple Vision Pro:
 Apple Vision:vision/pp174:unknown:visionOS 2:visionOS 2:UNKNOWN Marketing Model Name from Specs Page:
+AirPods:airpods/301265:125135:AirPods Pro 3:AirPods Pro 3:AirPods Pro 3:
 AirPods:airpods/301050:121203:AirPods 4:AirPods 4:AirPods 4:
 AirPods:airpods/301051:121204:AirPods 4 with Active Noise Cancellation:AirPods 4 with Active Noise Cancellation:AirPods 4 with Active Noise Cancellation:
 AirPods:airpods/301049:121205:AirPods Max with USB-C:AirPods Max with USB-C:AirPods Max with USB-C:

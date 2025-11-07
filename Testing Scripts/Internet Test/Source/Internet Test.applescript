@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.13-1
+-- Version: 2025.10.23-1
 
 -- App Icon is “Satellite Antenna” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -145,9 +145,20 @@ end if
 set systemVersion to (system version of (system info))
 considering numeric strings
 	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
-	set is15dot6OrNewer to (systemVersion ≥ "15.6")
+	set isBigSurOrNewer to (systemVersion ≥ "11.0")
+	set isVenturaOrNewer to (systemVersion ≥ "13.0")
+	set isSequoiaFifteenDotSixOrNewer to (systemVersion ≥ "15.6")
 end considering
 
+set tabOrNulAndTab to tab
+if (isVenturaOrNewer) then
+	-- On macOS 13 Ventura and newer with the "extended" alert style AND on macOS 26 Tahoe where alerts text will be left aligned,
+	-- the system still trim leading spaces like the centered text alerts of macOS 11 Big Sur.
+	-- So, need to work around this trimming behaviro by using NUL+TAB instead of just TAB so that the line will no longer
+	-- start with whitespace (since it will start with a NUL char instead) and therefore will NOT be trimmed.
+	
+	set tabOrNulAndTab to ((ASCII character 0) & tab)
+end if
 
 repeat
 	set progress total steps to -1
@@ -228,17 +239,27 @@ repeat
 						exit repeat
 					else
 						try
+							set noEthernetCableDetectedAlertTitle to "🚫	No Ethernet Cable Detected"
+							set noEthernetCableDetectedAlertMessage to "🔌	PLUG IN an Ethernet cable and then click \"Test Ethernet Again\".
+
+‼️	If an Ethernet cable is plugged in and is not detected after multiple
+" & tabOrNulAndTab & "attempts, click \"Skip Ethernet Test\" and CONSULT AN INSTRUCTOR."
+							
+							set noEthernetCableDetectedAlertButtons to {"Open Test Sites in Safari", "Skip Ethernet Test", "Test Ethernet Again"}
+							
 							try
 								activate
 							end try
-							set noEthernetCableDetectedAlertReply to display dialog "🚫	No Ethernet Cable Detected
-
-
-🔌	PLUG IN an Ethernet cable and then click \"Test Ethernet Again\".
-
-‼️	If an Ethernet cable is plugged in and is not detected after multiple
-	attempts, click \"Skip Ethernet Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Ethernet Test", "Test Ethernet Again"} cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
-							if (button returned of noEthernetCableDetectedAlertReply is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
+							if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+								-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+								-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+								
+								display dialog (noEthernetCableDetectedAlertTitle & linefeed & linefeed & linefeed & noEthernetCableDetectedAlertMessage) buttons noEthernetCableDetectedAlertButtons cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
+							else
+								display alert (noEthernetCableDetectedAlertTitle & linefeed) message noEthernetCableDetectedAlertMessage buttons noEthernetCableDetectedAlertButtons cancel button 2 default button 3 as critical giving up after 30
+							end if
+							
+							if ((button returned of result) is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
 							delay 2
 						on error
 							set ethernetTestSkipped to true
@@ -276,18 +297,28 @@ repeat
 					exit repeat
 				else
 					try
+						set failedEthernetTestAlertTitle to "❌	Failed to Connect to the Internet via Ethernet"
+						set failedEthernetTestAlertMessage to "🔒	Make sure the Ethernet cable is SECURELY CONNECTED or connect
+" & tabOrNulAndTab & "a DIFFERENT Ethernet cable and then click \"Test Ethernet Again\".
+
+‼️	If the Ethernet cable is securely connected and this test fails after multiple
+" & tabOrNulAndTab & "attempts, click \"Skip Ethernet Test\" and CONSULT AN INSTRUCTOR."
+						
+						set failedEthernetTestAlertButtons to {"Open Test Sites in Safari", "Skip Ethernet Test", "Test Ethernet Again"}
+						
 						try
 							activate
 						end try
-						set failedEthernetTestAlertReply to display dialog "❌	Failed to Connect to the Internet via Etherent
-
-
-🔒	Make sure the Ethernet cable is SECURELY CONNECTED or connect
-	a DIFFERENT Ethernet cable and then click \"Test Ethernet Again\".
-
-‼️	If the Ethernet cable is securely connected and this test fails after multiple
-	attempts, click \"Skip Ethernet Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Ethernet Test", "Test Ethernet Again"} cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
-						if (button returned of failedEthernetTestAlertReply is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
+						if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+							-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+							-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+							
+							display dialog (failedEthernetTestAlertTitle & linefeed & linefeed & linefeed & failedEthernetTestAlertMessage) buttons failedEthernetTestAlertButtons cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
+						else
+							display alert (failedEthernetTestAlertTitle & linefeed) message failedEthernetTestAlertMessage buttons failedEthernetTestAlertButtons cancel button 2 default button 3 as critical giving up after 30
+						end if
+						
+						if ((button returned of result) is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
 						delay 2
 					on error
 						set ethernetTestSkipped to true
@@ -321,21 +352,31 @@ repeat
 					
 					if (wiFiIsOff) then
 						try
+							set failedToEnableWiFiAlertTitle to "🚫	Failed to Enable Wi-Fi"
+							set failedToEnableWiFiAlertMessage to "☝️	Manually TURN ON Wi-Fi and then click \"Test Wi-Fi Again\".
+
+👉	If Wi-Fi is turned on, DISCONNECT the Ethernet cable
+" & tabOrNulAndTab & "and then click \"Test Wi-Fi Again\".
+
+‼️	If Wi-Fi is turned on and the Ethernet cable is
+" & tabOrNulAndTab & "disconnected and this test fails after multiple attempts,
+" & tabOrNulAndTab & "click \"Skip Wi-Fi Test\" and CONSULT AN INSTRUCTOR."
+							
+							set failedToEnableWiFiAlertButtons to {"Open Test Sites in Safari", "Skip Wi-Fi Test", "Test Wi-Fi Again"}
+							
 							try
 								activate
 							end try
-							set failedToEnableWiFiAlertReply to display dialog "🚫	Failed to Enable Wi-Fi
-
-
-☝️	Manually TURN ON Wi-Fi and then click \"Test Wi-Fi Again\".
-
-👉	If Wi-Fi is turned on, DISCONNECT the Ethernet cable
-	and then click \"Test Wi-Fi Again\".
-
-‼️	If Wi-Fi is turned on and the Ethernet cable is
-	disconnected and this test fails after multiple attempts,
-	click \"Skip Wi-Fi Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Wi-Fi Test", "Test Wi-Fi Again"} cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
-							if (button returned of failedToEnableWiFiAlertReply is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
+							if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+								-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+								-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+								
+								display dialog (failedToEnableWiFiAlertTitle & linefeed & linefeed & linefeed & failedToEnableWiFiAlertMessage) buttons failedToEnableWiFiAlertButtons cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
+							else
+								display alert (failedToEnableWiFiAlertTitle & linefeed) message failedToEnableWiFiAlertMessage buttons failedToEnableWiFiAlertButtons cancel button 2 default button 3 as critical giving up after 30
+							end if
+							
+							if (button returned of result is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
 							delay 2
 						on error
 							set wiFiTestSkipped to true
@@ -361,7 +402,7 @@ repeat
 							-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
 							-- So, fallback to using "ipconfig getsummary" instead.
 							
-							if (is15dot6OrNewer) then
+							if (isSequoiaFifteenDotSixOrNewer) then
 								-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
 								-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
 								
@@ -377,7 +418,7 @@ repeat
 								end if
 							end try
 							
-							if (is15dot6OrNewer) then
+							if (isSequoiaFifteenDotSixOrNewer) then
 								-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
 								
 								try
@@ -409,7 +450,7 @@ repeat
 								-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
 								-- So, fallback to using "ipconfig getsummary" instead.
 								
-								if (is15dot6OrNewer) then
+								if (isSequoiaFifteenDotSixOrNewer) then
 									-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
 									-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
 									
@@ -425,7 +466,7 @@ repeat
 									end if
 								end try
 								
-								if (is15dot6OrNewer) then
+								if (isSequoiaFifteenDotSixOrNewer) then
 									-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
 									
 									try
@@ -480,21 +521,32 @@ repeat
 					exit repeat
 				else
 					try
+						set wiFiTestFailedAlertTitle to "❌	Failed to Connect to the Internet via Wi-Fi"
+						
+						set differentOrNothing to ""
+						if (connectedWiFiNetworkName is not equal to "") then set differentOrNothing to " DIFFERENT"
+						set wiFiTestFailedAlertMessage to "☝️	MANUALLY CONNECT to a" & differentOrNothing & " Wi-Fi network
+" & tabOrNulAndTab & "and then click \"Test Wi-Fi Again\".
+
+‼️	If this computer is connected to a known good Wi-Fi
+" & tabOrNulAndTab & "network and this test fails after multiple attempts,
+" & tabOrNulAndTab & "click \"Skip Wi-Fi Test\" and CONSULT AN INSTRUCTOR."
+						
+						set wiFiTestFailedAlertButtons to {"Open Test Sites in Safari", "Skip Wi-Fi Test", "Test Wi-Fi Again"}
+						
 						try
 							activate
 						end try
-						set differentOrNothing to ""
-						if (connectedWiFiNetworkName is not equal to "") then set differentOrNothing to " DIFFERENT"
-						set wiFiTestFailedAlertReply to display dialog "❌	Failed to Connect to the Internet via Wi-Fi
-
-
-☝️	MANUALLY CONNECT to a" & differentOrNothing & " Wi-Fi network
-	and then click \"Test Wi-Fi Again\".
-
-‼️	If this computer is connected to a known good Wi-Fi
-	network and this test fails after multiple attempts,
-	click \"Skip Wi-Fi Test\" and CONSULT AN INSTRUCTOR." buttons {"Open Test Sites in Safari", "Skip Wi-Fi Test", "Test Wi-Fi Again"} cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
-						if (button returned of wiFiTestFailedAlertReply is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
+						if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+							-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+							-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+							
+							display dialog (wiFiTestFailedAlertTitle & linefeed & linefeed & linefeed & wiFiTestFailedAlertMessage) buttons wiFiTestFailedAlertButtons cancel button 2 default button 3 with title (name of me) with icon caution giving up after 30
+						else
+							display alert (wiFiTestFailedAlertTitle & linefeed) message wiFiTestFailedAlertMessage buttons wiFiTestFailedAlertButtons cancel button 2 default button 3 as critical giving up after 30
+						end if
+						
+						if ((button returned of result) is equal to "Open Test Sites in Safari") then openTestSitesInSafari()
 						delay 2
 					on error
 						set wiFiTestSkipped to true
@@ -565,7 +617,7 @@ repeat
 					set resultsOutput to resultsOutput & "
 
 👍	Successfully Connected to Apple.com
-	and Google.com via Wi-Fi"
+" & tabOrNulAndTab & "and Google.com via Wi-Fi"
 				else
 					if (connectedToAppleViaWiFi) then
 						set resultsOutput to resultsOutput & "
@@ -581,7 +633,7 @@ repeat
 				set resultsOutput to resultsOutput & "
 
 👎	Failed to Connect to Both Apple.com
-	and Google.com via Wi-Fi"
+" & tabOrNulAndTab & "and Google.com via Wi-Fi"
 			end if
 			
 			if (connectedWiFiNetworkName is equal to "") then
@@ -590,7 +642,7 @@ repeat
 🚫	Failed to Connect to a Wi-Fi Network
 
 ‼️	MANUALLY CONNECT TO A WI-FI
-	NETWORK AND TRY AGAIN"
+" & tabOrNulAndTab & "NETWORK AND TRY AGAIN"
 			else
 				set resultsOutput to resultsOutput & "
 
@@ -601,7 +653,7 @@ repeat
 				set resultsOutput to resultsOutput & "
 
 ‼️	MANUALLY CONNECT TO A DIFFERENT
-	WI-FI NETWORK AND TRY AGAIN"
+" & tabOrNulAndTab & "WI-FI NETWORK AND TRY AGAIN"
 			end if
 		end if
 		
@@ -609,7 +661,7 @@ repeat
 			set resultsOutput to resultsOutput & "
 
 ‼️	MULTIPLE WI-FI CARDS DETECTED
-	ONLY ONE WI-FI CARD HAS BEEN TESTED"
+" & tabOrNulAndTab & "ONLY ONE WI-FI CARD HAS BEEN TESTED"
 		end if
 	end if
 	
@@ -630,7 +682,7 @@ repeat
 				set resultsOutput to resultsOutput & "
 
 👍	Successfully Connected to Apple.com
-	and Google.com via Ethernet"
+" & tabOrNulAndTab & "and Google.com via Ethernet"
 			else
 				if (connectedToAppleViaEthernet) then
 					set resultsOutput to resultsOutput & "
@@ -646,14 +698,14 @@ repeat
 			set resultsOutput to resultsOutput & "
 
 👎	Failed to Connect to Both Apple.com
-	and Google.com via Ethernet"
+" & tabOrNulAndTab & "and Google.com via Ethernet"
 		else
 			set resultsOutput to resultsOutput & "
 
 🚫	No Ethernet Cable Detected
 
 ‼️	PLUG IN AN ETHERNET CABLE
-	AND TRY AGAIN"
+" & tabOrNulAndTab & "AND TRY AGAIN"
 		end if
 		
 		if ((count of ethernetNetworkDeviceIDs) > 1) then
@@ -662,8 +714,8 @@ repeat
 ‼️	MULTIPLE ETHERNET PORTS DETECTED
 
 ‼️	TEST EACH ETHERNET PORT BY RUNNING
-	THIS TEST MULTIPLE TIMES WITH ONLY
-	ONE CABLE PLUGGED IN"
+" & tabOrNulAndTab & "THIS TEST MULTIPLE TIMES WITH ONLY
+" & tabOrNulAndTab & "ONE CABLE PLUGGED IN"
 		end if
 	else if (not manufacturedWithoutEthernetPort) then
 		if (hasWiFiCard) then set resultsOutput to resultsOutput & "
@@ -681,8 +733,8 @@ repeat
 		set resultsOutput to resultsOutput & "‼️	NO WI-FI CARD DETECTED
 
 ‼️	IF THIS COMPUTER SHOULD HAVE WI-FI
-	MAKE SURE WI-FI IS TURNED ON
-	AND TRY AGAIN"
+" & tabOrNulAndTab & "MAKE SURE WI-FI IS TURNED ON
+" & tabOrNulAndTab & "AND TRY AGAIN"
 	end if
 	
 	if ((hasWiFiCard and (connectedWiFiNetworkName is not equal to "") and (not wiFiTestPassed)) or (hasEthernetPort and ethernetCableConnected and (not ethernetTestPassed))) then
@@ -690,7 +742,7 @@ repeat
 
 
 ‼️	CONSULT AN INSTRUCTOR
-	SINCE INTERNET TEST FAILED"
+" & tabOrNulAndTab & "SINCE INTERNET TEST FAILED"
 	end if
 	
 	set didPassInternetTest to (wiFiTestPassed and (ethernetTestPassed or (manufacturedWithoutEthernetPort and (not hasEthernetPort))))
@@ -702,31 +754,50 @@ repeat
 	try
 		activate
 	end try
+	
+	set resultsButtons to {"Test Internet Again", "Done"}
+	
 	if didPassInternetTest then
 		if ((count of ethernetNetworkDeviceIDs) > 1) then
 			try
-				display dialog resultsTitle & "
-
-
-" & resultsOutput buttons {"Test Internet Again", "Done"} cancel button 1 default button 2 with title (name of me) with icon note
+				if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+					-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+					-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+					
+					display dialog (resultsTitle & linefeed & linefeed & linefeed & resultsOutput) buttons resultsButtons cancel button 1 default button 2 with title (name of me) with icon note
+				else
+					display alert (resultsTitle & linefeed) message resultsOutput buttons resultsButtons cancel button 1 default button 2
+				end if
+				
 				exit repeat
 			end try
 		else
 			set progress total steps to 1
 			set progress completed steps to 1
 			
-			display dialog resultsTitle & "
-
-
-" & resultsOutput buttons {"Done"} default button 1 with title (name of me) with icon note
+			set resultsButtons to {"Done"}
+			if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+				-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+				-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+				
+				display dialog (resultsTitle & linefeed & linefeed & linefeed & resultsOutput) buttons resultsButtons default button 1 with title (name of me) with icon note
+			else
+				display alert (resultsTitle & linefeed) message resultsOutput buttons resultsButtons default button 1
+			end if
+			
 			exit repeat
 		end if
 	else
 		try
-			display dialog resultsTitle & "
-
-
-" & resultsOutput buttons {"Test Internet Again", "Done"} cancel button 1 default button 2 with title (name of me) with icon caution
+			if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+				-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+				-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+				
+				display dialog (resultsTitle & linefeed & linefeed & linefeed & resultsOutput) buttons resultsButtons cancel button 1 default button 2 with title (name of me) with icon caution
+			else
+				display alert (resultsTitle & linefeed) message resultsOutput buttons resultsButtons cancel button 1 default button 2 as critical
+			end if
+			
 			exit repeat
 		end try
 	end if

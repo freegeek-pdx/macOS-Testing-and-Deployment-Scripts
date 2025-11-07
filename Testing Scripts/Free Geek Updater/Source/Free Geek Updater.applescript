@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.13-1
+-- Version: 2025.10.27-1
 
 -- App Icon is “Counterclockwise Arrows” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -107,6 +107,8 @@ end try
 set systemVersion to (system version of (system info))
 considering numeric strings
 	set isCatalinaOrNewer to (systemVersion ≥ "10.15")
+	set isBigSurOrNewer to (systemVersion ≥ "11.0")
+	set isVenturaOrNewer to (systemVersion ≥ "13.0")
 	set isTahoeOrNewer to (systemVersion ≥ "16.0")
 end considering
 
@@ -216,18 +218,29 @@ if (appVersion is not equal to "UNKNOWN") then
 				do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 			end try
 			try
-				display dialog (name of me) & " Failed to Check for Updates
+				set failedToCheckForUpdatesTitle to ((name of me) & " Failed to Check for Updates
 
-
-You must be connected to the internet to be able to check for updates.
-
-Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
+You must be connected to the internet to be able to check for updates.")
+				
+				set failedToCheckForUpdatesMessage to "Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
 
 If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
 
 Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
 
-If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Continue Without Updating", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T."
+				
+				set failedToCheckForUpdateButtons to {"Continue Without Updating", "Try Again"}
+				
+				if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+					-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+					-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+					
+					display dialog (failedToCheckForUpdatesTitle & linefeed & linefeed & linefeed & failedToCheckForUpdatesMessage) buttons failedToCheckForUpdateButtons cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
+				else
+					display alert failedToCheckForUpdatesTitle message failedToCheckForUpdatesMessage buttons failedToCheckForUpdateButtons cancel button 1 default button 2 as critical giving up after 30
+				end if
+				
 				delay 0.5
 			on error
 				exit repeat

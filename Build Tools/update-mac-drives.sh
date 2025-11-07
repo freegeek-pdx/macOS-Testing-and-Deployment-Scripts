@@ -84,15 +84,15 @@ if [[ "${confirm_format_drives}" =~ ^[Yy] ]]; then
 
 			diskutil_partition_disk_array=(
 				JHFS+ 'fgMIB'						1.33G		# 1.2 GB
-			#	JHFS+ 'Install macOS High Sierra'	5.435G		# 5.305 GB
-			#	JHFS+ 'Install macOS Mojave'		6.245G		# 6.115 GB
+				# JHFS+ 'Install macOS High Sierra'	5.435G		# 5.305 GB
+				# JHFS+ 'Install macOS Mojave'		6.245G		# 6.115 GB
 				JHFS+ 'Install macOS Catalina'		8.46G		# 8.33 GB
 				JHFS+ 'Install macOS Big Sur'		13.665G		# 13.535 GB
 				JHFS+ 'Install macOS Monterey'		14.735G		# 14.605 GB
 				JHFS+ 'Install macOS Ventura'		14.53G		# 14.4 GB
 				JHFS+ 'Install macOS Sonoma'		15.985G		# 15.855 GB
 				JHFS+ 'Install macOS Sequoia'		17.995G		# 17.865 GB
-				JHFS+ 'Install macOS Tahoe'			19.285G		# 19.155 GB
+				JHFS+ 'Install macOS Tahoe'			19.635G		# 19.505 GB
 				JHFS+ 'Mac Test Boot'				0B			# All Remaining Space
 			)
 
@@ -154,7 +154,7 @@ human_readable_duration_from_seconds() { # Based On: https://stackoverflow.com/a
 overall_start_timestamp="$(date '+%s')"
 
 declare -a installer_names_to_update=(
-#	'High Sierra' 'Mojave'
+	# 'High Sierra' 'Mojave'
 	'Catalina' 'Big Sur' 'Monterey' 'Ventura' 'Sonoma' 'Sequoia' 'Tahoe'
 )
 
@@ -164,7 +164,7 @@ for this_installer_name_to_update in "${installer_names_to_update[@]}"; do
 
 	# Suppress ShellCheck suggestion to use "find" instead of "ls" since we need "ls -t" to sort by modification date to easily get a single result of the newest installer, and this path will never contain non-alphanumeric characters.
 	# shellcheck disable=SC2012
-	installer_dmg_path="$(ls -t "${PROJECT_DIR}/../../MacLand Images/macOS Installers/Install macOS ${this_installer_name_to_update}"*'.dmg' | head -1)"
+	installer_dmg_path="$(ls -t "/Users/Shared/Mac Deployment/macOS Installers/Install macOS ${this_installer_name_to_update}"*'.dmg' | head -1)"
 	echo -e "\nMounting Installer DMG \"${installer_dmg_path##*/}\"..."
 	installer_source_volume="$(hdiutil attach "${installer_dmg_path}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
 	if [[ -d "${installer_source_volume}" ]]; then
@@ -330,7 +330,7 @@ done
 connected_mtb_count=0
 # Suppress ShellCheck suggestion to use "find" instead of "ls" since we need "ls -t" to sort by modification date to easily get a single result of the newest MTB image, and this path will never contain non-alphanumeric characters.
 # shellcheck disable=SC2012
-mtb_dmg_path="$(ls -t "${PROJECT_DIR}/../../MacLand Images/FreeGeek-MacTestBoot-"*'.dmg' | head -1)"
+mtb_dmg_path="$(ls -t '/Users/Shared/Mac Deployment/FreeGeek-MacTestBoot-'*'.dmg' | head -1)"
 echo -e "\nMounting MTB Source DMG \"${mtb_dmg_path##*/}\" to Get Version..."
 mtb_source_volume="$(hdiutil attach "${mtb_dmg_path}" -nobrowse -readonly -plist 2> /dev/null | xmllint --xpath 'string(//string[starts-with(text(), "/Volumes/")])' - 2> /dev/null)"
 if [[ -d "${mtb_source_volume}" ]]; then

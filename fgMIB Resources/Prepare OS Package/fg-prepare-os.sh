@@ -30,7 +30,7 @@
 # Only run if running as root on first boot after OS installation, or on a clean installation prepared by fg-install-os.
 # IMPORTANT: If on a clean installation prepared by fg-install-os, AppleSetupDone will have been created to not show Setup Assistant while the package installations run via LaunchDaemon.
 
-readonly SCRIPT_VERSION='2025.10.16-1'
+readonly SCRIPT_VERSION='2025.10.23-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -1042,6 +1042,15 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 		defaults delete '/Library/Preferences/.GlobalPreferences' AppleFirstWeekday &> /dev/null
 
 
+		# SET KEYBOARD TYPES FOR KNOWN USED DEVICES SO THAT "Keyboard Setup Assistant" DOES NOT OPEN FOR THEM
+		# https://macadmin.fraserhess.com/2023/01/29/suppressing-keyboard-setup-assistant/
+
+		defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '4-4-0' -integer '40' # USB Switcher (https://www.amazon.com/dp/B08TM4YLQK)
+		defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '50475-1133-0' -integer '40' # Logitech CU0007 Unifying Receiver
+		defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '49473-1046-0' -integer '40' # WoneNice Wireless Barcode Scanner Receiver
+		defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '4608-1504-0' -integer '40' # Symbol Wired Barcode Scanner
+
+
 		# DISABLE AUTOMATIC OS & APP STORE UPDATES
 		# Keeping AutomaticCheckEnabled and AutomaticDownload enabled is required for EFIAllowListAll to be able to be updated when EFIcheck is run by our scripts, the rest should be disabled.
 
@@ -1318,6 +1327,13 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 						# DISABLE SCREEN SAVER
 
 						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults -currentHost write 'com.apple.screensaver' idleTime -int 0
+
+
+						# DISABLE OS UPDATE NOTIFICATIONS
+						# https://lapcatsoftware.com/articles/2024/2/2.html
+
+						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.SoftwareUpdate' MajorOSUserNotificationDate -date "$(date -jv '+5y' '+%F')"
+						launchctl asuser "${this_uid}" sudo -u "${this_username}" defaults write 'com.apple.SoftwareUpdate' UserNotificationDate -date "$(date -jv '+5y' '+%F')"
 
 
 						# DISABLE NOTIFICATIONS
@@ -1658,7 +1674,7 @@ if (( DARWIN_MAJOR_VERSION >= 17 )) && [[ ! -f '/private/var/db/.AppleSetupDone'
 
 									write_to_log "Creating LaunchAgent to Disable BTM Notifications for \"${this_username}\" User"
 
-									# NOTE: See comments in "SETUP FREE GEEK SETUP AUTO-LAUNCH" section above for information about "AssociatedBundleIdentifiers", and using "LSRegisterURL" and "open" for the "Free Geek Task Runner" app name and icon properly show for the following LaunchAgent in the Login Items section.
+									# NOTE: See comments in "SETUP FREE GEEK SETUP AUTO-LAUNCH" section above for information about "AssociatedBundleIdentifiers" to properly display in the Login Items section in macOS 13 Ventura, and using "LSRegisterURL" and "open" for the "Free Geek Task Runner" app name and icon properly show for the following LaunchAgent in the Login Items section.
 									osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); run = argv => $.LSRegisterURL($.NSURL.fileURLWithPath(argv[0]), true)' -- "${this_user_apps_folder}/Free Geek Task Runner.app" &> /dev/null
 									launchctl asuser "${this_uid}" sudo -u "${this_username}" open -na "${this_user_apps_folder}/Free Geek Task Runner.app"
 
@@ -1687,9 +1703,9 @@ usernoted_preferences_domain='${this_home_folder}/Library/Group Containers/group
 defaults export \"\${usernoted_preferences_domain}\" \"\${TMPDIR}fg-usernoted.plist\"
 
 this_usernoted_apps_index=0
-while this_usernoted_apps_bundle_id=\"\$(plutil -extract \"apps.\${this_usernoted_apps_index}.bundle-id\" raw \"\${TMPDIR}fg-usernoted.plist\" -o - 2> /dev/null)\"; do
+while this_usernoted_apps_bundle_id=\"\$(plutil -extract \"apps.\${this_usernoted_apps_index}.bundle-id\" raw \"\${TMPDIR}fg-usernoted.plist\" 2> /dev/null)\"; do
 	if [[ \"\${this_usernoted_apps_bundle_id}\" == 'com.apple.BTMNotificationAgent' ]]; then
-		if [[ \"\$(plutil -extract \"apps.\${this_usernoted_apps_index}.flags\" raw \"\${TMPDIR}fg-usernoted.plist\" -o - 2> /dev/null)\" != '${notification_center_disable_all_flags}' ]]; then
+		if [[ \"\$(plutil -extract \"apps.\${this_usernoted_apps_index}.flags\" raw \"\${TMPDIR}fg-usernoted.plist\" 2> /dev/null)\" != '${notification_center_disable_all_flags}' ]]; then
 			plutil -replace \"apps.\${this_usernoted_apps_index}.flags\" -integer '${notification_center_disable_all_flags}' \"\${TMPDIR}fg-usernoted.plist\"
 			defaults import \"\${usernoted_preferences_domain}\" \"\${TMPDIR}fg-usernoted.plist\"
 			killall usernoted
@@ -1705,9 +1721,9 @@ rm -f \"\${TMPDIR}fg-usernoted.plist\"
 "
 
 									plutil -insert 'ProgramArguments' -string "${disable_btm_notifications_code}" -append "${this_user_launch_agents_folder}/org.freegeek.Disable-BTM-Notifications.plist"
-									# Use "plutil" for script code that may contain special xml/plist characters that need to be escaped.
+									# Use "plutil" for script code that contains special xml/plist characters that need to be escaped.
 									# "PlistBuddy" would escape special xml/plist characters in values properly too, but because of how "PlistBuddy" values need to be specified inside of commands that
-									# are within a quoted string means that quotes in the values (which also exist) would need to be escaped to not break the "PlistBuddy" commands themselves.
+									# are within a quoted string means that nested quotes in the values (which also exist) would need to be double escaped to not break the "PlistBuddy" commands themselves.
 									# That possible nested quoting issue doesn't exist with "plutil" because of how values are specified as their own separate argument rather than within commands like with "PlistBuddy".
 								fi
 
@@ -1739,7 +1755,7 @@ rm -f \"\${TMPDIR}fg-usernoted.plist\"
 									# See REBOOT AFTER DATE IS SET BACK IN TIME comments in fg-snapshot-preserver for more information about this.
 									# This means that StartCalendarInterval and StartInterval could actually be used together, but now there is no real benefit to switching back to that over the existing StartCalendarInterval setup.
 
-									# NOTE: See comments above in "Free Geek Setup" LaunchAgent setup about setting up this app with "AssociatedBundleIdentifiers" to properly display in the Login Items section in macOS 13 Ventura (including the following two commands being necessary).
+									# NOTE: See comments in "SETUP FREE GEEK SETUP AUTO-LAUNCH" section above for information about "AssociatedBundleIdentifiers" to properly display in the Login Items section in macOS 13 Ventura, and using "LSRegisterURL" and "open" for the "Free Geek Task Runner" app name and icon properly show for the following LaunchAgent in the Login Items section.
 									# This also requires the "fg-snapshot-preserver.sh" script being SIGNED with the same Team ID as the app of the AssociatedBundleIdentifiers, so that script is signed in the "build-fg-prepare-os-pkg.sh" script.
 
 									osascript -l 'JavaScript' -e 'ObjC.import("LaunchServices"); run = argv => $.LSRegisterURL($.NSURL.fileURLWithPath(argv[0]), true)' -- "${this_user_apps_folder}/Free Geek Snapshot Helper.app" &> /dev/null
@@ -1780,7 +1796,7 @@ Save
 						# SETUP DOCK
 						# Add "QA Helper" to the front (if installed), add "DriveDx" and "Geekbench" and "Mactracker" after "QA Helper" (if installed),
 						# and then add "KeyboardCleanTool" after that (if installed and is a laptop),
-						# replace "Safari" with "Firefox" (if installed which it will be on macOS 10.15 Catalina and older),
+						# replace "Safari" with "Firefox" (if installed, which it will be on versions of macOS which are no longer receiving Safari updates),
 						# add "LibreOffice" after "Reminders" (if installed, which it won't be anymore but the code is left in place as an example),
 						# lock contents size and position, and hide recents (on macOS 10.14 Mojave and newer).
 

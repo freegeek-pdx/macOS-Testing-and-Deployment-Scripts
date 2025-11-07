@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.17-1
+-- Version: 2025.10.27-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -136,40 +136,47 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	
 	try
-		set commandLineArguments to ((current application's NSProcessInfo's processInfo's arguments) as list) -- using "on run argv" seems to NOT work for compiled applets, so use AppleScriptObjC bridge instead.
-		set commandLineArgumentsCount to (count of commandLineArguments)
+		set commandLineArguments to (rest of ((current application's NSProcessInfo's processInfo's arguments) as list))
+		-- NOTE: using "on run argv" seems to NOT work for compiled applets, so use AppleScriptObjC bridge instead.
+		-- ALSO NOTE: "rest of" is used to remove first item which will always be the app binary path.
 		
-		if (commandLineArgumentsCount > 1) then -- "item 1 of commandLineArguments" will always be the app binary path.
-			set taskType to (item 2 of commandLineArguments)
+		set thisTaskType to missing value
+		set isAdminTask to false
+		
+		repeat with thisCommandLineArgument in commandLineArguments
+			set thisCommandLineArgument to (thisCommandLineArgument as text)
 			
-			if ((taskType is equal to "sh") or (taskType is equal to "bash") or (taskType is equal to "zsh")) then
-				if (commandLineArgumentsCount is equal to 3) then
-					set shellScriptToExecute to (item 3 of commandLineArguments)
-					
-					if (taskType is equal to "sh") then
-						do shell script shellScriptToExecute
-					else
-						do shell script ("/bin/" & taskType & " -c " & (quoted form of shellScriptToExecute))
-					end if
-				else if ((commandLineArgumentsCount is equal to 4) and ((item 3 of commandLineArguments) is equal to "admin")) then
-					set adminShellScriptToExecute to (item 4 of commandLineArguments)
-					
-					if (taskType is equal to "sh") then
-						doShellScriptAsAdmin(adminShellScriptToExecute)
-					else
-						doShellScriptAsAdmin("/bin/" & taskType & " -c " & (quoted form of adminShellScriptToExecute))
-					end if
-				end if
-			else if (((taskType is equal to "applescript") or (taskType is equal to "jxa")) and (commandLineArgumentsCount is equal to 3)) then
-				set scriptToExecute to (item 3 of commandLineArguments)
-				
-				if (taskType is equal to "jxa") then
-					run script scriptToExecute in "JavaScript"
+			if (thisCommandLineArgument is not equal to "") then
+				if ({"admin", "root", "sudo"} contains thisCommandLineArgument) then
+					set isAdminTask to true
+				else if (thisTaskType is equal to missing value) then
+					set thisTaskType to thisCommandLineArgument
 				else
-					run script scriptToExecute
+					try
+						if ({"sh", "shell"} contains thisTaskType) then
+							if (isAdminTask) then
+								doShellScriptAsAdmin(thisCommandLineArgument)
+							else
+								do shell script thisCommandLineArgument
+							end if
+						else if ({"bash", "zsh"} contains thisTaskType) then
+							if (isAdminTask) then
+								doShellScriptAsAdmin("/bin/" & thisTaskType & " -c " & (quoted form of thisCommandLineArgument))
+							else
+								do shell script ("/bin/" & thisTaskType & " -c " & (quoted form of thisCommandLineArgument))
+							end if
+						else if (thisTaskType is equal to "applescript") then
+							run script thisCommandLineArgument
+						else if (thisTaskType is equal to "jxa") then
+							run script thisCommandLineArgument in "JavaScript"
+						end if
+					end try
+					
+					set thisTaskType to missing value
+					set isAdminTask to false
 				end if
 			end if
-		end if
+		end repeat
 	end try
 else
 	try

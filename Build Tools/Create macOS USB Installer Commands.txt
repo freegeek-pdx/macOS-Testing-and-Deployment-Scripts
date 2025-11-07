@@ -2,7 +2,7 @@
 # THE FOLLOWING COMMANDS ARE INTENDED TO BE COPIED-AND-PASTED INTO TERMINAL WHEN NEEDED.
 # BUT, THIS *IS NOT NEEDED ANYMORE* SINCE "update-mac-drives.sh" CAN BE USED INSTEAD.
 
-# CREATE Tahoe INSTALLER USB (19.155 GB REQUIRED):
+# CREATE Tahoe INSTALLER USB (19.505 GB REQUIRED):
 sudo '/Volumes/Install macOS Tahoe/Install macOS Tahoe.app/Contents/Resources/createinstallmedia' --volume /Volumes/InstallTahoe --nointeraction
 
 # CREATE Sequoia INSTALLER USB (17.865 GB REQUIRED):

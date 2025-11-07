@@ -12,6 +12,7 @@ Apple TV:AppleTV11,1:Apple TV 4K (2nd generation):A2169:
 Apple TV:AppleTV14,1:Apple TV 4K (3rd generation) Wi-Fi + Ethernet:A2843:
 Apple TV:AppleTV14,1:Apple TV 4K (3rd generation) Wi-Fi:A2737:
 Apple Vision:RealityDevice14,1:Vision Pro:A2117:
+Apple Vision:RealityDevice17,1:Vision Pro (M5):A3416:
 Apple Watch:Watch1,1:Apple Watch (1st generation) (38mm):A1553:
 Apple Watch:Watch1,2:Apple Watch (1st generation) (42mm) (Store Display Model):A1638:
 Apple Watch:Watch1,2:Apple Watch (1st generation) (42mm):A1554:
@@ -61,6 +62,15 @@ Apple Watch:Watch7,8:Apple Watch Series 10 (GPS, 42mm):A2997:A2998:
 Apple Watch:Watch7,9:Apple Watch Series 10 (GPS, 46mm):A2999:A3000:
 Apple Watch:Watch7,10:Apple Watch Series 10 (GPS + Cellular, 42mm):A3001:A3002:
 Apple Watch:Watch7,11:Apple Watch Series 10 (GPS + Cellular, 46mm):A3003:A3206:
+Apple Watch:Watch7,12:Apple Watch Ultra 3:A3281:A3282:
+Apple Watch:Watch7,13:Apple Watch SE 3 (GPS, 40mm):A3324:A3391:
+Apple Watch:Watch7,14:Apple Watch SE 3 (GPS, 44mm):A3325:A3392:
+Apple Watch:Watch7,15:Apple Watch SE 3 (GPS + Cellular, 40mm):A3326:A3327:
+Apple Watch:Watch7,16:Apple Watch SE 3 (GPS + Cellular, 44mm):A3328:A3329:
+Apple Watch:Watch7,17:Apple Watch Series 11 (GPS, 42mm):A3331:A3450:
+Apple Watch:Watch7,18:Apple Watch Series 11 (GPS, 46mm):A3333:A3451:
+Apple Watch:Watch7,19:Apple Watch Series 11 (GPS + Cellular, 42mm):A3335:A3452:
+Apple Watch:Watch7,20:Apple Watch Series 11 (GPS + Cellular, 46mm):A3337:A3453:
 HomePod:AudioAccessory1,1:HomePod (1st generation):A1639:
 HomePod:AudioAccessory5,1:HomePod mini (China Mainland):A2531:
 HomePod:AudioAccessory5,1:HomePod mini:A2374:
@@ -163,6 +173,10 @@ iPad:iPad16,3:iPad Pro 11-inch (M4) Wi-Fi:A2836:
 iPad:iPad16,4:iPad Pro 11-inch (M4) Wi-Fi + Cellular:A2837:A3006:
 iPad:iPad16,5:iPad Pro 13-inch (M4) Wi-Fi:A2925:
 iPad:iPad16,6:iPad Pro 13-inch (M4) Wi-Fi + Cellular:A2926:A3007:
+iPad:iPad17,1:iPad Pro 11-inch Wi-Fi (M5):A3357:
+iPad:iPad17,2:iPad Pro 11-inch Wi-Fi + Cellular (M5):A3358:A3359:
+iPad:iPad17,3:iPad Pro 13-inch Wi-Fi (M5):A3360:
+iPad:iPad17,4:iPad Pro 13-inch Wi-Fi + Cellular (M5):A3361:A3362:
 iPhone:iPhone1,1:iPhone:A1203:
 iPhone:iPhone1,2:iPhone 3G:A1241:A1324:
 iPhone:iPhone2,1:iPhone 3GS:A1303:A1325:
@@ -221,6 +235,10 @@ iPhone:iPhone17,2:iPhone 16 Pro Max:A3084:A3295:A3296:A3297:
 iPhone:iPhone17,3:iPhone 16:A3081:A3286:A3287:A3288:
 iPhone:iPhone17,4:iPhone 16 Plus:A3082:A3289:A3290:A3291:
 iPhone:iPhone17,5:iPhone 16e:A3212:A3408:A3409:A3410:
+iPhone:iPhone18,1:iPhone 17 Pro:A3256:A3522:A3523:A3524:
+iPhone:iPhone18,2:iPhone 17 Pro Max:A3257:A3525:A3526:A3527:
+iPhone:iPhone18,3:iPhone 17:A3258:A3519:A3520:A3521:
+iPhone:iPhone18,4:iPhone Air:A3260:A3516:A3517:A3518:
 iPod:iPod1,1:iPod touch (1st generation):A1213:
 iPod:iPod2,1:iPod touch (2nd generation):A1288:A1319:
 iPod:iPod3,1:iPod touch (3rd generation):A1318:
@@ -300,11 +318,14 @@ Mac Desktop:Macmini1,1:Mac mini (Late 2006):A1176:
 Mac Desktop:Macmini2,1:Mac mini (Mid 2007):A1176:
 Mac Desktop:Macmini3,1:Mac mini (Early 2009):A1283:
 Mac Desktop:Macmini3,1:Mac mini (Late 2009):A1283:
+Mac Desktop:Macmini3,1:Mac mini (Mac OS X Server):A1283:
+Mac Desktop:Macmini4,1:Mac mini Server (Mid 2010):A1347:
 Mac Desktop:Macmini4,1:Mac mini (Mid 2010):A1347:
 Mac Desktop:Macmini5,1:Mac mini (Mid 2011, Integrated graphics):A1347:
 Mac Desktop:Macmini5,2:Mac mini (Mid 2011, Dedicated graphics):A1347:
 Mac Desktop:Macmini5,3:Mac mini (Mid 2011, Server):A1347:
 Mac Desktop:Macmini6,1:Mac mini (Late 2012, Core i5):A1347:
+Mac Desktop:Macmini6,2:Mac mini Server (Late 2012):A1347:
 Mac Desktop:Macmini6,2:Mac mini (Late 2012, Core i7):A1347:
 Mac Desktop:Macmini7,1:Mac mini (Late 2014):A1347:
 Mac Desktop:Macmini8,1:Mac mini (Late 2018):A1993:
@@ -434,6 +455,7 @@ Mac Laptop:Mac16,7:MacBook Pro (16-inch, M4 Pro, Nov 2024):A3403:
 Mac Laptop:Mac16,8:MacBook Pro (14-inch, M4 Pro, Nov 2024):A3401:
 Mac Laptop:Mac16,12:MacBook Air (13-inch, M4, 2025):A3240:
 Mac Laptop:Mac16,13:MacBook Air (15-inch, M4, 2025):A3241:
+Mac Laptop:Mac17,2:MacBook Pro 14-inch (M5):A3434:
 Mac Laptop:MacBook1,1:MacBook (13-inch, Mid 2006):A1181:
 Mac Laptop:MacBook2,1:MacBook (13-inch, Late 2006):A1181:
 Mac Laptop:MacBook2,1:MacBook (13-inch, Mid 2007):A1181:
@@ -515,17 +537,17 @@ Mac Laptop:MacBookPro13,3:MacBook Pro (15-inch, 2016):A1707:
 Mac Laptop:MacBookPro14,1:MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports):A1708:
 Mac Laptop:MacBookPro14,2:MacBook Pro (13-inch, 2017, Four Thunderbolt 3 ports):A1706:
 Mac Laptop:MacBookPro14,3:MacBook Pro (15-inch, 2017):A1707:
-Mac Laptop:MacBookPro15,1:MacBook Pro (15-inch, 2018, Integrated graphics):A1990:
-Mac Laptop:MacBookPro15,1:MacBook Pro (15-inch, 2019, Integrated graphics):A1990:
+Mac Laptop:MacBookPro15,1:MacBook Pro (15-inch, 2018):A1990:
+Mac Laptop:MacBookPro15,1:MacBook Pro (15-inch, 2019):A1990:
 Mac Laptop:MacBookPro15,2:MacBook Pro (13-inch, 2018):A1989:
 Mac Laptop:MacBookPro15,2:MacBook Pro (13-inch, 2019, Four Thunderbolt 3 ports):A1989:
-Mac Laptop:MacBookPro15,3:MacBook Pro (15-inch, 2018, Dedicated graphics):A1990:
-Mac Laptop:MacBookPro15,3:MacBook Pro (15-inch, 2019, Dedicated graphics):A1990:
+Mac Laptop:MacBookPro15,3:MacBook Pro (15-inch, 2018, Radeon Pro Vega Graphics):A1990:
+Mac Laptop:MacBookPro15,3:MacBook Pro (15-inch, 2019, Radeon Pro Vega Graphics):A1990:
 Mac Laptop:MacBookPro15,4:MacBook Pro (13-inch, 2019, Two Thunderbolt 3 ports):A2159:
-Mac Laptop:MacBookPro16,1:MacBook Pro (16-inch, 2019, Integrated graphics):A2141:
+Mac Laptop:MacBookPro16,1:MacBook Pro (16-inch, 2019):A2141:
 Mac Laptop:MacBookPro16,2:MacBook Pro (13-inch, 2020, Four Thunderbolt 3 ports):A2251:
 Mac Laptop:MacBookPro16,3:MacBook Pro (13-inch, 2020, Two Thunderbolt 3 ports):A2289:
-Mac Laptop:MacBookPro16,4:MacBook Pro (16-inch, 2019, Dedicated graphics):A2141:
+Mac Laptop:MacBookPro16,4:MacBook Pro (16-inch, 2019, Radeon Pro 5600M Graphics):A2141:
 Mac Laptop:MacBookPro17,1:MacBook Pro (13-inch, M1, 2020):A2338:
 Mac Laptop:MacBookPro18,1:MacBook Pro (16-inch, M1 Pro, 2021):A2485:
 Mac Laptop:MacBookPro18,2:MacBook Pro (16-inch, M1 Max, 2021):A2485:

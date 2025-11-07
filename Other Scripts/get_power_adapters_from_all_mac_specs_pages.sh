@@ -54,18 +54,18 @@ every_140w_magsafe3_model='MacBookPro18,1+MacBookPro18,2+Mac14,6+Mac14,10+Mac15,
 every_67w_or_96w_magsafe3_model='MacBookPro18,3+MacBookPro18,4+Mac14,5+Mac14,9+'
 every_30w_or_35W_dp_or_70w_magsafe3_model='Mac14,2+Mac15,12+Mac16,12+'
 every_35W_dp_or_70w_magsafe3_model='Mac14,15+Mac15,13+Mac16,13+'
-every_70w_or_96w_magsafe3_model='Mac15,3+Mac15,6+Mac15,8+Mac15,10+Mac16,1+Mac16,6+Mac16,8+'
+every_70w_or_96w_magsafe3_model='Mac15,3+Mac15,6+Mac15,8+Mac15,10+Mac16,1+Mac16,6+Mac16,8+Mac17,2+'
 
 every_unknown_model=''
 
 for this_mac_idenification_page in "${all_mac_identification_pages[@]}"; do
-	this_mac_idenification_page_source="$(curl -m 5 -sfL "https://support.apple.com/${this_mac_idenification_page}")"
+	this_mac_idenification_page_source="$(curl -m 5 -sfL "https://support.apple.com/${this_mac_idenification_page}?nocache=$(date '+%s')")"
 
 	this_model_identifier=''
 	while IFS='' read -r this_model_id_or_specs_url; do
 		if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
 			echo " (${this_model_id_or_specs_url}):"
-			power_adapter_elements_from_page="$(curl -m 5 -sfL "${this_model_id_or_specs_url}" | xmllint --html --xpath '//*[contains(text(),"Power Adapter") or contains(text(),"MagSafe")]' - 2> /dev/null)"
+			power_adapter_elements_from_page="$(curl -m 5 -sfL "${this_model_id_or_specs_url}?nocache=$(date '+%s')" | xmllint --html --xpath '//*[contains(text(),"Power Adapter") or contains(text(),"MagSafe")]' - 2> /dev/null)"
 			power_adapter_elements_from_page="${power_adapter_elements_from_page//></>$'\n'<}"
 			power_adapter_elements_from_page="${power_adapter_elements_from_page//; /$'\n'}"
 
@@ -240,7 +240,7 @@ echo "\"${every_unknown_model//$'\n'/", "}\""
 
 echo ''
 
-# Example output from 5/15/25:
+# Example output from 10/27/25:
 
 # 85W MagSafe 1
 # "MacBookPro1,1", "MacBookPro1,2", "MacBookPro2,1", "MacBookPro2,2", "MacBookPro3,1", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro8,2", "MacBookPro8,3", "MacBookPro9,1"
@@ -291,7 +291,7 @@ echo ''
 # "Mac14,15", "Mac15,13", "Mac16,13"
 
 # 70W or 96W USB-C/MagSafe 3
-# "Mac15,3", "Mac15,6", "Mac15,8", "Mac15,10", "Mac16,1", "Mac16,6", "Mac16,8"
+# "Mac15,3", "Mac15,6", "Mac15,8", "Mac15,10", "Mac16,1", "Mac16,6", "Mac16,8", "Mac17,2"
 
 # UNKNOWN Power Adapter (REQUIRES MANUAL EXAMINATION)
 # ""

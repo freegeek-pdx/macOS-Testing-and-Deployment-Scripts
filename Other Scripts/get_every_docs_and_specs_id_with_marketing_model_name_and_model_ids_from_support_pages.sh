@@ -165,7 +165,7 @@ else
 			fi
 
 			if [[ -n "${awk_model_id_scraping_code}" ]]; then
-				this_identification_page_source="$(curl -m 10 --retry 3 -sfL "https://support.apple.com/${this_identification_page_id}")"
+				this_identification_page_source="$(curl -m 10 --retry 3 -sfL "https://support.apple.com/${this_identification_page_id}?nocache=$(date '+%s')")"
 				if [[ -z "${this_identification_page_source}" ]]; then
 					>&2 echo "ERROR: NO RESPONSE FROM https://support.apple.com/${this_identification_page_id}"
 					exit 1
@@ -182,7 +182,7 @@ else
 				while IFS='' read -r this_model_id_or_specs_url; do
 					if [[ "${this_model_id_or_specs_url}" == 'https://'* ]]; then
 						this_specs_url="${this_model_id_or_specs_url}"
-						this_specs_page_source="$(curl -m 10 --retry 3 -sfL "${this_specs_url}" 2> /dev/null)"
+						this_specs_page_source="$(curl -m 10 --retry 3 -sfL "${this_specs_url}?nocache=$(date '+%s')" 2> /dev/null)"
 						if [[ -z "${this_specs_page_source}" ]]; then
 							>&2 echo "ERROR: NO RESPONSE FROM ${this_specs_url}"
 						fi
@@ -271,14 +271,14 @@ if [[ -f "${every_docs_and_specs_id_with_marketing_model_name_from_docs_pages_fi
 	>&2 echo "ALREADY CREATED FILE: ${every_docs_and_specs_id_with_marketing_model_name_from_docs_pages_file_path}"
 else
 
-	every_docs_device_type_url="$(curl -m 10 --retry 3 -sfL 'https://support.apple.com/docs' | xmllint --html --xpath '//a[contains(@href, "/docs/") and not(contains(@href, "/docs/localeselector"))]/@href' - 2> /dev/null | cut -d '"' -f 2)"
+	every_docs_device_type_url="$(curl -m 10 --retry 3 -sfL "https://support.apple.com/docs?nocache=$(date '+%s')" | xmllint --html --xpath '//a[contains(@href, "/docs/") and not(contains(@href, "/docs/localeselector"))]/@href' - 2> /dev/null | cut -d '"' -f 2)"
 	if [[ -z "${every_docs_device_type_url}" ]]; then
 		>&2 echo 'ERROR: NO RESPONSE FROM https://support.apple.com/docs'
 		exit 2
 	fi
 
 	while IFS='' read -r this_docs_device_type_url; do
-		this_docs_device_type_info="$(curl -m 10 --retry 3 -sfL "${this_docs_device_type_url}" | xmllint --html --xpath '
+		this_docs_device_type_info="$(curl -m 10 --retry 3 -sfL "${this_docs_device_type_url}?nocache=$(date '+%s')" | xmllint --html --xpath '
 //a[contains(@href, "/docs/") and not(contains(@href, "/docs/localeselector")) and not(starts-with(@data-ss-analytics-link-component_name, "All "))]/@href |
 //a[contains(@href, "/docs/") and not(contains(@href, "/docs/localeselector")) and not(starts-with(@data-ss-analytics-link-component_name, "All "))]/@data-ss-analytics-link-component_name |
 //a[contains(@href, "/docs/") and not(contains(@href, "/docs/localeselector")) and not(starts-with(@data-ss-analytics-link-component_name, "All "))]/@data-ss-analytics-link-text
@@ -326,7 +326,7 @@ else
 				this_device_marketing_model_name="${this_device_marketing_model_name// ,/,}" # Replace any space+comma with a just comma that exist in some model names, such as "https://support.apple.com/en-us/docs/ipod/113636" and others.
 				this_device_marketing_model_name="${this_device_marketing_model_name% }" # Remove single trailing spaces that exist in values from "https://support.apple.com/docs/mac/503556" and others.
 
-				this_device_docs_page_source="$(curl -m 10 --retry 3 -sfL "${this_device_docs_url}")"
+				this_device_docs_page_source="$(curl -m 10 --retry 3 -sfL "${this_device_docs_url}?nocache=$(date '+%s')")"
 				if [[ -z "${this_device_docs_page_source}" ]]; then
 					>&2 echo "ERROR: NO RESPONSE FROM ${this_device_docs_url}"
 				fi
@@ -340,7 +340,7 @@ else
 
 				this_specs_url="$(echo "${this_device_docs_page_source}" | xmllint --html --xpath 'string(//a[text()="Tech Specs"]/@href)' - 2> /dev/null)"
 				if [[ -n "${this_specs_url}" ]]; then
-					this_specs_page_source="$(curl -m 10 --retry 3 -sfL "${this_specs_url}" 2> /dev/null)"
+					this_specs_page_source="$(curl -m 10 --retry 3 -sfL "${this_specs_url}?nocache=$(date '+%s')" 2> /dev/null)"
 					if [[ -z "${this_specs_page_source}" ]]; then
 						>&2 echo "ERROR: NO RESPONSE FROM ${this_specs_url}"
 					fi

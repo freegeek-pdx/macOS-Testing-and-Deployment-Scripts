@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.13-1
+-- Version: 2025.10.27-1
 
 -- App Icon is “Studio Microphone” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -401,7 +401,9 @@ try
 								activate
 							end try
 							set endPlaybackDialogButton to "                          End Playback Early                          "
-							-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
+							-- On macOS 10.15 Catalina and newer, space padded text in DIALOG buttons (but not ALERT buttons) doesn't work as expected,
+							-- and the spaces that you want to pad with on each side must be DOUBLED at the END of the text rather than equally on both sides.
+							-- (On macOS 26 Tahoe and newer ALERT buttons now ALSO need the same workaround for space padded text in buttons.)
 							if (isCatalinaOrNewer) then set endPlaybackDialogButton to "End Playback Early                                                    "
 							display dialog "		Microphone Test is Playing Back
 		" & microphoneTestDuration & " Seconds of Recorded Audio

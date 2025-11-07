@@ -143,42 +143,14 @@ repeat
 			set (end of buildResultsOutput) to "⚠️		FAILED TO RETRIEVE markPreviouslyRemoteManagedMacAsRemovedURL"
 			set (end of buildResultsOutput) to ""
 		else if ((name of parentFolder) is equal to "Build Tools") then
-			set macLandFolder to (container of parentFolder)
-			set zipsForAutoUpdateFolderPath to ((POSIX path of (macLandFolder as alias)) & "ZIPs for Auto-Update/")
+			set zipsForAutoUpdateFolderPath to "/Users/Shared/Mac Deployment/App ZIPs for Auto-Update/"
 			try
 				do shell script "mkdir -p " & (quoted form of zipsForAutoUpdateFolderPath)
 			end try
+			set macLandFolder to (container of parentFolder)
 			set scriptTypeFolders to (get folders of macLandFolder)
 			repeat with thisScriptTypeFolder in scriptTypeFolders
-				if (((name of thisScriptTypeFolder) as text) is equal to "ZIPs for Auto-Update") then
-					set latestVersionsFilePath to ((POSIX path of (thisScriptTypeFolder as alias)) & "latest-versions.txt")
-					do shell script "rm -f " & (quoted form of latestVersionsFilePath) & "; touch " & (quoted form of latestVersionsFilePath)
-					
-					set zipFilesForAutoUpdate to (every file of thisScriptTypeFolder whose name extension is "zip")
-					repeat with thisScriptZip in zipFilesForAutoUpdate
-						-- NOTE: The "fgreset" script is no longer installed since we are no longer installing older than macOS 10.15 Catalina.
-						-- So, this code to include it for auto-updating is now commented out, but it is being left in place in case it is useful in the future.
-						(*
-						if (((name of thisScriptZip) as text) is equal to "fgreset.zip") then
-							do shell script ("ditto -xk --noqtn " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/")
-													
-							set thisScriptVersionLine to (do shell script "grep -m 1 '# Version: ' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/*.sh")
-													
-							if (thisScriptVersionLine contains "# Version: ") then
-								do shell script "echo '" & (text 1 thru -5 of ((name of thisScriptZip) as text)) & ": " & ((text 12 thru -1 of thisScriptVersionLine) as text) & "' >> " & (quoted form of latestVersionsFilePath)
-							end if
-													
-							do shell script "rm -f ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/*.sh"
-						else
-						*)
-						do shell script "unzip -jo " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " '*/Contents/Info.plist' -d ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
-						set thisAppName to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleName' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
-						set thisAppVersion to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
-						do shell script "echo '" & thisAppName & ": " & thisAppVersion & "' >> " & (quoted form of latestVersionsFilePath)
-						--end if
-					end repeat
-					do shell script "rm -rf ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
-				else if ((((name of thisScriptTypeFolder) as text) is not equal to "Build Tools") and (((name of thisScriptTypeFolder) as text) is not equal to "fgMIB Resources") and (((name of thisScriptTypeFolder) as text) is not equal to "Other Scripts")) then
+				if ((((name of thisScriptTypeFolder) as text) is not equal to "Build Tools") and (((name of thisScriptTypeFolder) as text) is not equal to "fgMIB Resources") and (((name of thisScriptTypeFolder) as text) is not equal to "Other Scripts")) then
 					set scriptFoldersForThisScriptType to (get folders of thisScriptTypeFolder)
 					repeat with thisScriptFolder in scriptFoldersForThisScriptType
 						set thisScriptName to ((name of thisScriptFolder) as text)
@@ -565,8 +537,40 @@ ditto " & (quoted form of (zipsForAutoUpdateFolderPath & thisScriptHyphenatedNam
 					set (end of buildResultsOutput) to ""
 				end if
 			end repeat
+			
+			set latestVersionsFilePath to (zipsForAutoUpdateFolderPath & "latest-versions.txt")
+			do shell script "rm -f " & (quoted form of latestVersionsFilePath) & "; touch " & (quoted form of latestVersionsFilePath)
+			
+			set zipFilesForAutoUpdate to (every file of ((zipsForAutoUpdateFolderPath as POSIX file) as alias) whose name extension is "zip")
+			repeat with thisScriptZip in zipFilesForAutoUpdate
+				-- NOTE: The "fgreset" script is no longer installed since we are no longer installing older than macOS 10.15 Catalina.
+				-- So, this code to include it for auto-updating is now commented out, but it is being left in place in case it is useful in the future.
+				(*
+				if (((name of thisScriptZip) as text) is equal to "fgreset.zip") then
+					do shell script ("ditto -xk --noqtn " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/")
+
+					set thisScriptVersionLine to (do shell script "grep -m 1 '# Version: ' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/*.sh")
+
+					if (thisScriptVersionLine contains "# Version: ") then
+						do shell script "echo '" & (text 1 thru -5 of ((name of thisScriptZip) as text)) & ": " & ((text 12 thru -1 of thisScriptVersionLine) as text) & "' >> " & (quoted form of latestVersionsFilePath)
+					end if
+
+					do shell script "rm -f ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/*.sh"
+				else
+				*)
+				do shell script "unzip -jo " & (quoted form of (POSIX path of (thisScriptZip as alias))) & " '*/Contents/Info.plist' -d ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
+				set thisAppName to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleName' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
+				set thisAppVersion to (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/Info.plist")
+				do shell script "echo '" & thisAppName & ": " & thisAppVersion & "' >> " & (quoted form of latestVersionsFilePath)
+				--end if
+			end repeat
+			do shell script "rm -rf ${TMPDIR:-/private/tmp/}MacLand-Script-Builder-Versions/"
 		end if
 	end tell
+	
+	try
+		do shell script "open -R " & (quoted form of (zipsForAutoUpdateFolderPath & "latest-versions.txt"))
+	end try
 	
 	activate
 	set buildResultsOutputReply to (choose from list (items 1 thru -2 of buildResultsOutput) with prompt "MacLand Script Builder Results" OK button name "Quit" cancel button name "Build Again" with title "MacLand Script Builder" with empty selection allowed)

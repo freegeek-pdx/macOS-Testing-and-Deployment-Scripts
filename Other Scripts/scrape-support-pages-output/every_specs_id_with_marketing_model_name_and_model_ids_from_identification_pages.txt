@@ -1,3 +1,4 @@
+Mac Laptop;125405;MacBook Pro (14-inch, M5):MacBook Pro (14-inch, M5):Mac17,2:
 Mac Laptop;121552;MacBook Pro (14-inch, 2024):MacBook Pro (14-inch, M4, 2024):Mac16,1:
 Mac Laptop;121553;MacBook Pro (14-inch, 2024):MacBook Pro (14-inch, M4 Pro or M4 Max, 2024):Mac16,6:Mac16,8:
 Mac Laptop;121554;MacBook Pro (16-inch, 2024):MacBook Pro (16-inch, 2024):Mac16,7:Mac16,5:
@@ -139,6 +140,10 @@ Mac Desktop;118464;Mac Pro Server (Mid 2012):Mac Pro (Mid 2012):MacPro5,1:
 Mac Desktop;112578;Mac Pro (Mid 2010):Mac Pro (Mid 2010):MacPro5,1:
 Mac Desktop;112578;Mac Pro Server (Mid 2010):Mac Pro (Mid 2010):MacPro5,1:
 Mac Desktop;112590;Mac Pro (Early 2009):Mac Pro (Early 2009):MacPro4,1:
+iPhone;125091;iPhone 17 Pro Max:iPhone 17 Pro Max:A3257:A3525:A3527:A3526:
+iPhone;125090;iPhone 17 Pro:iPhone 17 Pro:A3256:A3522:A3524:A3523:
+iPhone;125089;iPhone 17:iPhone 17:A3258:A3519:A3521:A3520:
+iPhone;125092;iPhone Air:iPhone Air:A3260:A3516:A3518:A3517:
 iPhone;122208;iPhone 16e:iPhone 16e:A3212:A3408:A3410:A3409:
 iPhone;121032;iPhone 16 Pro Max:iPhone 16 Pro Max:A3084:A3295:A3297:A3296:
 iPhone;121031;iPhone 16 Pro:iPhone 16 Pro:A3083:A3292:A3294:A3293:
@@ -186,6 +191,12 @@ iPhone;112562;iPhone 4:iPhone 4:A1349:A1332:
 iPhone;112307;iPhone 3GS:iPhone 3GS:A1325:A1303:
 iPhone;112496;iPhone 3G:iPhone 3G:A1324:A1241:
 iPhone;112445;iPhone:iPhone:A1203:
+iPad;125407;iPad Pro 13-inch (M5) Wi-Fi:iPad Pro 13-inch (M5):A3360:
+iPad;125407;iPad Pro 13-inch (M5) Wi-Fi + Cellular:iPad Pro 13-inch (M5):A3361:
+iPad;125407;iPad Pro 13-inch (M5) Wi-Fi + Cellular (China):iPad Pro 13-inch (M5):A3362:
+iPad;125406;iPad Pro 11-inch (M5) Wi-Fi:iPad Pro 11-inch (M5):A3357:
+iPad;125406;iPad Pro 11-inch (M5) Wi-Fi + Cellular:iPad Pro 11-inch (M5):A3358:
+iPad;125406;iPad Pro 11-inch (M5) Wi-Fi + Cellular (China):iPad Pro 11-inch (M5):A3359:
 iPad;119891;iPad Pro 13-inch (M4) Wi-Fi:iPad Pro 13-inch (M4):A2925:
 iPad;119891;iPad Pro 13-inch (M4) Wi-Fi + Cellular:iPad Pro 13-inch (M4):A2926:
 iPad;119891;iPad Pro 13-inch (M4) Wi-Fi + Cellular (China):iPad Pro 13-inch (M4):A3007:

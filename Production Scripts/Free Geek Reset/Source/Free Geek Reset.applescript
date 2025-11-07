@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.17-1
+-- Version: 2025.10.24-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: CFBundleAlternateNames: ["FG Reset", "fgreset", "Reset"]
@@ -105,7 +105,7 @@ on error checkReadOnlyErrorMessage
 end try
 
 
-global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate, hasT2chip, isAppleSilicon -- Needs to be accessible in functions.
+global adminUsername, adminPassword, lastDoShellScriptAsAdminAuthDate, hasT2chip, isAppleSilicon, isBigSurOrNewer, isVenturaOrNewer -- Needs to be accessible in functions.
 set lastDoShellScriptAsAdminAuthDate to 0
 
 set adminUsername to "fg-admin"
@@ -123,6 +123,14 @@ set isAppleSilicon to false
 try
 	set isAppleSilicon to ((do shell script "sysctl -in hw.optional.arm64") is equal to "1")
 end try
+
+set systemVersion to (system version of (system info))
+considering numeric strings
+	set isBigSurOrNewer to (systemVersion ≥ "11.0")
+	set isMontereyOrNewer to (systemVersion ≥ "12.0")
+	set isVenturaOrNewer to (systemVersion ≥ "13.0")
+	set isTahoeOrNewer to (systemVersion ≥ "16.0")
+end considering
 
 
 if (((short user name of (system info)) is equal to demoUsername) and ((POSIX path of (path to me)) is equal to ("/Users/" & demoUsername & "/Applications/" & (name of me) & ".app/"))) then
@@ -190,21 +198,16 @@ if (((short user name of (system info)) is equal to demoUsername) and ((POSIX pa
 	end try
 	
 	if (designedForSnapshotReset) then -- If Snapshot Reset (pre-T2 Mac), just prompt with instructions and reboot into Recovery.
-		try
-			activate
-		end try
-		
 		set rebootIntoRecoveryNote to "(will happen automatically after clicking the confirmation button below)"
-		set snapshotResetDialogButtons to {"No, Don't Reboot Into Recovery", "Yes, Reboot Into Recovery"}
+		set confirmSnapshotResetAlertButtons to {"No, Don't Reboot Into Recovery", "Yes, Reboot Into Recovery"}
 		if (isAppleSilicon) then -- CANNOT auto-reboot into Recovery using NVRAM variables on Apple Silicon (but Apple Silicon Macs should always be doing the newer "Erase Assistant" (EAC&S) reset, but keep this here while transitioning to newer processes).
 			set rebootIntoRecoveryNote to "by holding the Power button when booting until “Loading startup options…” is shown and then choose “Options”"
-			set snapshotResetDialogButtons to {"No, Don't Shut Down Yet", "Yes, Shut Down Now"}
+			set confirmSnapshotResetAlertButtons to {"No, Don't Shut Down Yet", "Yes, Shut Down Now"}
 		end if
 		
-		display dialog "Are you sure want to Snapshot Reset this Mac?
-
-
-USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
+		set confirmSnapshotResetAlertTitle to "Are you sure you want to Snapshot Reset this Mac?"
+		
+		set confirmSnapshotResetAlertMessage to "USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 
 • Reboot into Recovery " & rebootIntoRecoveryNote & ".
 
@@ -216,7 +219,19 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 
 • Select the Local Snapshot with time close to midnight (there should only be one option).
 
-• Confirm restoring Snapshot." buttons snapshotResetDialogButtons cancel button 1 default button 2 with title (name of me) with icon note
+• Confirm restoring Snapshot."
+		
+		try
+			activate
+		end try
+		if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+			-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+			-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+			
+			display dialog (confirmSnapshotResetAlertTitle & linefeed & linefeed & linefeed & confirmSnapshotResetAlertMessage) buttons confirmSnapshotResetAlertButtons cancel button 1 default button 2 with title (name of me) with icon note
+		else
+			display alert (confirmSnapshotResetAlertTitle & linefeed) message confirmSnapshotResetAlertMessage buttons confirmSnapshotResetAlertButtons cancel button 1 default button 2
+		end if
 		
 		checkRemoteManagement()
 		
@@ -240,13 +255,6 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 		quit
 		delay 10
 	end if
-	
-	set systemVersion to (system version of (system info))
-	considering numeric strings
-		set isMontereyOrNewer to (systemVersion ≥ "12.0")
-		set isVenturaOrNewer to (systemVersion ≥ "13.0")
-		set isTahoeOrNewer to (systemVersion ≥ "16.0")
-	end considering
 	
 	if (not isMontereyOrNewer) then
 		errorAndQuit("Only macOS 12 Monterey or newer is supported.")
@@ -311,9 +319,9 @@ USE THE FOLLOWING STEPS TO SNAPSHOT RESET THIS MAC:
 		try
 			activate
 		end try
-		display alert "Are you sure want to reset this Mac?" message "This Mac will reset itself automatically after clicking the confirmation button below.
+		display alert "Are you sure you want to reset this Mac?
 
-During the reset process this Mac will reboot into Recovery for Activation, which requires internet. So, it is best to connect an Ethernet cable now for a fully automated process, but you will also be able to manually connect to Wi-Fi in Recovery if needed.
+This Mac will reset itself automatically after clicking the confirmation button below." message "During the reset process this Mac will reboot into Recovery for Activation, which requires internet. So, it is best to connect an Ethernet cable now for a fully automated process, but you will also be able to manually connect to Wi-Fi in Recovery if needed.
 
 NOTE: You may need to select a language when rebooted into Recovery before Activation can start." buttons {"No, Don't Reset This Mac Yet", "Yes, Reset This Mac"} cancel button 1 default button 2
 	end if
@@ -635,18 +643,28 @@ on checkRemoteManagement()
 							exit repeat
 						on error
 							try
-								display dialog "You must be connected to the internet to be able to check for Remote Management.
+								set internetRequiredAlertTitle to "You must be connected to the internet to be able to check for Remote Management.
 
-The rest of “" & (name of me) & "” cannot be run and this Mac CANNOT BE SOLD until it has been confirmed that Remote Management is not enabled on this Mac.
-
-
-Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
+The rest of “" & (name of me) & "” cannot be run and this Mac CANNOT BE SOLD until it has been confirmed that Remote Management is not enabled on this Mac."
+								
+								set internetRequiredAlertMessage to "Make sure you're connected to either the “FG Staff” (or “Free Geek”) Wi-Fi network or plugged in with an Ethernet cable.
 
 If this Mac does not have an Ethernet port, use a Thunderbolt or USB to Ethernet adapter.
 
 Once you're connected to Wi-Fi or Ethernet, it may take a few moments for the internet connection to be established.
 
-If it takes more than a few minutes, consult an instructor or inform Free Geek I.T." buttons {"Quit", "Try Again"} cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
+If it takes more than a few minutes, consult an instructor or inform Free Geek I.T."
+								
+								set internetRequiredAlertButtons to {"Quit", "Try Again"}
+								
+								if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+									-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+									-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+									
+									display dialog (internetRequiredAlertTitle & linefeed & linefeed & linefeed & internetRequiredAlertMessage) buttons internetRequiredAlertButtons cancel button 1 default button 2 with title (name of me) with icon caution giving up after 30
+								else
+									display alert internetRequiredAlertTitle message internetRequiredAlertMessage buttons internetRequiredAlertButtons cancel button 1 default button 2 as critical giving up after 30
+								end if
 							on error
 								quit
 								delay 10
@@ -778,7 +796,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 								end repeat
 								
 								if (not remoteManagedMacIsAlreadyLogged) then
-									set remoteManagedMacPID to ""
+									set remoteManagedMacID to ""
 									repeat
 										try
 											activate
@@ -787,27 +805,27 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 											do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 										end try
 										
-										set invalidPIDnote to ""
+										set invalidIDnote to ""
 										
-										if (remoteManagedMacPID is not equal to "") then
-											set invalidPIDnote to "
-❌	“" & remoteManagedMacPID & "” IS NOT A VALID PID - TRY AGAIN
+										if (remoteManagedMacID is not equal to "") then
+											set invalidIDnote to "
+❌	“" & remoteManagedMacID & "” IS NOT A VALID ID - TRY AGAIN
 "
 										end if
 										
-										set remoteManagedMacPIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
-" & invalidPIDnote & "
-Enter the PID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacPID buttons {"Log Remote Managed Mac Without PID", "Log Remote Managed Mac"} default button 2)
+										set remoteManagedMacIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
+" & invalidIDnote & "
+Enter the ID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacID buttons {"Log Remote Managed Mac Without ID", "Log Remote Managed Mac"} default button 2)
 										
-										set remoteManagedMacPID to (text returned of remoteManagedMacPIDreply)
+										set remoteManagedMacID to (text returned of remoteManagedMacIDreply)
 										
-										if ((button returned of remoteManagedMacPIDreply) ends with "Without PID") then
-											set remoteManagedMacPID to "N/A"
+										if ((button returned of remoteManagedMacIDreply) ends with "Without ID") then
+											set remoteManagedMacID to "N/A"
 										end if
 										
-										if ((remoteManagedMacPID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacPID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
-											set remoteManagedMacPID to (do shell script "echo " & (quoted form of remoteManagedMacPID) & " | tr '[:lower:]' '[:upper:]'")
-											set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacPID)))
+										if ((remoteManagedMacID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
+											set remoteManagedMacID to (do shell script "echo " & (quoted form of remoteManagedMacID) & " | tr '[:lower:]' '[:upper:]'")
+											set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacID)))
 											exit repeat
 										end if
 									end repeat

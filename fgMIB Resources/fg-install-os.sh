@@ -20,7 +20,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-readonly SCRIPT_VERSION='2025.10.16-1'
+readonly SCRIPT_VERSION='2025.10.27-1'
 
 PATH='/usr/bin:/bin:/usr/sbin:/sbin:/usr/libexec' # Add "/usr/libexec" to PATH for easy access to PlistBuddy.
 
@@ -72,7 +72,7 @@ fi
 install_log_path='/private/tmp/Install OS Log.txt'
 
 write_to_log() {
-	echo -e "$(date -v '-7H' '+%D %T')\t$1" >> "${install_log_path}" # Must manually adjust from UTC to PDT timezone (by subtracting 7 hours) since the "date" command in recoveryOS always outputs UTC and setting the TZ='PDT' environment variable doesn't work in recoveryOS.
+	echo -e "$(date -jv '-7H' '+%D %T')\t$1" >> "${install_log_path}" # Must manually adjust from UTC to PDT timezone (by subtracting 7 hours) since the "date" command in recoveryOS always outputs UTC and setting the TZ='PDT' environment variable doesn't work in recoveryOS.
 }
 
 write_to_log "Starting Install OS (version ${SCRIPT_VERSION} / recoveryOS $(sw_vers -productVersion))"
@@ -142,6 +142,13 @@ readonly MODEL_ID_NUMBER="${MODEL_ID//[^0-9,]/}"
 IS_APPLE_SILICON="$([[ "$1" == 'debugAS' || "$(sysctl -in hw.optional.arm64)" == '1' ]] && echo 'true' || echo 'false')"
 if $IS_APPLE_SILICON && [[ "$1" == 'debugNoAS' ]]; then IS_APPLE_SILICON=false; fi
 readonly IS_APPLE_SILICON
+
+IS_VIRTUAL_MACHINE="$([[ " $(sysctl -in machdep.cpu.features) " == *' VMM '* || "$(sysctl -in kern.hv_vmm_present)" == '1' ]] && echo 'true' || echo 'false')"
+# "machdep.cpu.features" is always EMPTY on Apple Silicon (whether or not it's a VM) so it cannot be used to check for the "VMM" feature flag when the system is a VM,
+# but I examined the full "sysctl -a" output when running a VM on Apple Silicon and found that "kern.hv_vmm_present" is set to "1" when running a VM and "0" when not.
+# Though testing, I found the "kern.hv_vmm_present" key is also the present on Intel Macs starting with macOS version macOS 11 Big Sur and gets properly set to "1"
+# on Intel VMs, but still check for either since "kern.hv_vmm_present" is not available on every version of macOS that this script may be run on.
+readonly IS_VIRTUAL_MACHINE
 
 MODEL_PART_NUMBER=''
 if $HAS_T2_CHIP || $IS_APPLE_SILICON; then # This "M####LL/A" style Model Part Number is only be accessible in software on T2 and Apple Silicon Macs.
@@ -229,6 +236,7 @@ did_load_marketing_model_name=false
 possible_marketing_model_names=''
 if ! $IS_APPLE_SILICON; then
 	# The following list of Marketing Model Names with grouped Model IDs and Serial Config Codes is generated from: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/group_every_intel_mac_marketing_model_name_with_model_ids_and_serial_config_codes.sh
+	# And the full output from that script is here: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/serial-config-codes-output/every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes.txt
 	every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes='iMac (17-inch, Early 2006):iMac4,1:U2N:U2R:V4M:V4N:V4U:V66:VGB:VGZ:VH1:VHP:VV4:VV6:
 iMac (17-inch, Late 2006 CD):iMac5,2:
 iMac (17-inch, Late 2006):iMac5,1:AC1:VUX:VUY:WAR:WRR:WRW:WV8:WVR:X1A:X1W:X2W:X6Q:X9F:X9Y:XLF:Y3V:Y3W:Y3X:Y6K:Y94:Y97:YAG:YLJ:
@@ -291,7 +299,6 @@ Mac Pro (Rack, 2019):MacPro7,1:N5RH:N5RN:P7QQ:P7QR:P7QT:P7QV:PNTN:PNTP:PNTQ:PP3Y
 Mac Pro Server (Mid 2010):MacPro5,1:HPV:HPW:HPY:
 Mac Pro Server (Mid 2012):MacPro5,1:F4MF:F4MJ:F501:
 Mac Pro:MacPro1,1:MacPro2,1:
-MacBook (13-inch):MacBook1,1:
 MacBook (13-inch, Aluminum, Late 2008):MacBook5,1:
 MacBook (13-inch, Early 2008):MacBook4,1:0P0:0P1:0P2:0P4:0P5:0P6:1LX:1PX:1Q2:1Q7:1QA:1QB:1QE:1ZY:27H:27J:28C:28D:28E:385:3N9:3NA:3ND:3NE:3NF:3X6:47Z:4R7:4R8:
 MacBook (13-inch, Early 2009):MacBook5,2:4R1:4R2:4R3:79D:79E:79F:7A2:85D:88J:8CP:8SJ:93K:
@@ -302,6 +309,7 @@ MacBook (13-inch, Late 2009):MacBook6,1:
 MacBook (13-inch, Mid 2007):MacBook2,1:YA2:YA3:YA4:YA5:YA6:YA7:YA8:YA9:YJJ:YJK:YJL:YJM:YJN:YQ7:YQ8:YRG:YRH:YRJ:YRK:YSH:YSJ:YSK:YSL:YSM:YTK:YTL:YV8:YX1:YX2:YX4:YX5:YXZ:YY1:YYW:Z5V:Z5W:Z5X:Z5Y:Z5Z:Z60:Z88:ZA8:ZA9:ZAP:ZAQ:ZAS:ZAU:ZAV:ZAW:ZAX:ZAY:ZAZ:ZB0:ZB1:ZB2:ZB7:ZB8:ZB9:ZBA:ZBB:ZBE:ZBF:ZBG:ZBH:ZBJ:ZBK:ZCN:
 MacBook (13-inch, Mid 2009):MacBook5,2:9GU:9GV:A1W:A1X:A1Y:A9P:A9Q:A9Y:ABW:ASC:
 MacBook (13-inch, Mid 2010):MacBook7,1:
+MacBook (13-inch):MacBook1,1:
 MacBook (Retina, 12-inch, 2017):MacBook10,1:
 MacBook (Retina, 12-inch, Early 2015):MacBook8,1:
 MacBook (Retina, 12-inch, Early 2016):MacBook9,1:
@@ -354,7 +362,6 @@ MacBook Pro (15-inch, Mid 2009):MacBookPro5,3:
 MacBook Pro (15-inch, Mid 2010):MacBookPro6,2:
 MacBook Pro (15-inch, Mid 2012):MacBookPro9,1:
 MacBook Pro (16-inch, 2019):MacBookPro16,1:MacBookPro16,4:
-MacBook Pro (17-inch):MacBookPro1,2:
 MacBook Pro (17-inch, 2.4GHz):MacBookPro3,1:027:028:02D:09R:09S:0LR:0ND:0NM:0PD:1CW:1CX:1MF:1MG:2QW:X94:XA9:YAA:YAN:YAP:YNQ:YNS:YNW:YQ4:YQ5:YR2:YRD:YRE:YRF:YWB:YWC:YZ1:YZ2:Z5M:
 MacBook Pro (17-inch, Core 2 Duo):MacBookPro2,1:
 MacBook Pro (17-inch, Early 2008):MacBookPro4,1:1BY:1ED:1EN:1ER:1K2:1K8:1K9:1KA:1Q3:1SG:2CF:2DY:2DZ:2ED:3DC:3DD:3DE:3DF:3M0:3M4:3M5:YP3:YP4:ZLV:
@@ -364,6 +371,7 @@ MacBook Pro (17-inch, Late 2008):MacBookPro4,1:3R8:3R9:4RT:4RW:57J:5U0:634:65A:6
 MacBook Pro (17-inch, Late 2011):MacBookPro8,3:AY5W:DV10:DV11:DVHN:DVHV:DVHW:DW48:DY22:DY23:DY24:DY25:DY26:DY5W:DYG8:F13Y:F140:
 MacBook Pro (17-inch, Mid 2009):MacBookPro5,2:8YA:8YB:91T:A3M:A3N:A5R:A5W:AF3:AKV:AKW:AMV:AMW:AN1:ANC:AND:ANE:ANF:ANJ:AUU:E6L:
 MacBook Pro (17-inch, Mid 2010):MacBookPro6,1:
+MacBook Pro (17-inch):MacBookPro1,2:
 MacBook Pro (Original):MacBookPro1,1:THV:VGW:VGX:VGY:VJ0:VJ1:VJ2:VJ3:VJ5:VJ6:VJ7:VJM:VMU:VSD:VTZ:VU0:VWA:VWB:VXW:VXX:W2Q:
 MacBook Pro (Retina, 13-inch, Early 2013):MacBookPro10,2:FFRP:FFRR:FG1F:FG28:FGM8:FGN5:FGN6:FGPJ:FHCH:FHN0:
 MacBook Pro (Retina, 13-inch, Early 2015):MacBookPro12,1:
@@ -893,6 +901,8 @@ fi
 
 declare -a install_drive_choices=()
 declare -a fusion_drive_choices=()
+install_drive_ssd_count=0
+install_drive_hdd_count=0
 install_drive_choices_display=''
 
 declare -a install_drive_device_tree_paths=()
@@ -936,10 +946,18 @@ while IFS='' read -r this_disk_id; do
 	if $this_disk_is_valid_for_installation; then
 		this_disk_size_bytes="$(PlistBuddy -c 'Print :TotalSize' "${this_disk_info_plist_path}" 2> /dev/null)"
 
+		hdd_or_ssd='HDD'
+		if [[ "$(PlistBuddy -c 'Print :SolidState' "${this_disk_info_plist_path}" 2> /dev/null)" == 'true' ]]; then
+			hdd_or_ssd='SSD'
+			(( install_drive_ssd_count ++ ))
+		else
+			(( install_drive_hdd_count ++ ))
+		fi
+
 		this_disk_model="$(PlistBuddy -c 'Print :MediaName' "${this_disk_info_plist_path}" 2> /dev/null)"
 		this_disk_model="$(trim_and_squeeze_whitespace "${this_disk_model//:/ }")" # Make sure Models never contain ':' since it's used as a delimiter and the model is only for display.
 
-		this_drive_name="$([[ -z "${this_disk_size_bytes}" ]] && echo 'UNKNOWN Size' || echo "$(( this_disk_size_bytes / 1000 / 1000 / 1000 )) GB") ${this_disk_bus:-UNKNOWN Bus} $([[ "$(PlistBuddy -c 'Print :SolidState' "${this_disk_info_plist_path}" 2> /dev/null)" == 'true' ]] && echo 'SSD' || echo 'HDD') \"${this_disk_model:-UNKNOWN Model}\""
+		this_drive_name="$([[ -z "${this_disk_size_bytes}" ]] && echo 'UNKNOWN Size' || echo "$(( this_disk_size_bytes / 1000 / 1000 / 1000 )) GB") ${this_disk_bus:-UNKNOWN Bus} ${hdd_or_ssd} \"${this_disk_model:-UNKNOWN Model}\""
 
 		install_drive_choices_display+="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}${this_disk_id}:${ANSI_PURPLE} ${this_drive_name}${CLEAR_ANSI}"
 
@@ -950,7 +968,7 @@ while IFS='' read -r this_disk_id; do
 			# Only allow installation on at least at 60 GB drive (but actually check for at least 59 GB since byte sizes are not always precise).
 			# This limit is set because anything below about 60 GB will quickly be big hassle for the customer to have enough free space to even be able to install updates.
 			# But, smaller than 60 GB drives may be present (such as 32 GB or 24 GB) since they are intended to be used as part of a Fusion Drive.
-			install_drive_choices+=( "${this_disk_id}" )
+			install_drive_choices+=( "${this_disk_id}:${this_drive_name}" )
 		else
 			# If the drive is less that 60 GB (actually less than 59 GB), still display it so the technician knows it's present
 			# in the system and so that it can be used in a Fusion Drive (hence it still being included in "fusion_drive_choices").
@@ -967,15 +985,8 @@ while IFS='' read -r this_disk_id; do
 	rm -f "${this_disk_info_plist_path}"
 done <<< "${possible_disk_ids}"
 
-
-if (( ${#install_drive_choices[@]} == 0 )) || [[ -z "${install_drive_choices_display}" ]]; then
-	>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} No Installable Drives Detected${CLEAR_ANSI}\n\n"
-	write_to_log 'ERROR: No Installable Drives Detected'
-	exit 1
-fi
-
 fusion_drive_recommended_note='' # TODO: Should this part of "global_install_notes" instead? Or is the extra emphasis good?
-if diskutil 2>&1 | grep -q '^     resetFusion' && (( ${#fusion_drive_choices[@]} == 2 )); then
+if diskutil 2>&1 | grep -q '^     resetFusion' && (( ${#fusion_drive_choices[@]} == 2 && ( install_drive_ssd_count == 2 || ( install_drive_ssd_count == 1 && install_drive_hdd_count == 1 ) ) )); then
 
 	# CHECK IF CAN CREATE FUSION DRIVE AND ADD TO "install_drive_choices_display" IF SO (Doing this while "Detecting Drives" is still being displayed.)
 
@@ -983,14 +994,9 @@ if diskutil 2>&1 | grep -q '^     resetFusion' && (( ${#fusion_drive_choices[@]}
 	# Fusion Drives can be manually created on older versions of macOS, but it's too tedious to be worth since every Mac that shipped with a Fusion Drive supports macOS 10.14 Mojave and newer.
 	# More Info: https://support.apple.com/HT207584
 
-	internal_ssd_count="$(echo -e "${install_drive_choices_display}" | grep -c ' SSD "')"
-	internal_hdd_count="$(echo -e "${install_drive_choices_display}" | grep -c ' HDD "')"
-
-	if (( internal_ssd_count == 2 || ( internal_ssd_count == 1 && internal_hdd_count == 1 ) )); then
-		install_drive_choices+=( 'diskF' )
-		fusion_drive_recommended_note="\n\n    ${ANSI_YELLOW}${ANSI_BOLD}NOTE:${ANSI_YELLOW} Creating a Fusion Drive is ${ANSI_BOLD}RECOMMENDED${ANSI_YELLOW} Over Installing On One Drive${CLEAR_ANSI}\n"
-		install_drive_choices_display="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}diskF:${ANSI_PURPLE} Create Fusion Drive ${ANSI_YELLOW}(Will ${ANSI_BOLD}ERASE BOTH${ANSI_YELLOW} Internal Drives)${CLEAR_ANSI}${install_drive_choices_display}"
-	fi
+	install_drive_choices+=( 'diskF:Fusion Drive' )
+	fusion_drive_recommended_note="\n\n    ${ANSI_YELLOW}${ANSI_BOLD}NOTE:${ANSI_YELLOW} Creating a Fusion Drive is ${ANSI_BOLD}RECOMMENDED${ANSI_YELLOW} Over Installing On One Drive${CLEAR_ANSI}\n"
+	install_drive_choices_display="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}diskF:${ANSI_PURPLE} Create Fusion Drive ${ANSI_YELLOW}(Will ${ANSI_BOLD}ERASE BOTH${ANSI_YELLOW} Internal Drives)${CLEAR_ANSI}${install_drive_choices_display}"
 fi
 
 
@@ -1071,7 +1077,7 @@ if ! $is_clean_install && [[ -f "${SCRIPT_DIR}/customization-resources/fg-instal
 								this_volume_os_name="macOS ${this_volume_os_version} Sonoma"
 							elif [[ "${this_volume_os_version}" == '15'* ]]; then
 								this_volume_os_name="macOS ${this_volume_os_version} Sequoia"
-							elif [[ "${this_volume_os_version}" == '16'* || "${this_volume_os_version}" == '26'* ]]; then
+							elif [[ "${this_volume_os_version}" == '26'* ]]; then
 								this_volume_os_name="macOS ${this_volume_os_version} Tahoe"
 							fi
 
@@ -1097,8 +1103,8 @@ if ! $is_clean_install && [[ -f "${SCRIPT_DIR}/customization-resources/fg-instal
 									fi
 								fi
 
-								if $this_volume_is_on_fusion_drive || strip_ansi_styles "${install_drive_choices_display}" | grep -q "^    ${this_volume_disk_id}:"; then
-									this_volume_drive_name='UNKNOWN Drive'
+								if $IS_VIRTUAL_MACHINE || $this_volume_is_on_fusion_drive || [[ " ${install_drive_choices[*]}" == *" ${this_volume_disk_id}:"* ]]; then
+									this_volume_drive_name=''
 									if $this_volume_is_on_fusion_drive; then
 										this_fusion_drive_size_bytes="$(PlistBuddy -c 'Print :TotalSize' "${this_volume_info_plist_path}" 2> /dev/null)"
 										if [[ -n "${this_fusion_drive_size_bytes}" ]]; then
@@ -1108,8 +1114,11 @@ if ! $is_clean_install && [[ -f "${SCRIPT_DIR}/customization-resources/fg-instal
 										fi
 										this_volume_drive_name="${this_fusion_drive_size} Fusion Drive"
 									else
-										this_volume_drive_name="$(strip_ansi_styles "${install_drive_choices_display}" | grep -m 1 "^    ${this_volume_disk_id}:")"
-										this_volume_drive_name="${this_volume_drive_name#*: }"
+										while IFS=':' read -rd '' this_disk_id this_drive_name; do
+											if [[ -n "${this_disk_id}" && "${this_disk_id}" == "${this_volume_disk_id}" ]]; then
+												this_volume_drive_name="${this_drive_name}"
+											fi
+										done < <(printf '%s\0' "${install_drive_choices[@]}")
 									fi
 
 									clean_install_choice_index="${#clean_install_choices[@]}"
@@ -1120,8 +1129,8 @@ if ! $is_clean_install && [[ -f "${SCRIPT_DIR}/customization-resources/fg-instal
 										next_line_indent_spaces+=' '
 									done
 
-									clean_install_choices_display+="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}${clean_install_choice_index}:${ANSI_PURPLE} ${this_volume_os_name} at \"${this_volume}\"\n${next_line_indent_spaces}on ${this_volume_drive_name}${CLEAR_ANSI}"
-									clean_install_choices+=( "${this_volume_os_name}:${this_volume_drive_name}:${this_volume}" )
+									clean_install_choices_display+="\n\n    ${ANSI_PURPLE}${ANSI_BOLD}${clean_install_choice_index}:${ANSI_PURPLE} ${this_volume_os_name} at \"${this_volume}\"\n${next_line_indent_spaces}on ${this_volume_drive_name:-UNKNOWN Drive}${CLEAR_ANSI}"
+									clean_install_choices+=( "${this_volume_os_name}:${this_volume_drive_name:-UNKNOWN Drive}:${this_volume}" )
 								else
 									echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_volume}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} ${this_volume_disk_id} Is Not an Internal Drive${CLEAR_ANSI}"
 								fi
@@ -1178,7 +1187,7 @@ if (( ${#clean_install_choices[@]} > 0 )); then
 			fi
 
 			if [[ -n "${chosen_clean_install_index}" ]] && (( chosen_clean_install_index < ${#clean_install_choices[@]} )); then
-				IFS=':' read -rd '' possible_clean_install_os_name possible_clean_install_drive_name possible_clean_install_to_customize_volume < <(echo -n "${clean_install_choices[chosen_clean_install_index]}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
+				IFS=':' read -rd '' possible_clean_install_os_name possible_clean_install_drive_name possible_clean_install_to_customize_volume < <(printf '%s' "${clean_install_choices[chosen_clean_install_index]}") # MUST to use "printf '%s'" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
 
 				echo -en "\n  Enter ${ANSI_BOLD}${chosen_clean_install_index}${CLEAR_ANSI} Again to Confirm Customizing ${ANSI_BOLD}${possible_clean_install_os_name}${CLEAR_ANSI}\n  at ${ANSI_BOLD}\"${possible_clean_install_to_customize_volume}\"${CLEAR_ANSI} on ${ANSI_BOLD}${possible_clean_install_drive_name}${CLEAR_ANSI}: "
 				read -r confirmed_clean_install_index
@@ -1279,6 +1288,13 @@ if [[ -n "${clean_install_to_customize_volume}" ]]; then
 fi
 
 # NOTICE: Script will END and REBOOT Mac in THE PREVIOUS BLOCK if technician chose to customize an existing clean installation.
+
+
+if (( ${#install_drive_choices[@]} == 0 )) || [[ -z "${install_drive_choices_display}" ]]; then
+	>&2 echo -e "\n    ${ANSI_RED}${ANSI_BOLD}ERROR:${ANSI_RED} No Installable Drives Detected${CLEAR_ANSI}\n\n"
+	write_to_log 'ERROR: No Installable Drives Detected'
+	exit 1
+fi
 
 
 # DETECT MACOS INSTALLERS
@@ -1390,7 +1406,7 @@ for this_os_installer_search_group_prefixes in '/Volumes/Image ' '/Volumes/Insta
 					{ ! $SUPPORTS_MACOS_15_SEQUOIA && [[ "${this_os_installer_name}" == *' Sequoia'* ]]; } ||
 					{ ! $SUPPORTS_MACOS_26_TAHOE && [[ "${this_os_installer_name}" == *' Tahoe'* ]]; }; then
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Model Does Not Support ${this_os_installer_name}${CLEAR_ANSI}"
-				elif [[ "$(strip_ansi_styles "${os_installer_choices_display}")" == *": ${this_os_installer_name}"* ]]; then
+				elif [[ " ${os_installer_choices[*]}" == *" ${this_os_installer_name}:"* ]]; then
 					echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_app_path}\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"
 				else
 					if $is_first_os_installer_of_search_group; then
@@ -1404,7 +1420,9 @@ for this_os_installer_search_group_prefixes in '/Volumes/Image ' '/Volumes/Insta
 						os_installer_choices_display+=" (${this_os_installer_usage_notes})"
 					fi
 
-					os_installer_choices+=( "${this_os_installer_path}" )
+
+					this_os_installer_usage_notes="$(trim_and_squeeze_whitespace "${this_os_installer_usage_notes//:/ }")" # Make sure usage notes never contain ':' since it's used as a delimiter and the usage notes are only for display (this should never happen, but better safe than sorry).
+					os_installer_choices+=( "${this_os_installer_name}:${this_os_installer_usage_notes}:${this_os_installer_path}" )
 				fi
 			else
 				# Stub installers (which will download the full installer from the internet) will not have "SharedSupport.dmg" or "InstallESD.dmg" but WILL HAVE "startosinstall".
@@ -1427,24 +1445,22 @@ if $is_clean_install || $IS_APPLE_SILICON; then
 	# DOES NOT include/install the specified packages and just does a clean install (a customized install on Apple Silicon does not use "startosinstall" though).
 
 	is_first_stub_os_installer=true
-	for this_stub_installer_info in "${stub_os_installers_info[@]}"; do
-		IFS=':' read -rd '' this_os_installer_name this_os_installer_usage_notes this_os_installer_path < <(echo -n "${this_stub_installer_info}") # MUST to use "echo -n" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
-
+	while IFS=':' read -rd '' this_os_installer_name this_os_installer_usage_notes this_os_installer_path; do
 		# Do not need to check if model supports stub installer version since stubs should only be for an already booted version.
 		if [[ -n "${this_os_installer_name}" && -n "${this_os_installer_usage_notes}" && -n "${this_os_installer_path}" ]]; then # "this_os_installer_usage_notes" will always at least contain "Internet Required".
-			if [[ "$(strip_ansi_styles "${os_installer_choices_display}")" != *": ${this_os_installer_name}"* ]]; then
+			if [[ " ${os_installer_choices[*]}" != *" ${this_os_installer_name}:"* ]]; then
 				if $is_first_stub_os_installer; then
 					os_installer_choices_display+=$'\n'
 					is_first_stub_os_installer=false
 				fi
 
 				os_installer_choices_display+="\n    ${ANSI_PURPLE}${ANSI_BOLD}${#os_installer_choices[@]}:${ANSI_PURPLE} ${this_os_installer_name}${CLEAR_ANSI} (${this_os_installer_usage_notes})"
-				os_installer_choices+=( "${this_os_installer_path}" )
+				os_installer_choices+=( "${this_os_installer_name}:${this_os_installer_usage_notes}:${this_os_installer_path}" )
 			else
 				echo -e "\n    ${ANSI_YELLOW}${ANSI_BOLD}EXCLUDED:${ANSI_YELLOW} ${this_os_installer_path%.app/*}.app\n      ${ANSI_BOLD}REASON:${ANSI_YELLOW} Duplicate Installer Already Added${CLEAR_ANSI}"
 			fi
 		fi
-	done
+	done < <(printf '%s\0' "${stub_os_installers_info[@]}")
 fi
 
 
@@ -1457,10 +1473,7 @@ os_installer_usage_notes=''
 
 if (( os_installer_choices_count > 0 )); then
 	if (( os_installer_choices_count == 1 )); then
-		os_installer_path="${os_installer_choices[0]}"
-		os_installer_line="$(strip_ansi_styles "${os_installer_choices_display}" | grep -m 1 '^    0:')"
-		os_installer_name="$(echo "${os_installer_line}" | awk -F ': | [(]' '{ print $2; exit }')"
-		if [[ "${os_installer_line}" == *')' ]]; then os_installer_usage_notes="$(echo "${os_installer_line}" | awk -F '[()]' '{ print $2; exit }')"; fi
+		IFS=':' read -rd '' os_installer_name os_installer_usage_notes os_installer_path < <(printf '%s' "${os_installer_choices[0]}") # MUST to use "printf '%s'" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
 		write_to_log "Defaulted to Installing ${os_installer_name}"
 	fi
 
@@ -1481,10 +1494,7 @@ if (( os_installer_choices_count > 0 )); then
 		fi
 
 		if [[ -n "${chosen_os_installer_index}" ]] && (( chosen_os_installer_index < os_installer_choices_count )); then
-			possible_os_installer_path="${os_installer_choices[chosen_os_installer_index]}"
-			os_installer_line="$(strip_ansi_styles "${os_installer_choices_display}" | grep -m 1 "^    ${chosen_os_installer_index}:")"
-			os_installer_name="$(echo "${os_installer_line}" | awk -F ': | [(]' '{ print $2; exit }')"
-			if [[ "${os_installer_line}" == *')' ]]; then os_installer_usage_notes="$(echo "${os_installer_line}" | awk -F '[()]' '{ print $2; exit }')"; fi
+			IFS=':' read -rd '' os_installer_name os_installer_usage_notes possible_os_installer_path < <(printf '%s' "${os_installer_choices[chosen_os_installer_index]}") # MUST to use "printf '%s'" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
 
 			echo -en "\n  Enter ${ANSI_BOLD}${chosen_os_installer_index}${CLEAR_ANSI} Again to Confirm Installing ${ANSI_BOLD}${os_installer_name}${CLEAR_ANSI}: "
 			read -r confirmed_os_installer_index
@@ -1690,44 +1700,41 @@ if $IS_APPLE_SILICON; then
 	# to sure that "Erase Mac" has been run successfully and that this Apple Silicon Mac is ready for a new installation.
 	# See comments below about a possible error when running "Erase Mac" twice in a row that can cause the internal drive to not have a mounted volume.
 
-	for this_disk_id in "${install_drive_choices[@]}"; do
-		# There will only be a single internal drive on Apple Silicon, so this should always be correct.
-		internal_drive_name="$(strip_ansi_styles "${install_drive_choices_display}" | grep -m 1 "^    ${this_disk_id}:")"
-		internal_drive_name="${internal_drive_name#*: }"
+	IFS=':' read -rd '' this_disk_id internal_drive_name < <(printf '%s' "${install_drive_choices[0]}") # MUST to use "printf '%s'" and process substitution since a here-string would add a trailing line break that would be included in the last value (this allows line breaks to exist within the values, even though that is unlikely).
+	# There will only be a single internal drive on Apple Silicon, so using "${install_drive_choices[0]}" should always be correct.
 
-		# Make sure all internal drives are mounted to be able to check if "Erase Mac" has been run successfully. This should not be necessary on Apple Silicon, but does not hurt.
-		diskutil mountDisk "${this_disk_id}" &> /dev/null
+	# Make sure all internal drives are mounted to be able to check if "Erase Mac" has been run successfully. This should not be necessary on Apple Silicon, but does not hurt.
+	diskutil mountDisk "${this_disk_id}" &> /dev/null
 
-		# Mounting parent disk IDs appears to not mount the child APFS Container disk IDs, so mount them too to be able to check if "Erase Mac" has been run successfully.
-		while read -ra this_disk_info_line_elements; do
-			if [[ "${this_disk_info_line_elements[2]#[^[:alpha:]]}" == 'Container' && "${this_disk_info_line_elements[3]}" == 'disk'* ]]; then
-				this_apfs_container_disk_id="${this_disk_info_line_elements[3]%[^[:digit:]]}"
-				# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop,
-				# so just parse the human readable output of a single "diskutil list" command instead since it's right there even though it's not necessarily future-proof to parse the human readable output.
-				# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID as of macOS 11 Big Sur and newer, so they must be removed.
+	# Mounting parent disk IDs appears to not mount the child APFS Container disk IDs, so mount them too to be able to check if "Erase Mac" has been run successfully.
+	while read -ra this_disk_info_line_elements; do
+		if [[ "${this_disk_info_line_elements[2]#[^[:alpha:]]}" == 'Container' && "${this_disk_info_line_elements[3]}" == 'disk'* ]]; then
+			this_apfs_container_disk_id="${this_disk_info_line_elements[3]%[^[:digit:]]}"
+			# Trying to get APFS Containers of a disk from "diskutil" plist output would require a "diskutil list -plist" command and then multiple "diskutil info -plist" commands in a loop,
+			# so just parse the human readable output of a single "diskutil list" command instead since it's right there even though it's not necessarily future-proof to parse the human readable output.
+			# BUT, there are invisible characters in the "diskutil list" output before "Container" and after the disk ID as of macOS 11 Big Sur and newer, so they must be removed.
 
-				diskutil mountDisk "${this_apfs_container_disk_id}" &> /dev/null
+			diskutil mountDisk "${this_apfs_container_disk_id}" &> /dev/null
 
-				this_apfs_container_info_plist="$(diskutil list -plist "${this_apfs_container_disk_id}")"
-				if echo "${this_apfs_container_info_plist}" | grep -q '>/Volumes/'; then # Using PlistBuddy would not make these checks any easier.
-					# Make sure any volume is mounted on the internal drive to check for a possible error after "Erase Mac" has been run. See comments below for more information.
-					internal_drive_has_mounted_volume=true
+			this_apfs_container_info_plist="$(diskutil list -plist "${this_apfs_container_disk_id}")"
+			if echo "${this_apfs_container_info_plist}" | grep -q '>/Volumes/'; then # Using PlistBuddy would not make these checks any easier.
+				# Make sure any volume is mounted on the internal drive to check for a possible error after "Erase Mac" has been run. See comments below for more information.
+				internal_drive_has_mounted_volume=true
 
-					if $nvram_indicates_erase_mac_has_been_run; then # Only bother checking for "Untitled" or "Macintosh HD" volume after "Erase Mac" if nvram_indicates_erase_mac_has_been_run. See comments above for more information.
-						erased_volume_name="$( (( BOOTED_DARWIN_MAJOR_VERSION >= 21 )) && echo 'Macintosh HD' || echo 'Untitled' )" # Internal drive will be named "Untitled" after "Erase Mac" on macOS 11 Big Sur or named "Macintosh HD" on macOS 12 Monterey and newer.
-						if echo "${this_apfs_container_info_plist}" | grep -q ">/Volumes/${erased_volume_name}<" && [[ -d "/Volumes/${erased_volume_name}" ]]; then
-							erased_volume_contents="$(find "/Volumes/${erased_volume_name}" -mindepth 1 -maxdepth 1 2> /dev/null)"
+				if $nvram_indicates_erase_mac_has_been_run; then # Only bother checking for "Untitled" or "Macintosh HD" volume after "Erase Mac" if nvram_indicates_erase_mac_has_been_run. See comments above for more information.
+					erased_volume_name="$( (( BOOTED_DARWIN_MAJOR_VERSION >= 21 )) && echo 'Macintosh HD' || echo 'Untitled' )" # Internal drive will be named "Untitled" after "Erase Mac" on macOS 11 Big Sur or named "Macintosh HD" on macOS 12 Monterey and newer.
+					if echo "${this_apfs_container_info_plist}" | grep -q ">/Volumes/${erased_volume_name}<" && [[ -d "/Volumes/${erased_volume_name}" ]]; then
+						erased_volume_contents="$(find "/Volumes/${erased_volume_name}" -mindepth 1 -maxdepth 1 2> /dev/null)"
 
-							if [[ -z "${erased_volume_contents}" || "${erased_volume_contents}" == "/Volumes/${erased_volume_name}/.fseventsd" ]]; then
-								# If nvram_indicates_erase_mac_has_been_run and an internal drive has an empty "/Volumes/Untitled" or "/Volumes/Macintosh HD" volume, we can safely assume "Erase Mac" has been run successfully.
-								erase_mac_has_been_run=true
-							fi
+						if [[ -z "${erased_volume_contents}" || "${erased_volume_contents}" == "/Volumes/${erased_volume_name}/.fseventsd" ]]; then
+							# If nvram_indicates_erase_mac_has_been_run and an internal drive has an empty "/Volumes/Untitled" or "/Volumes/Macintosh HD" volume, we can safely assume "Erase Mac" has been run successfully.
+							erase_mac_has_been_run=true
 						fi
 					fi
 				fi
 			fi
-		done < <(diskutil list "${this_disk_id}")
-	done
+		fi
+	done < <(diskutil list "${this_disk_id}")
 
 	if ! $internal_drive_has_mounted_volume; then
 		# As of macOS 11.3 Big Sur, when "Erase Mac" is run twice in a row on Apple Silicon the volume will not mount when rebooted into
@@ -2006,12 +2013,14 @@ else
 			fi
 		fi
 
-		if [[ " ${install_drive_choices[*]} " == *" disk${chosen_disk_id_number} "* ]]; then
-			install_drive_name="$(strip_ansi_styles "${install_drive_choices_display}" | grep -m 1 "^    disk${chosen_disk_id_number}:")"
-			install_drive_name="${install_drive_name#*: }"
-			if [[ "${install_drive_name}" == 'Create Fusion Drive'* ]]; then
-				install_drive_name='Fusion Drive'
-			elif [[ -n "${fusion_drive_recommended_note}" ]]; then
+		while IFS=':' read -rd '' this_disk_id this_drive_name; do
+			if [[ -n "${this_disk_id}" && "${this_disk_id}" == "disk${chosen_disk_id_number}" ]]; then
+				install_drive_name="${this_drive_name}"
+			fi
+		done < <(printf '%s\0' "${install_drive_choices[@]}")
+
+		if [[ -n "${install_drive_name}" ]]; then
+			if [[ -n "${fusion_drive_recommended_note}" && "${install_drive_name}" != 'Fusion Drive' ]]; then
 				echo -en "${fusion_drive_recommended_note#*\n}"
 			fi
 
@@ -2106,11 +2115,11 @@ else
 		if [[ "${install_disk_id}" == 'diskF' ]]; then
 			echo -e "\n    ${ANSI_BOLD}Unmounting All Internal Drives...${CLEAR_ANSI}\n"
 
-			for this_disk_id in "${install_drive_choices[@]}"; do
+			while IFS=':' read -rd '' this_disk_id _; do
 				if [[ -n "${this_disk_id}" && "${this_disk_id}" != 'diskF' ]]; then
 					diskutil unmountDisk "${this_disk_id}" || diskutil unmountDisk force "${this_disk_id}"
 				fi
-			done
+			done < <(printf '%s\0' "${install_drive_choices[@]}")
 
 			if [[ -d "${install_volume_path}" ]]; then
 				# Unmount any other drive already named the same as install_volume_name to not conflict with our intended formatted drive mount point.
@@ -2129,7 +2138,7 @@ else
 
 				did_delete_apfs_container=false
 
-				for this_disk_id in "${install_drive_choices[@]}"; do
+				while IFS=':' read -rd '' this_disk_id _; do
 					if [[ -n "${this_disk_id}" && "${this_disk_id}" != 'diskF' ]]; then
 						while read -ra this_disk_info_line_elements; do
 							if [[ "${this_disk_info_line_elements[2]#[^[:alpha:]]}" == 'Container' && "${this_disk_info_line_elements[3]}" == 'disk'* ]] &&
@@ -2142,7 +2151,7 @@ else
 							fi
 						done < <(diskutil list "${this_disk_id}")
 					fi
-				done
+				done < <(printf '%s\0' "${install_drive_choices[@]}")
 
 				if $did_delete_apfs_container && echo 'Yes' | diskutil resetFusion; then
 					erase_did_succeed=true

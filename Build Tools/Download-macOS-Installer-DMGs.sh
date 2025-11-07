@@ -21,10 +21,10 @@ PATH='/usr/bin:/bin:/usr/sbin:/sbin'
 
 readonly MIST_PATH='/usr/local/bin/mist'
 
-PROJECT_DIR="$(cd "${BASH_SOURCE[0]%/*}" &> /dev/null && pwd -P)/.."
-readonly PROJECT_DIR
-
-installer_dmgs_path="$(realpath "${PROJECT_DIR}/../../MacLand Images/macOS Installers")"
+installer_dmgs_path='/Users/Shared/Mac Deployment/macOS Installers'
+if [[ ! -d "${installer_dmgs_path}" ]]; then
+	mkdir -p "${installer_dmgs_path}"
+fi
 
 declare -a installer_names_to_download=(
 #	'High Sierra' 'Mojave' 'Catalina' 'Big Sur' 'Monterey' 'Ventura' # NOT including these versions anymore since the latest installers are already downloaded and they will never get any new updates.
@@ -94,3 +94,5 @@ function run(argv) {
 		echo "\"${this_installer_name_to_download}\" WAS NOT FOUND: $(declare -p this_installer_info | cut -d '=' -f 2-)"
 	fi
 done
+
+open -R "${installer_dmgs_path}"

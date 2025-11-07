@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.13-1
+-- Version: 2025.10.27-1
 
 -- App Icon is “Microscope” from Twemoji (https://github.com/twitter/twemoji) by Twitter (https://twitter.com)
 -- Licensed under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
@@ -497,11 +497,11 @@ repeat
 		if (isLaptop) then
 			set progress completed steps to (progress completed steps + 1)
 			set progress description to "
-🔋	Loading Battery Information"
+🔋	Loading Battery Health Information"
 			
-			-- BATTERY INFORMATION
+			-- BATTERY Health INFORMATION
 			
-			set batteryCapacityPercentage to "⚠️	NOT Detected  ⚠️
+			set batteryHealth to "⚠️	NOT Detected  ⚠️
 	‼️	CHECK IF A BATTERY IS INSTALLED	‼️
 	‼️	  CHECK BATTERY CONNECTIONS	‼️
 	‼️	 REPLACE BATTERY IF NECESSARY	‼️"
@@ -537,7 +537,7 @@ repeat
 				if (maxCapacityMhA is equal to 100) then set maxCapacityMhA to appleRawMaxCapacityMhA -- To get correct maxCapacityMhA on Apple Silicon
 				
 				if (designCapacityMhA is equal to 0) then error "No Battery Found"
-				set batteryCapacityPercentageLimit to 75
+				set batteryCapacityPercentageLimit to 60
 				set batteryCapacityPercentageNumber to (((round (((maxCapacityMhA / designCapacityMhA) * 100) * 10)) / 10) as text)
 				if ((text -2 thru -1 of batteryCapacityPercentageNumber) is equal to ".0") then set batteryCapacityPercentageNumber to (text 1 thru -3 of batteryCapacityPercentageNumber)
 				set batteryCapacityPercentageNumber to (batteryCapacityPercentageNumber as number)
@@ -545,16 +545,16 @@ repeat
 				
 				set pluralizeCycles to "Cycle"
 				if (cycleCount is not equal to 1) then set pluralizeCycles to "Cycles"
-				set batteryCapacityPercentage to (batteryCapacityPercentageNumber as text) & "% (Remaining of Design Capacity) + " & cycleCount & " " & pluralizeCycles
+				set batteryHealth to (batteryCapacityPercentageNumber as text) & "% (Remaining of Design Capacity) + " & cycleCount & " " & pluralizeCycles
 				if (batteryCapacityPercentageNumber < batteryCapacityPercentageLimit) then
-					set batteryCapacityPercentage to batteryCapacityPercentage & "
+					set batteryHealth to batteryHealth & "
 	⚠️	BELOW " & batteryCapacityPercentageLimit & "% DESIGN CAPACITY  ⚠️"
 				end if
 				
 				set cycleCountLimit to designCycleCount
 				if (not macBookProPossibleBadGraphics) then set cycleCountLimit to (round (designCycleCount * 0.8))
 				if ((designCycleCount > 0) and (cycleCount > (cycleCountLimit + 10))) then -- https://support.apple.com/HT201585
-					set batteryCapacityPercentage to batteryCapacityPercentage & "
+					set batteryHealth to batteryHealth & "
 	⚠️	BATTERY OVER " & cycleCountLimit & " MAX CYCLES  ⚠️"
 				end if
 			on error (batteryCapacityInfoErrorMessage) number (batteryCapacityInfoErrorNumber)
@@ -579,7 +579,7 @@ repeat
 			
 			set powerAdapterType to "⚠️	UNKNOWN Power Adapter  ⚠️"
 			
-			-- Power Adapter Model IDs Last Updated: 5/15/25
+			-- Power Adapter Model IDs Last Updated: 10/27/25
 			if ({"MacBookPro1,1", "MacBookPro1,2", "MacBookPro2,1", "MacBookPro2,2", "MacBookPro3,1", "MacBookPro4,1", "MacBookPro5,1", "MacBookPro5,2", "MacBookPro5,3", "MacBookPro6,1", "MacBookPro6,2", "MacBookPro8,2", "MacBookPro8,3", "MacBookPro9,1"} contains modelIdentifier) then
 				set powerAdapterType to "85W MagSafe 1"
 			else if ({"MacBook1,1", "MacBook2,1", "MacBook3,1", "MacBook4,1", "MacBook5,1", "MacBook5,2", "MacBook6,1", "MacBook7,1", "MacBookPro5,4", "MacBookPro5,5", "MacBookPro7,1", "MacBookPro8,1", "MacBookPro9,2"} contains modelIdentifier) then
@@ -612,7 +612,7 @@ repeat
 				set powerAdapterType to "30W or 35W Dual Port or 70W USB-C/MagSafe 3"
 			else if ({"Mac14,15", "Mac15,13", "Mac16,13"} contains modelIdentifier) then
 				set powerAdapterType to "35W Dual Port or 70W USB-C/MagSafe 3"
-			else if ({"Mac15,3", "Mac15,6", "Mac15,8", "Mac15,10", "Mac16,1", "Mac16,6", "Mac16,8"} contains modelIdentifier) then
+			else if ({"Mac15,3", "Mac15,6", "Mac15,8", "Mac15,10", "Mac16,1", "Mac16,6", "Mac16,8", "Mac17,2"} contains modelIdentifier) then
 				set powerAdapterType to "70W or 96W USB-C/MagSafe 3"
 			end if
 			
@@ -761,6 +761,7 @@ repeat
 		else
 			try
 				-- The following list of Marketing Model Names with grouped Model IDs and Serial Config Codes is generated from: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/group_every_intel_mac_marketing_model_name_with_model_ids_and_serial_config_codes.sh
+				-- And the full output from that script is here: https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/serial-config-codes-output/every_intel_mac_marketing_model_name_with_grouped_model_ids_and_serial_config_codes.txt
 				set everyIntelMacMarketingModelNameWithGroupedModelIDsAndSerialConfigCodes to {"iMac (17-inch, Early 2006):iMac4,1:U2N:U2R:V4M:V4N:V4U:V66:VGB:VGZ:VH1:VHP:VV4:VV6:", ¬
 					"iMac (17-inch, Late 2006 CD):iMac5,2:", ¬
 					"iMac (17-inch, Late 2006):iMac5,1:AC1:VUX:VUY:WAR:WRR:WRW:WV8:WVR:X1A:X1W:X2W:X6Q:X9F:X9Y:XLF:Y3V:Y3W:Y3X:Y6K:Y94:Y97:YAG:YLJ:", ¬
@@ -823,7 +824,6 @@ repeat
 					"Mac Pro Server (Mid 2010):MacPro5,1:HPV:HPW:HPY:", ¬
 					"Mac Pro Server (Mid 2012):MacPro5,1:F4MF:F4MJ:F501:", ¬
 					"Mac Pro:MacPro1,1:MacPro2,1:", ¬
-					"MacBook (13-inch):MacBook1,1:", ¬
 					"MacBook (13-inch, Aluminum, Late 2008):MacBook5,1:", ¬
 					"MacBook (13-inch, Early 2008):MacBook4,1:0P0:0P1:0P2:0P4:0P5:0P6:1LX:1PX:1Q2:1Q7:1QA:1QB:1QE:1ZY:27H:27J:28C:28D:28E:385:3N9:3NA:3ND:3NE:3NF:3X6:47Z:4R7:4R8:", ¬
 					"MacBook (13-inch, Early 2009):MacBook5,2:4R1:4R2:4R3:79D:79E:79F:7A2:85D:88J:8CP:8SJ:93K:", ¬
@@ -834,6 +834,7 @@ repeat
 					"MacBook (13-inch, Mid 2007):MacBook2,1:YA2:YA3:YA4:YA5:YA6:YA7:YA8:YA9:YJJ:YJK:YJL:YJM:YJN:YQ7:YQ8:YRG:YRH:YRJ:YRK:YSH:YSJ:YSK:YSL:YSM:YTK:YTL:YV8:YX1:YX2:YX4:YX5:YXZ:YY1:YYW:Z5V:Z5W:Z5X:Z5Y:Z5Z:Z60:Z88:ZA8:ZA9:ZAP:ZAQ:ZAS:ZAU:ZAV:ZAW:ZAX:ZAY:ZAZ:ZB0:ZB1:ZB2:ZB7:ZB8:ZB9:ZBA:ZBB:ZBE:ZBF:ZBG:ZBH:ZBJ:ZBK:ZCN:", ¬
 					"MacBook (13-inch, Mid 2009):MacBook5,2:9GU:9GV:A1W:A1X:A1Y:A9P:A9Q:A9Y:ABW:ASC:", ¬
 					"MacBook (13-inch, Mid 2010):MacBook7,1:", ¬
+					"MacBook (13-inch):MacBook1,1:", ¬
 					"MacBook (Retina, 12-inch, 2017):MacBook10,1:", ¬
 					"MacBook (Retina, 12-inch, Early 2015):MacBook8,1:", ¬
 					"MacBook (Retina, 12-inch, Early 2016):MacBook9,1:", ¬
@@ -886,7 +887,6 @@ repeat
 					"MacBook Pro (15-inch, Mid 2010):MacBookPro6,2:", ¬
 					"MacBook Pro (15-inch, Mid 2012):MacBookPro9,1:", ¬
 					"MacBook Pro (16-inch, 2019):MacBookPro16,1:MacBookPro16,4:", ¬
-					"MacBook Pro (17-inch):MacBookPro1,2:", ¬
 					"MacBook Pro (17-inch, 2.4GHz):MacBookPro3,1:027:028:02D:09R:09S:0LR:0ND:0NM:0PD:1CW:1CX:1MF:1MG:2QW:X94:XA9:YAA:YAN:YAP:YNQ:YNS:YNW:YQ4:YQ5:YR2:YRD:YRE:YRF:YWB:YWC:YZ1:YZ2:Z5M:", ¬
 					"MacBook Pro (17-inch, Core 2 Duo):MacBookPro2,1:", ¬
 					"MacBook Pro (17-inch, Early 2008):MacBookPro4,1:1BY:1ED:1EN:1ER:1K2:1K8:1K9:1KA:1Q3:1SG:2CF:2DY:2DZ:2ED:3DC:3DD:3DE:3DF:3M0:3M4:3M5:YP3:YP4:ZLV:", ¬
@@ -896,6 +896,7 @@ repeat
 					"MacBook Pro (17-inch, Late 2011):MacBookPro8,3:AY5W:DV10:DV11:DVHN:DVHV:DVHW:DW48:DY22:DY23:DY24:DY25:DY26:DY5W:DYG8:F13Y:F140:", ¬
 					"MacBook Pro (17-inch, Mid 2009):MacBookPro5,2:8YA:8YB:91T:A3M:A3N:A5R:A5W:AF3:AKV:AKW:AMV:AMW:AN1:ANC:AND:ANE:ANF:ANJ:AUU:E6L:", ¬
 					"MacBook Pro (17-inch, Mid 2010):MacBookPro6,1:", ¬
+					"MacBook Pro (17-inch):MacBookPro1,2:", ¬
 					"MacBook Pro (Original):MacBookPro1,1:THV:VGW:VGX:VGY:VJ0:VJ1:VJ2:VJ3:VJ5:VJ6:VJ7:VJM:VMU:VSD:VTZ:VU0:VWA:VWB:VXW:VXX:W2Q:", ¬
 					"MacBook Pro (Retina, 13-inch, Early 2013):MacBookPro10,2:FFRP:FFRR:FG1F:FG28:FGM8:FGN5:FGN6:FGPJ:FHCH:FHN0:", ¬
 					"MacBook Pro (Retina, 13-inch, Early 2015):MacBookPro12,1:", ¬
@@ -1644,8 +1645,8 @@ repeat
 									-- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
 									-- BUT, I wrote a script (https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_bluetooth_from_all_mac_specs_pages.sh) to extract every Bluetooth version from every specs URL to be able to know what version this model has if Bluetooth is detected.
 									
-									-- Bluetooth Model IDs Last Updated: 5/15/25
-									if ({"Mac14,2", "Mac14,3", "Mac14,5", "Mac14,6", "Mac14,8", "Mac14,9", "Mac14,10", "Mac14,12", "Mac14,13", "Mac14,14", "Mac14,15", "Mac15,3", "Mac15,4", "Mac15,5", "Mac15,6", "Mac15,7", "Mac15,8", "Mac15,9", "Mac15,10", "Mac15,11", "Mac15,12", "Mac15,13", "Mac15,14", "Mac16,1", "Mac16,2", "Mac16,3", "Mac16,5", "Mac16,6", "Mac16,7", "Mac16,8", "Mac16,9", "Mac16,10", "Mac16,11", "Mac16,12", "Mac16,13"} contains modelIdentifier) then
+									-- Bluetooth Model IDs Last Updated: 10/27/25
+									if ({"Mac14,2", "Mac14,3", "Mac14,5", "Mac14,6", "Mac14,8", "Mac14,9", "Mac14,10", "Mac14,12", "Mac14,13", "Mac14,14", "Mac14,15", "Mac15,3", "Mac15,4", "Mac15,5", "Mac15,6", "Mac15,7", "Mac15,8", "Mac15,9", "Mac15,10", "Mac15,11", "Mac15,12", "Mac15,13", "Mac15,14", "Mac16,1", "Mac16,2", "Mac16,3", "Mac16,5", "Mac16,6", "Mac16,7", "Mac16,8", "Mac16,9", "Mac16,10", "Mac16,11", "Mac16,12", "Mac16,13", "Mac17,2"} contains modelIdentifier) then
 										set bluetoothInfo to "Bluetooth 5.3 Detected"
 										set (end of bluetoothSupportedFeaturesList) to "BLE"
 										set (end of bluetoothSupportedFeaturesList) to "Handoff"
@@ -1754,7 +1755,7 @@ repeat
 								try
 									set batteryCondition to ((value of property list item "sppower_battery_health" of property list item "sppower_battery_health_info" of thisPowerItem) as text)
 									if (batteryCondition is not equal to "Good") then -- https://support.apple.com/HT204054#battery
-										set batteryCapacityPercentage to batteryCapacityPercentage & "
+										set batteryHealth to batteryHealth & "
 	⚠️	BATTERY CONDITION IS NOT NORMAL  ⚠️
 	‼️	CONDITION IS “" & batteryCondition & "”  ‼️"
 									end if
@@ -1893,8 +1894,8 @@ repeat
 							-- For some strange reason, detailed Bluetooth information no longer exists in Monterey, can only detect if it is present.
 							-- BUT, I wrote a script (https://github.com/freegeek-pdx/macOS-Testing-and-Deployment-Scripts/blob/main/Other%20Scripts/get_bluetooth_from_all_mac_specs_pages.sh) to extract every Bluetooth version from every specs URL to be able to know what version this model has if Bluetooth is detected.
 							
-							-- Bluetooth Model IDs Last Updated: 5/15/25
-							if ({"Mac14,2", "Mac14,3", "Mac14,5", "Mac14,6", "Mac14,8", "Mac14,9", "Mac14,10", "Mac14,12", "Mac14,13", "Mac14,14", "Mac14,15", "Mac15,3", "Mac15,4", "Mac15,5", "Mac15,6", "Mac15,7", "Mac15,8", "Mac15,9", "Mac15,10", "Mac15,11", "Mac15,12", "Mac15,13", "Mac15,14", "Mac16,1", "Mac16,2", "Mac16,3", "Mac16,5", "Mac16,6", "Mac16,7", "Mac16,8", "Mac16,9", "Mac16,10", "Mac16,11", "Mac16,12", "Mac16,13"} contains modelIdentifier) then
+							-- Bluetooth Model IDs Last Updated: 10/27/25
+							if ({"Mac14,2", "Mac14,3", "Mac14,5", "Mac14,6", "Mac14,8", "Mac14,9", "Mac14,10", "Mac14,12", "Mac14,13", "Mac14,14", "Mac14,15", "Mac15,3", "Mac15,4", "Mac15,5", "Mac15,6", "Mac15,7", "Mac15,8", "Mac15,9", "Mac15,10", "Mac15,11", "Mac15,12", "Mac15,13", "Mac15,14", "Mac16,1", "Mac16,2", "Mac16,3", "Mac16,5", "Mac16,6", "Mac16,7", "Mac16,8", "Mac16,9", "Mac16,10", "Mac16,11", "Mac16,12", "Mac16,13", "Mac17,2"} contains modelIdentifier) then
 								set bluetoothInfo to "Bluetooth 5.3 Detected"
 								set (end of bluetoothSupportedFeaturesList) to "BLE"
 								set (end of bluetoothSupportedFeaturesList) to "Handoff"
@@ -1951,8 +1952,8 @@ repeat
 		end if
 		
 		
-		if (isLaptop and (not didGetBatteryHealthInfo) and ((offset of "⚠️" in batteryCapacityPercentage) = 0)) then
-			set batteryCapacityPercentage to batteryCapacityPercentage & "
+		if (isLaptop and (not didGetBatteryHealthInfo) and ((offset of "⚠️" in batteryHealth) = 0)) then
+			set batteryHealth to batteryHealth & "
 	⚠️	UNKNOWN Battery Health Condition  ⚠️
 	‼️	CHECK “System Information” FOR BATTERY HEALTH  ‼️"
 			set showSystemInfoAppButton to true
@@ -2085,7 +2086,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 							end repeat
 							
 							if (not remoteManagedMacIsAlreadyLogged) then
-								set remoteManagedMacPID to ""
+								set remoteManagedMacID to ""
 								repeat
 									try
 										activate
@@ -2094,27 +2095,27 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 										do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 									end try
 									
-									set invalidPIDnote to ""
+									set invalidIDnote to ""
 									
-									if (remoteManagedMacPID is not equal to "") then
-										set invalidPIDnote to "
-❌	“" & remoteManagedMacPID & "” IS NOT A VALID PID - TRY AGAIN
+									if (remoteManagedMacID is not equal to "") then
+										set invalidIDnote to "
+❌	“" & remoteManagedMacID & "” IS NOT A VALID ID - TRY AGAIN
 "
 									end if
 									
-									set remoteManagedMacPIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
-" & invalidPIDnote & "
-Enter the PID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacPID buttons {"Log Remote Managed Mac Without PID", "Log Remote Managed Mac"} default button 2)
+									set remoteManagedMacIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
+" & invalidIDnote & "
+Enter the ID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacID buttons {"Log Remote Managed Mac Without ID", "Log Remote Managed Mac"} default button 2)
 									
-									set remoteManagedMacPID to (text returned of remoteManagedMacPIDreply)
+									set remoteManagedMacID to (text returned of remoteManagedMacIDreply)
 									
-									if ((button returned of remoteManagedMacPIDreply) ends with "Without PID") then
-										set remoteManagedMacPID to "N/A"
+									if ((button returned of remoteManagedMacIDreply) ends with "Without ID") then
+										set remoteManagedMacID to "N/A"
 									end if
 									
-									if ((remoteManagedMacPID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacPID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
-										set remoteManagedMacPID to (do shell script "echo " & (quoted form of remoteManagedMacPID) & " | tr '[:lower:]' '[:upper:]'")
-										set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacPID)))
+									if ((remoteManagedMacID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
+										set remoteManagedMacID to (do shell script "echo " & (quoted form of remoteManagedMacID) & " | tr '[:lower:]' '[:upper:]'")
+										set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacID)))
 										exit repeat
 									end if
 								end repeat
@@ -2157,7 +2158,9 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 							end if
 							
 							set remoteManagementDialogButton to "                                                      Understood                                                      "
-							-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
+							-- On macOS 10.15 Catalina and newer, space padded text in DIALOG buttons (but not ALERT buttons) doesn't work as expected,
+							-- and the spaces that you want to pad with on each side must be DOUBLED at the END of the text rather than equally on both sides.
+							-- (On macOS 26 Tahoe and newer ALERT buttons now ALSO need the same workaround for space padded text in buttons.)
 							if (isCatalinaOrNewer) then set remoteManagementDialogButton to "Understood                                                                                                            "
 							
 							try
@@ -2264,8 +2267,8 @@ This should not have happened, please inform Free Geek I.T." buttons {"Continue"
 	if (isLaptop) then
 		set batteryRows to "
 
-🔋	Battery:
-	" & batteryCapacityPercentage
+🔋	Battery Health:
+	" & batteryHealth
 		
 		if (macBookPro2016and2017RecalledBatteryRecall) then
 			set batteryRows to batteryRows & "

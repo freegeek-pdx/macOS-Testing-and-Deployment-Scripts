@@ -74,7 +74,7 @@ human_readable_duration_from_seconds() { # Based On: https://stackoverflow.com/a
 overall_start_timestamp="$(date '+%s')"
 connected_fgMIB_count=0
 
-if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" ]]; then
+if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f '/Users/Shared/Mac Deployment/fg-prepare-os.pkg' ]]; then
 	for this_fgMIB_volume in '/Volumes/fgMIB'*; do
 		if [[ -d "${this_fgMIB_volume}" ]]; then
 			(( connected_fgMIB_count ++ ))
@@ -99,13 +99,13 @@ if [[ -f "${PROJECT_DIR}/fg-install-os.sh" && -f "${PROJECT_DIR}/Prepare OS Pack
 				mv "${this_fgMIB_volume}/install-packages" "${this_fgMIB_volume}/customization-resources"
 			fi
 
-			if ! cmp -s "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg"; then
+			if ! cmp -s '/Users/Shared/Mac Deployment/fg-prepare-os.pkg' "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg"; then
 				if [[ -d "${this_fgMIB_volume}/customization-resources" ]]; then
 					rm -f "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg"
 				fi
 
 				echo 'COPYING customization-resources/fg-prepare-os.pkg...'
-				ditto "${PROJECT_DIR}/Prepare OS Package/fg-prepare-os.pkg" "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg" || exit
+				ditto '/Users/Shared/Mac Deployment/fg-prepare-os.pkg' "${this_fgMIB_volume}/customization-resources/fg-prepare-os.pkg" || exit
 			else
 				echo "EXACT COPY EXISTS: customization-resources/fg-prepare-os.pkg"
 			fi

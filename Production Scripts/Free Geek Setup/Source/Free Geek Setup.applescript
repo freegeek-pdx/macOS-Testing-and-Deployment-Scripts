@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.16-1
+-- Version: 2025.10.27-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -361,7 +361,6 @@ killall ControlStrip
 		set bundleIDofFreeGeekDemoHelperApp to "org.freegeek.Free-Geek-Demo-Helper"
 		set bundleIDofFreeGeekTaskRunnerApp to "org.freegeek.Free-Geek-Task-Runner"
 		set bundleIDofCleanupAfterQACompleteApp to "org.freegeek.Cleanup-After-QA-Complete"
-		set bundleIDofKeyboardTestApp to "org.freegeek.Keyboard-Test"
 		set bundleIDofFreeGeekResetApp to "org.freegeek.Free-Geek-Reset"
 		
 		if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceAccessibility")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Accessibility Access")
@@ -372,8 +371,20 @@ killall ControlStrip
 			-- Full Disk Access was introduced in macOS 10.14 Mojave.
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceSystemPolicyAllFiles")) then error ("“" & (name of me) & "” DOES NOT HAVE REQUIRED Full Disk Access") -- This should not be possible to hit since reading the global TCC.db would have errored if this app didn't have FDA, but check anyways.
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Demo Helper” DOES NOT HAVE REQUIRED Full Disk Access"
-			if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekTaskRunnerApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Task Runner” DOES NOT HAVE REQUIRED Full Disk Access"
 			if (globalTCCallowedAppsAndServices does not contain (bundleIDofCleanupAfterQACompleteApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Cleanup After QA Complete” DOES NOT HAVE REQUIRED Full Disk Access"
+			
+			set taskRunnerIsInstalled to false
+			try
+				((("/Users/" & demoUsername & "/Applications/Free Geek Task Runner.app") as POSIX file) as alias)
+				set taskRunnerIsInstalled to true -- MUST NOT check TCC permissions in this "try" since the "error" would get caught instead of being thrown to the parent "try".
+			end try
+			
+			if (taskRunnerIsInstalled) then
+				-- "Free Geek Task Runner" may not be installed if "Free Geek Setup" is updated on an installation prior to 10/17/25 when "Free Geek Task Runner" was first added.
+				-- This could happen if an old installation was set aside becuase it was Remote Managed, and then rebooted later to check Remote Management again.
+				
+				if (globalTCCallowedAppsAndServices does not contain (bundleIDofFreeGeekTaskRunnerApp & "|kTCCServiceSystemPolicyAllFiles")) then error "“Free Geek Task Runner” DOES NOT HAVE REQUIRED Full Disk Access"
+			end if
 			
 			set snapshotHelperIsInstalled to false
 			try
@@ -437,11 +448,10 @@ killall ControlStrip
 					set userTCCunauthorizedAppsAndServices to (paragraphs of (do shell script ("sqlite3 " & (quoted form of userTCCdbPath) & " 'SELECT client,service FROM access WHERE (auth_value = 0)'"))) -- This SELECT command on the user TCC.db will error if "Free Geek Setup" doesn't have Full Disk Access (but that should never happen because we couldn't get this far without FDA).
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekSetupApp & "|kTCCServiceMicrophone")) then error "“Free Geek Setup” WAS NOT DENIED Microphone Access"
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekUpdaterApp & "|kTCCServiceMicrophone")) then error "“Free Geek Updater” WAS NOT DENIED Microphone Access"
-					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekSnapshotHelperApp & "|kTCCServiceMicrophone")) then error "“Free Geek Snapshot Helper” WAS NOT DENIED Microphone Access"
+					if (snapshotHelperIsInstalled and (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekSnapshotHelperApp & "|kTCCServiceMicrophone"))) then error "“Free Geek Snapshot Helper” WAS NOT DENIED Microphone Access"
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekDemoHelperApp & "|kTCCServiceMicrophone")) then error "“Free Geek Demo Helper” WAS NOT DENIED Microphone Access"
-					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekTaskRunnerApp & "|kTCCServiceMicrophone")) then error "“Free Geek Task Runner” WAS NOT DENIED Microphone Access"
+					if (taskRunnerIsInstalled and (userTCCunauthorizedAppsAndServices does not contain (bundleIDofFreeGeekTaskRunnerApp & "|kTCCServiceMicrophone"))) then error "“Free Geek Task Runner” WAS NOT DENIED Microphone Access"
 					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofCleanupAfterQACompleteApp & "|kTCCServiceMicrophone")) then error "“Cleanup After QA Complete” WAS NOT DENIED Microphone Access"
-					if (userTCCunauthorizedAppsAndServices does not contain (bundleIDofKeyboardTestApp & "|kTCCServiceMicrophone")) then error "“Keyboard Test” WAS NOT DENIED Microphone Access"
 				end if
 			on error checkUserTCCErrorMessage
 				if (didJustGrantUserTCC) then error checkUserTCCErrorMessage
@@ -458,7 +468,6 @@ killall ControlStrip
 				set csreqForFreeGeekDemoHelperApp to "fade0c00000000b0000000010000000600000002000000226f72672e667265656765656b2e467265652d4765656b2d44656d6f2d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForFreeGeekTaskRunnerApp to "fade0c00000000b0000000010000000600000002000000226f72672e667265656765656b2e467265652d4765656b2d5461736b2d52756e6e65720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForCleanupAfterQACompleteApp to "fade0c00000000b4000000010000000600000002000000266f72672e667265656765656b2e436c65616e75702d41667465722d51412d436f6d706c6574650000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
-				set csreqForKeyboardTestApp to "fade0c00000000a80000000100000006000000020000001a6f72672e667265656765656b2e4b6579626f6172642d546573740000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForQAHelperApp to "fade0c00000000a4000000010000000600000002000000166f72672e667265656765656b2e51412d48656c7065720000000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				set csreqForFreeGeekResetApp to "fade0c00000000a80000000100000006000000020000001c6f72672e667265656765656b2e467265652d4765656b2d5265736574000000060000000f000000060000000e000000010000000a2a864886f76364060206000000000000000000060000000e000000000000000a2a864886f7636406010d0000000000000000000b000000000000000a7375626a6563742e4f550000000000010000000a595257364e55474136330000"
 				
@@ -513,11 +522,10 @@ killall ControlStrip
 					set unauthorizedFields to "0,3"
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekSetupApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekSetupApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekUpdaterApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekUpdaterApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
-					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekSnapshotHelperApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekSnapshotHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+					if (snapshotHelperIsInstalled) then set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekSnapshotHelperApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekSnapshotHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekDemoHelperApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekDemoHelperApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
-					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekTaskRunnerApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekTaskRunnerApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
+					if (taskRunnerIsInstalled) then set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofFreeGeekTaskRunnerApp & "',0," & unauthorizedFields & ",1,X'" & csreqForFreeGeekTaskRunnerApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofCleanupAfterQACompleteApp & "',0," & unauthorizedFields & ",1,X'" & csreqForCleanupAfterQACompleteApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
-					set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "REPLACE INTO access VALUES('kTCCServiceMicrophone','" & bundleIDofKeyboardTestApp & "',0," & unauthorizedFields & ",1,X'" & csreqForKeyboardTestApp & "',NULL,0,'UNUSED',NULL,0," & currentUnixTime & footerFields & ");")
 				end if
 				
 				set setUserTCCpermissionsCommands to (setUserTCCpermissionsCommands & "COMMIT;")
@@ -618,6 +626,38 @@ defaults write '/Users/" & demoUsername & "/Library/Containers/com.apple.notific
 			close every window
 		end try
 	end tell
+	
+	if (isVenturaThirteenDotThreeOrNewer and isAppleSilicon) then
+		-- Approve "Allow accessory to connect?" prompts for Apple Silicon on macOS 13.3 Ventura or newer (this prompt is exclusive to laptops, but is a quick check regardless of device type).
+		--  In our testing environment, we may have a USB Ethernet adapter connected on boot and want them to be auto-allowed without the technician needing to click the prompt.
+		
+		try
+			if (application id "com.apple.UserNotificationCenter" is running) then
+				repeat 60 times
+					set clickedAllowAccessoryButton to false
+					try
+						with timeout of 2 seconds
+							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
+								repeat with thisUNCWindow in windows
+									if (((count of static texts of thisUNCWindow) is equal to 2) and ((value of static text 1 of thisUNCWindow) is equal to "Allow accessory to connect?") and ((count of buttons of thisUNCWindow) ≥ 3)) then
+										repeat with thisUNCButton in (buttons of thisUNCWindow)
+											if (title of thisUNCButton is "Allow") then
+												click thisUNCButton
+												set clickedAllowAccessoryButton to true
+												exit repeat
+											end if
+										end repeat
+									end if
+								end repeat
+							end tell
+						end timeout
+					end try
+					if (not clickedAllowAccessoryButton) then exit repeat -- Exit loop after NOT clicked to be sure ALL windows have been closed.
+					delay 0.5
+				end repeat
+			end if
+		end try
+	end if
 	
 	if (isMontereyOrNewer) then
 		-- In macOS 12 Monterey, the Safari Container is created upon login instead of first Safari launch.
@@ -1628,7 +1668,7 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 								end repeat
 								
 								if (not remoteManagedMacIsAlreadyLogged) then
-									set remoteManagedMacPID to ""
+									set remoteManagedMacID to ""
 									repeat
 										try
 											activate
@@ -1637,27 +1677,27 @@ Next check will be allowed " & nextAllowedProfilesShowTime & ".") message "This 
 											do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 										end try
 										
-										set invalidPIDnote to ""
+										set invalidIDnote to ""
 										
-										if (remoteManagedMacPID is not equal to "") then
-											set invalidPIDnote to "
-❌	“" & remoteManagedMacPID & "” IS NOT A VALID PID - TRY AGAIN
+										if (remoteManagedMacID is not equal to "") then
+											set invalidIDnote to "
+❌	“" & remoteManagedMacID & "” IS NOT A VALID ID - TRY AGAIN
 "
 										end if
 										
-										set remoteManagedMacPIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
-" & invalidPIDnote & "
-Enter the PID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacPID buttons {"Log Remote Managed Mac Without PID", "Log Remote Managed Mac"} default button 2)
+										set remoteManagedMacIDreply to (display dialog "🔒	This Mac is Remote Managed by “" & remoteManagementOrganizationName & "”
+" & invalidIDnote & "
+Enter the ID of this Mac below to log this Mac with the contact info for “" & remoteManagementOrganizationName & "” so that they can be contacted to remove Remote Management:" default answer remoteManagedMacID buttons {"Log Remote Managed Mac Without ID", "Log Remote Managed Mac"} default button 2)
 										
-										set remoteManagedMacPID to (text returned of remoteManagedMacPIDreply)
+										set remoteManagedMacID to (text returned of remoteManagedMacIDreply)
 										
-										if ((button returned of remoteManagedMacPIDreply) ends with "Without PID") then
-											set remoteManagedMacPID to "N/A"
+										if ((button returned of remoteManagedMacIDreply) ends with "Without ID") then
+											set remoteManagedMacID to "N/A"
 										end if
 										
-										if ((remoteManagedMacPID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacPID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
-											set remoteManagedMacPID to (do shell script "echo " & (quoted form of remoteManagedMacPID) & " | tr '[:lower:]' '[:upper:]'")
-											set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacPID)))
+										if ((remoteManagedMacID is equal to "N/A") or ((do shell script "bash -c " & (quoted form of ("[[ " & (quoted form of remoteManagedMacID) & " =~ ^[[:alpha:]]*[[:digit:]]+\\-[[:digit:]]+$ ]]; echo $?"))) is equal to "0")) then
+											set remoteManagedMacID to (do shell script "echo " & (quoted form of remoteManagedMacID) & " | tr '[:lower:]' '[:upper:]'")
+											set logRemoteManagedMacCommand to (logRemoteManagedMacCommand & " --data-urlencode " & (quoted form of ("pid=" & remoteManagedMacID)))
 											exit repeat
 										end if
 									end repeat
@@ -1700,7 +1740,9 @@ If it takes more than a few minutes, consult an instructor or inform Free Geek I
 								end if
 								
 								set remoteManagementDialogButton to "                                                       Shut Down                                                       "
-								-- For some reason centered text with padding in a dialog button like this doesn't work as expected on Catalina
+								-- On macOS 10.15 Catalina and newer, space padded text in DIALOG buttons (but not ALERT buttons) doesn't work as expected,
+								-- and the spaces that you want to pad with on each side must be DOUBLED at the END of the text rather than equally on both sides.
+								-- (On macOS 26 Tahoe and newer ALERT buttons now ALSO need the same workaround for space padded text in buttons.)
 								if (isCatalinaOrNewer) then set remoteManagementDialogButton to "Shut Down                                                                                                              "
 								
 								try
@@ -1831,14 +1873,25 @@ This should not have happened, please inform Free Geek I.T." buttons {"Shut Down
 		try
 			do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 		end try
-		display dialog "This " & shortModelName & " (" & modelIdentifier & ") has an NVMe internal drive installed (" & nvmeDriveModelName & "), but it did not originally ship with an NVMe drive.
+		
+		set wrongDriveAlertTitle to "This " & shortModelName & " (" & modelIdentifier & ") has an NVMe internal drive installed (" & nvmeDriveModelName & "), but it did not originally ship with an NVMe drive.
 
 Since this Mac did not originally ship with an NVMe drive, it is not fully compatible with using an NVMe drive as its primary internal drive.
 
-You MUST replace the internal drive with a non-NVMe (AHCI) drive before this Mac can be sold.
-
-
-The EFI Firmware will never be able to be properly updated when our customers run system updates with an NVMe drive installed as the primary internal drive." buttons {"Shut Down"} default button 1 with title (name of me) with icon caution
+You MUST replace the internal drive with a non-NVMe (AHCI) drive before this Mac can be sold."
+		
+		set wrongDriveAlertMesssage to "The EFI Firmware will never be able to be properly updated when our customers run system updates with an NVMe drive installed as the primary internal drive."
+		
+		set wrongDriveAlertButtons to {"Shut Down"}
+		
+		if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+			-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+			-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+			
+			display dialog (wrongDriveAlertTitle & linefeed & linefeed & linefeed & wrongDriveAlertMesssage) buttons wrongDriveAlertButtons default button 1 with title (name of me) with icon caution
+		else
+			display alert wrongDriveAlertTitle message wrongDriveAlertMesssage buttons wrongDriveAlertButtons default button 1 as critical
+		end if
 		
 		tell application id "com.apple.systemevents" to shut down with state saving preference
 		
@@ -1854,7 +1907,11 @@ The EFI Firmware will never be able to be properly updated when our customers ru
 			do shell script "afplay /System/Library/Sounds/Basso.aiff > /dev/null 2>&1 &"
 		end try
 		
-		set updateFirmwareMesssage to "You should not normally see this alert since the EFI Firmware should have been updated during the installation process.
+		set updateFirmwareAlertTitle to "macOS has reported that the current EFI Firmware (version " & currentEFIfirmwareVersion & ") IS NOT in the allowed list of EFI Firmware versions (the EFI AllowList).
+
+The EFI Firmware or the EFI AllowList MUST be updated before this Mac can be sold."
+		
+		set updateFirmwareAlertMesssage to "You should not normally see this alert since the EFI Firmware should have been updated during the installation process.
 
 Although, it is possible to see this alert on first boot if this Mac's EFI Firmware is already newer than what shipped with this version of macOS and the EFI AllowList has not yet been updated from the internet.
 
@@ -1862,13 +1919,17 @@ If the EFI Firmware version listed above starts with a NUMBER, this is likely an
 
 If the EFI Firmware version listed above starts with a LETTER, or you continue seeing this alert after multiple attempts, please inform and deliver this Mac to Free Geek I.T. for further research."
 		
+		set updateFirwmareAlertButtons to {"Reboot", "Shut Down", "Check Again"}
+		
 		try
-			display dialog "macOS has reported that the current EFI Firmware (version " & currentEFIfirmwareVersion & ") IS NOT in the allowed list of EFI Firmware versions (the EFI AllowList).
-
-The EFI Firmware or the EFI AllowList MUST be updated before this Mac can be sold.
-
-
-" & updateFirmwareMesssage buttons {"Reboot", "Shut Down", "Check Again"} cancel button 2 default button 3 with title (name of me) with icon caution
+			if (isBigSurOrNewer and (not isVenturaOrNewer)) then
+				-- On macOS 11 Big Sur and macOS 12 Monterey, alerts will only ever be a "compact" layout with a narrow window and centered text (and long text could need to be scrolled).
+				-- That style looks very bad for long detailed messages, so "display dialog" will be used instead of "display alert" on those versions of macOS.
+				
+				display dialog (updateFirmwareAlertTitle & linefeed & linefeed & linefeed & updateFirmwareAlertMesssage) buttons updateFirwmareAlertButtons cancel button 2 default button 3 with title (name of me) with icon caution
+			else
+				display alert updateFirmwareAlertTitle message updateFirmwareAlertMesssage buttons updateFirwmareAlertButtons cancel button 2 default button 3 as critical
+			end if
 			
 			if ((button returned of result) is not equal to "Reboot") then
 				set currentEFIfirmwareIsNotInAllowList to checkEFIfirmwareIsNotInAllowList()
@@ -2066,24 +2127,28 @@ on checkEFIfirmwareIsNotInAllowList()
 			repeat
 				try -- EFIcheck may open UserNotificationCenter with a "Your computer has detected a potential problem" alert if EFI Firmware is out-of-date.
 					if (application id "com.apple.UserNotificationCenter" is running) then
-						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
-							repeat 60 times
-								set clickedDontSendButton to false
-								repeat with thisUNCWindow in windows
-									if ((count of buttons of thisUNCWindow) ≥ 3) then
-										repeat with thisUNCButton in (buttons of thisUNCWindow)
-											if (title of thisUNCButton is "Don’t Send") then
-												click thisUNCButton
-												set clickedDontSendButton to true
-												exit repeat
+						repeat 60 times
+							set clickedDontSendButton to false
+							try
+								with timeout of 2 seconds
+									tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
+										repeat with thisUNCWindow in windows
+											if ((count of buttons of thisUNCWindow) ≥ 3) then
+												repeat with thisUNCButton in (buttons of thisUNCWindow)
+													if (title of thisUNCButton is "Don’t Send") then
+														click thisUNCButton
+														set clickedDontSendButton to true
+														exit repeat
+													end if
+												end repeat
 											end if
 										end repeat
-									end if
-								end repeat
-								if (not clickedDontSendButton) then exit repeat
-								delay 0.5
-							end repeat
-						end tell
+									end tell
+								end timeout
+							end try
+							if (not clickedDontSendButton) then exit repeat -- Exit loop after NOT clicked to be sure ALL windows have been closed.
+							delay 0.5
+						end repeat
 					end if
 				end try
 				

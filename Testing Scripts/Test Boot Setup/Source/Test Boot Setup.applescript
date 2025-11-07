@@ -16,7 +16,7 @@
 -- WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --
 
--- Version: 2025.10.17-1
+-- Version: 2025.11.7-1
 
 -- Build Flag: LSUIElement
 -- Build Flag: IncludeSignedLauncher
@@ -135,7 +135,7 @@ if ((currentUsername is equal to "Tester") and ((POSIX path of (path to me)) is 
 		set isCatalinaOrNewer to (systemVersion ≥ "10.15")
 		set isSonomaOrNewer to (systemVersion ≥ "14.0")
 		set isBigSurOrNewer to (systemVersion ≥ "11.0")
-		set is15dot6OrNewer to (systemVersion ≥ "15.6")
+		set isSequoiaFifteenDotSixOrNewer to (systemVersion ≥ "15.6")
 	end considering
 	
 	if (isMojaveOrNewer) then
@@ -267,7 +267,7 @@ USE THE FOLLOWING STEPS TO FIX THIS ISSUE:
 			-- The MTB version is NOT stored in a user accessable location so that it cannot be super easily manually edited.
 			set currentMTBversion to doShellScriptAsAdmin("cat '/private/var/root/.mtbVersion'") -- If the file doesn't exist, it's older than 20220726 which was the first version to include this file (version 20220705 stored the file at "/Users/Shared/.mtbVersion" and no MTB version file existed before that).
 			
-			set validMTBversions to {"20251013", "20251017"}
+			set validMTBversions to {"20251105"}
 			if (validMTBversions does not contain currentMTBversion) then error "OUTDATED"
 		on error
 			set serialNumber to ""
@@ -480,24 +480,28 @@ echo '<dict/>' | # NOTE: Starting with this plist fragment '<dict/>' is a way to
 				repeat
 					try -- EFIcheck may open UserNotificationCenter with a "Your computer has detected a potential problem" alert if EFI Firmware is out-of-date.
 						if (application id "com.apple.UserNotificationCenter" is running) then
-							tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
-								repeat 60 times
-									set clickedDontSendButton to false
-									repeat with thisUNCWindow in windows
-										if ((count of buttons of thisUNCWindow) ≥ 3) then
-											repeat with thisUNCButton in (buttons of thisUNCWindow)
-												if (title of thisUNCButton is "Don’t Send") then
-													click thisUNCButton
-													set clickedDontSendButton to true
-													exit repeat
+							repeat 60 times
+								set clickedDontSendButton to false
+								try
+									with timeout of 2 seconds
+										tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
+											repeat with thisUNCWindow in windows
+												if ((count of buttons of thisUNCWindow) ≥ 3) then
+													repeat with thisUNCButton in (buttons of thisUNCWindow)
+														if (title of thisUNCButton is "Don’t Send") then
+															click thisUNCButton
+															set clickedDontSendButton to true
+															exit repeat
+														end if
+													end repeat
 												end if
 											end repeat
-										end if
-									end repeat
-									if (not clickedDontSendButton) then exit repeat
-									delay 0.5
-								end repeat
-							end tell
+										end tell
+									end timeout
+								end try
+								if (not clickedDontSendButton) then exit repeat -- Exit loop after NOT clicked to be sure ALL windows have been closed.
+								delay 0.5
+							end repeat
 						end if
 					end try
 					
@@ -537,6 +541,12 @@ defaults write '/Library/Preferences/.GlobalPreferences' AppleMeasurementUnits -
 defaults write '/Library/Preferences/.GlobalPreferences' AppleMetricUnits -bool false
 defaults write '/Library/Preferences/.GlobalPreferences' AppleTemperatureUnit -string 'Fahrenheit'
 defaults write '/Library/Preferences/.GlobalPreferences' AppleTextDirection -bool false
+
+# SET KEYBOARD TYPES FOR KNOWN USED DEVICES SO THAT Keyboard Setup Assistant DOES NOT OPEN FOR THEM (https://macadmin.fraserhess.com/2023/01/29/suppressing-keyboard-setup-assistant/)
+defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '4-4-0' -integer '40' # USB Switcher (https://www.amazon.com/dp/B08TM4YLQK)
+defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '50475-1133-0' -integer '40' # Logitech CU0007 Unifying Receiver
+defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '49473-1046-0' -integer '40' # WoneNice Wireless Barcode Scanner Receiver
+defaults write '/Library/Preferences/com.apple.keyboardtype' keyboardtype -dict-add '4608-1504-0' -integer '40' # Symbol Wired Barcode Scanner
 ")
 	end try
 	
@@ -824,7 +834,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 									-- Starting on macOS 15, "networksetup -getairportnetwork" will always output "You are not associated with an AirPort network." even when connected to a Wi-Fi network.
 									-- So, fallback to using "ipconfig getsummary" instead.
 									
-									if (is15dot6OrNewer) then
+									if (isSequoiaFifteenDotSixOrNewer) then
 										-- Starting with macOS 15.6, the Wi-Fi name on the "SSID" line of "ipconfig getsummary" will be "<redacted>" unless "ipconfig setverbose 1" is set, which must be run as root.
 										-- Apple support shared that "ipconfig setverbose 1" un-redacts the "ipconfig getsummary" output with a member of MacAdmins Slack who shared it there: https://macadmins.slack.com/archives/GA92U9YV9/p1757621890952369?thread_ts=1750227817.961659&cid=GA92U9YV9
 										
@@ -840,7 +850,7 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 										end if
 									end try
 									
-									if (is15dot6OrNewer) then
+									if (isSequoiaFifteenDotSixOrNewer) then
 										-- Running "ipconfig setverbose 1" is a persistent system wide setting, so must manually disable it (which also requires running as root/sudo).
 										
 										try
@@ -956,6 +966,14 @@ scutil --set LocalHostName " & (quoted form of intendedLocalHostName))
 		end tell
 	end try
 	
+	-- DISABLE OS UPDATE NOTIFICATIONS (https://lapcatsoftware.com/articles/2024/2/2.html)
+	try
+		do shell script "
+defaults write 'com.apple.SoftwareUpdate' MajorOSUserNotificationDate -date \"$(date -jv '+5y' '+%F')\"
+defaults write 'com.apple.SoftwareUpdate' UserNotificationDate -date \"$(date -jv '+5y' '+%F')\"
+"
+	end try
+	
 	-- DISABLE NOTIFICATIONS
 	try
 		do shell script "
@@ -1061,22 +1079,24 @@ killall usernoted
 		if (application id "com.apple.UserNotificationCenter" is running) then
 			repeat 60 times
 				set clickedIgnoreCancelDontSendButton to false
-				with timeout of 2 seconds -- Adding timeout because maybe this could be where things are getting hung sometimes.
-					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
-						repeat with thisUNCWindow in windows
-							if ((count of buttons of thisUNCWindow) ≥ 2) then
-								repeat with thisUNCButton in (buttons of thisUNCWindow)
-									if ((title of thisUNCButton is "Ignore") or (title of thisUNCButton is "Cancel") or (title of thisUNCButton is "Don’t Send")) then
-										click thisUNCButton
-										set clickedIgnoreCancelDontSendButton to true
-										exit repeat
-									end if
-								end repeat
-							end if
-						end repeat
-					end tell
-				end timeout
-				if (not clickedIgnoreCancelDontSendButton) then exit repeat
+				try
+					with timeout of 2 seconds -- Adding timeout because maybe this could be where things are getting hung sometimes.
+						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.UserNotificationCenter")
+							repeat with thisUNCWindow in windows
+								if ((count of buttons of thisUNCWindow) ≥ 2) then
+									repeat with thisUNCButton in (buttons of thisUNCWindow)
+										if ((title of thisUNCButton is "Ignore") or (title of thisUNCButton is "Cancel") or (title of thisUNCButton is "Don’t Send")) then
+											click thisUNCButton
+											set clickedIgnoreCancelDontSendButton to true
+											exit repeat
+										end if
+									end repeat
+								end if
+							end repeat
+						end tell
+					end timeout
+				end try
+				if (not clickedIgnoreCancelDontSendButton) then exit repeat -- Exit loop after NOT clicked to be sure ALL windows have been closed.
 				delay 0.5
 			end repeat
 		end if
@@ -1086,22 +1106,24 @@ killall usernoted
 		if (application "/System/Library/CoreServices/backupd.bundle/Contents/Resources/TMHelperAgent.app" is running) then -- if application id "com.apple.TMHelperAgent" is used then compilation could fail if TMHelperAgent hasn't been run yet this boot.
 			repeat 60 times
 				set clickedDontUseButton to false
-				with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
-					tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.TMHelperAgent")
-						repeat with thisTMHAWindow in windows
-							if ((count of buttons of thisTMHAWindow) ≥ 2) then
-								repeat with thisTMHAButton in (buttons of thisTMHAWindow)
-									if (title of thisTMHAButton is "Don't Use") then
-										click thisTMHAButton
-										set clickedDontUseButton to true
-										exit repeat
-									end if
-								end repeat
-							end if
-						end repeat
-					end tell
-				end timeout
-				if (not clickedDontUseButton) then exit repeat
+				try
+					with timeout of 2 seconds -- Adding timeout to copy style of dismissing UserNotificationCenter for consistency.
+						tell application id "com.apple.systemevents" to tell (first application process whose bundle identifier is "com.apple.TMHelperAgent")
+							repeat with thisTMHAWindow in windows
+								if ((count of buttons of thisTMHAWindow) ≥ 2) then
+									repeat with thisTMHAButton in (buttons of thisTMHAWindow)
+										if (title of thisTMHAButton is "Don't Use") then
+											click thisTMHAButton
+											set clickedDontUseButton to true
+											exit repeat
+										end if
+									end repeat
+								end if
+							end repeat
+						end tell
+					end timeout
+				end try
+				if (not clickedDontUseButton) then exit repeat -- Exit loop after NOT clicked to be sure ALL windows have been closed.
 				delay 0.5
 			end repeat
 		end if

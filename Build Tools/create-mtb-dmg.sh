@@ -465,7 +465,7 @@ while IFS='' read -rd '' this_app_path; do
 						;;
 				esac
 
-				latest_version="$(curl -m 5 -sfL "${mas_url}" | xmllint --html --xpath 'substring-after(//p[contains(@class,"whats-new__latest__version")], " ")' - 2> /dev/null)"
+				latest_version="$(curl -m 5 -sfL "${mas_url}" | xmllint --html --xpath 'substring-after(//h4[starts-with(text(),"Version ")], " ")' - 2> /dev/null)"
 
 				if [[ -n "${latest_version}" ]]; then
 					tracked_apps+=( "${this_app_name}" )
@@ -777,7 +777,7 @@ echo -e "\n\nCreating MTB Disk Image (of Device ID ${mtb_source_device_id})..."
 date '+%Y%m%d' > "${mtb_source_path}/private/var/root/.mtbVersion"
 diskutil unmountDisk "${mtb_source_device_id}" || diskutil unmountDisk force "${mtb_source_device_id}"
 
-mtb_dmg_path="$(realpath "${PROJECT_DIR}/../../MacLand Images")"
+mtb_dmg_path='/Users/Shared/Mac Deployment'
 if [[ ! -d "${mtb_dmg_path}" ]]; then
 	mkdir -p "${mtb_dmg_path}"
 fi

@@ -39,11 +39,11 @@ readonly WIFI_PASSWORD
 
 latest_firefox_version="$(curl -m 5 -sfw '%{redirect_url}' -o /dev/null 'https://download.mozilla.org/?product=firefox-pkg-latest-ssl&os=osx&lang=en-US' | awk -F '/' '{ print $7; exit }')"
 if [[ -n "${latest_firefox_version}" ]]; then
-	latest_firefox_pkg_path="${PROJECT_DIR}/Package Resources/Global/Apps/darwin-le-20/Firefox ${latest_firefox_version}.pkg"
+	latest_firefox_pkg_path="${PROJECT_DIR}/Package Resources/Global/Apps/darwin-le-22/Firefox ${latest_firefox_version}.pkg"
 	if [[ -f "${latest_firefox_pkg_path}" ]]; then
 		echo "Firefox ${latest_firefox_version} PKG Is Up-to-Date"
 	else
-		rm -f "${PROJECT_DIR}/Package Resources/Global/Apps/darwin-le-20/Firefox"*'.pkg'
+		rm -f "${PROJECT_DIR}/Package Resources/Global/Apps/darwin-le-22/Firefox"*'.pkg'
 		echo "Downloading Firefox ${latest_firefox_version}..."
 		mkdir -p "${latest_firefox_pkg_path%/*}"
 		curl --connect-timeout 5 --progress-bar -fL 'https://download.mozilla.org/?product=firefox-pkg-latest-ssl&os=osx&lang=en-US' -o "${latest_firefox_pkg_path}"
@@ -210,7 +210,7 @@ chmod +x "${PROJECT_DIR}/Package Scripts/postinstall"
 rm -f "${PROJECT_DIR}/Package Scripts/.DS_Store"
 
 rm -f "${TMPDIR}${package_name}.pkg"
-rm -f "${PROJECT_DIR}/${package_name}.pkg"
+rm -f "/Users/Shared/Mac Deployment/${package_name}.pkg"
 
 pkg_version="$(date '+%Y.%-m.%-d')" # https://strftime.org
 
@@ -229,6 +229,8 @@ productbuild \
 	--package "${TMPDIR}${package_name}.pkg" \
 	--identifier "${package_id}" \
 	--version "${pkg_version}" \
-	"${PROJECT_DIR}/${package_name}.pkg"
+	"/Users/Shared/Mac Deployment/${package_name}.pkg"
 
 rm -f "${TMPDIR}${package_name}.pkg"
+
+open -R "/Users/Shared/Mac Deployment/${package_name}.pkg"
